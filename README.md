@@ -3,9 +3,9 @@
 A comprehensive, framework-agnostic authentication and authorization library built with TypeScript, Bun, and SQLite. It provides JWT-based auth, RBAC (roles and permissions), framework-neutral middleware, and a flexible database layer.
 
 - Runtime: Bun (Node.js compatible for most features)
-- Storage: SQLite by default (via Bun), extensible to other SQL engines
+- Storage: SQLite by default (via Bun), **extensible to other databases via adapter system**
 - Language: TypeScript, with full type definitions
-- Features: Schema extensions, BIT type support, advanced filtering, RBAC, JWT auth
+- Features: Schema extensions, BIT type support, advanced filtering, RBAC, JWT auth, **custom database adapters**
 
 ---
 
@@ -135,6 +135,97 @@ This library’s public API is re-exported from the entrypoint so you can import
 - Types (from src/types/auth)
   - User, Role, Permission, RegisterData, LoginData, UpdateUserData, AuthResult, AuthErrorType, AuthContext, AuthRequest, AuthResponse, PermissionOptions, AssignRoleData, JWTPayload, SessionInfo, and more
 
+
+---
+
+## Database Adapter System
+
+The library now includes a flexible adapter system that allows you to use custom database implementations while maintaining the same API.
+
+### Using Custom Adapters
+
+```ts
+import { BaseController } from 'open-bauth';
+import { SimpleCustomAdapter } from './examples/custom-adapter-example';
+
+// Create a custom adapter
+const customAdapter = new SimpleCustomAdapter({
+  connectionString: "custom://localhost"
+});
+
+// Use it with BaseController
+const userController = new BaseController("users", {
+  adapter: customAdapter
+});
+
+// All existing methods work the same
+const users = await userController.findAll();
+const user = await userController.findById(1);
+```
+
+### Creating Your Own Adapter
+
+```ts
+import { IDatabaseAdapter, DatabaseConnection } from 'open-bauth';
+
+export class MyCustomAdapter implements IDatabaseAdapter {
+  private connection: DatabaseConnection;
+  
+  constructor(config: any) {
+    // Initialize your database connection
+    this.connection = this.createConnection();
+  }
+
+  async initialize(): Promise<void> {
+    // Initialize adapter
+  }
+
+  async close(): Promise<void> {
+    // Close connection
+  }
+
+  isConnected(): boolean {
+    return true; // Check connection status
+  }
+
+  getConnection(): DatabaseConnection {
+    return this.connection;
+  }
+
+  getDatabaseType() {
+    return {
+      isSQLite: false,
+      isSQLServer: false,
+      isPostgreSQL: false,
+      isMySQL: false
+    };
+  }
+
+  getConfig() {
+    return this.config;
+  }
+
+  getSqlHelpers() {
+    return {
+      mapDataType: (type: string) => type,
+      formatDefaultValue: (value: any) => String(value),
+      getRandomOrder: () => "ORDER BY RANDOM()",
+      getPrimaryKeyQuery: (tableName: string) => `SELECT * FROM ${tableName} LIMIT 1`,
+      getTableInfoQuery: (tableName: string) => `SELECT * FROM ${tableName} LIMIT 1`
+    };
+  }
+
+  // Add your custom methods
+  async getSimpleValue(): Promise<{ value: number; timestamp: string }> {
+    return {
+      value: 42,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+```
+
+**Documentation**: See `docs/adapter-usage.md` for complete adapter documentation and examples.
 
 ---
 

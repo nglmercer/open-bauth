@@ -6,6 +6,8 @@
 
 import { SQL } from "bun";
 import type { Database } from "bun:sqlite";
+import type { IDatabaseAdapter, DatabaseAdapterConfig } from "./adapter";
+import { AdapterFactory } from "./adapter";
 
 export type TruthyFilter = { isTruthy: true };
 export type FalsyFilter = { isFalsy: true };
@@ -125,7 +127,8 @@ export interface DatabaseConnection {
 }
 
 export interface BaseControllerOptions {
-  database: SQL | Database;
+  database?: SQL | Database;
+  adapter?: IDatabaseAdapter;
   schemas?: SchemaCollection;
   isSQLite?: boolean;
   isSQLServer?: boolean;
@@ -206,7 +209,7 @@ export class DatabaseAdapter implements DatabaseConnection {
 }
 
 export class BaseController<T = Record<string, any>> {
-  protected adapter: DatabaseAdapter;
+  protected adapter: IDatabaseAdapter;
   protected tableName: string;
   protected schemas?: SchemaCollection;
   protected isSQLite: boolean;
@@ -215,9 +218,26 @@ export class BaseController<T = Record<string, any>> {
   constructor(tableName: string, options: BaseControllerOptions) {
     this.tableName = tableName;
     this.schemas = options.schemas;
-    this.isSQLite = options.isSQLite ?? false;
-    this.isSQLServer = options.isSQLServer ?? false;
-    this.adapter = new DatabaseAdapter(options.database, this.isSQLite);
+    
+    // Use provided adapter or create one from database
+    if (options.adapter) {
+      this.adapter = options.adapter;
+      const dbType = this.adapter.getDatabaseType();
+      this.isSQLite = dbType.isSQLite;
+      this.isSQLServer = dbType.isSQLServer;
+    } else if (options.database) {
+      // Create default adapter from database
+      const adapterConfig: DatabaseAdapterConfig = {
+        database: options.database,
+        isSQLite: options.isSQLite ?? false,
+        isSQLServer: options.isSQLServer ?? false,
+      };
+      this.adapter = AdapterFactory.createAdapter(adapterConfig);
+      this.isSQLite = options.isSQLite ?? false;
+      this.isSQLServer = options.isSQLServer ?? false;
+    } else {
+      throw new Error("Either 'adapter' or 'database' must be provided in BaseControllerOptions");
+    }
   }
 
   static async initializeDatabase(
@@ -558,8 +578,9 @@ export class BaseController<T = Record<string, any>> {
   }
   private async getTableInfo(): Promise<Array<{ name: string; pk: number }>> {
     try {
+      const connection = this.adapter.getConnection();
       if (this.isSQLite) {
-        const result = await this.adapter
+        const result = await connection
           .query(`PRAGMA table_info("${this.tableName}")`)
           .all();
         return Array.isArray(result)
@@ -567,7 +588,7 @@ export class BaseController<T = Record<string, any>> {
           : [];
       } else {
         // Generic SQL for PostgreSQL
-        const result = await this.adapter
+        const result = await connection
           .query(
             `
           SELECT
@@ -639,7 +660,7 @@ export class BaseController<T = Record<string, any>> {
       });
 
       const insertQuery = `INSERT INTO "${this.tableName}" (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`;
-      const result = await this.adapter.query(insertQuery).get(...values);
+      const result = await this.adapter.getConnection().query(insertQuery).get(...values);
 
       if (!result) {
         return {
@@ -665,7 +686,7 @@ export class BaseController<T = Record<string, any>> {
   async findById(id: number | string): Promise<ControllerResponse<T>> {
     try {
       const primaryKey = await this.getPrimaryKey();
-      const result = await this.adapter
+      const result = await this.adapter.getConnection()
         .query(`SELECT * FROM "${this.tableName}" WHERE "${primaryKey}" = ?`)
         .get(id);
 
@@ -709,10 +730,10 @@ export class BaseController<T = Record<string, any>> {
       query += ` LIMIT ? OFFSET ?`;
       params.push(limit, offset);
 
-      const records = await this.adapter.query(query).all(...params);
+      const records = await this.adapter.getConnection().query(query).all(...params);
 
       const countParams = params.slice(0, -2);
-      const totalResult = (await this.adapter
+      const totalResult = (await this.adapter.getConnection()
         .query(countQuery)
         .get(...countParams)) as { total: number };
 
@@ -759,7 +780,7 @@ export class BaseController<T = Record<string, any>> {
       ];
 
       const updateQuery = `UPDATE "${this.tableName}" SET ${setClause} WHERE "${primaryKey}" = ?`;
-      const result = await this.adapter.query(updateQuery).run(...values);
+      const result = await this.adapter.getConnection().query(updateQuery).run(...values);
 
       if (result.changes === 0) {
         return {
@@ -787,7 +808,7 @@ export class BaseController<T = Record<string, any>> {
     try {
       const primaryKey = await this.getPrimaryKey();
       const deleteQuery = `DELETE FROM "${this.tableName}" WHERE "${primaryKey}" = ?`;
-      const result = await this.adapter.query(deleteQuery).run(id);
+      const result = await this.adapter.getConnection().query(deleteQuery).run(id);
 
       if (result.changes === 0) {
         return {
@@ -810,7 +831,7 @@ export class BaseController<T = Record<string, any>> {
 
   async query(sql: string, params: any[] = []): Promise<ControllerResponse> {
     try {
-      const records = await this.adapter.query(sql).all(...params);
+      const records = await this.adapter.getConnection().query(sql).all(...params);
       return {
         success: true,
         data: records,
@@ -829,7 +850,7 @@ export class BaseController<T = Record<string, any>> {
     error?: string;
   }> {
     try {
-      const pragmaQuery = this.adapter.query(
+      const pragmaQuery = this.adapter.getConnection().query(
         `PRAGMA table_info(${this.tableName})`,
       );
       const rawColumns = (await pragmaQuery.all()) as any[];
@@ -899,7 +920,7 @@ export class BaseController<T = Record<string, any>> {
         (filters as Record<string, any>) || {},
       );
       const query = `SELECT COUNT(*) as total FROM "${this.tableName}"${whereClause}`;
-      const result = (await this.adapter.query(query).get(...params)) as {
+      const result = (await this.adapter.getConnection().query(query).get(...params)) as {
         total: number;
       };
 
@@ -929,7 +950,7 @@ export class BaseController<T = Record<string, any>> {
       const query = `SELECT * FROM "${this.tableName}"${whereClause} ${randomOrderClause} LIMIT ?`;
       params.push(limit);
 
-      const records = await this.adapter.query(query).all(...params);
+      const records = await this.adapter.getConnection().query(query).all(...params);
 
       return {
         success: true,
@@ -1025,12 +1046,12 @@ export class BaseController<T = Record<string, any>> {
       query += ` LIMIT ? OFFSET ?`;
       params.push(limit, offset);
 
-      const records = await this.adapter.query(query).all(...params);
+      const records = await this.adapter.getConnection().query(query).all(...params);
 
       const primaryKey = await this.getPrimaryKey();
       let countQuery = `SELECT COUNT(DISTINCT "${this.tableName}"."${primaryKey}") as total FROM "${this.tableName}"${joinClause}${whereClause}`;
       const countParams = params.slice(0, -2);
-      const totalResult = (await this.adapter
+      const totalResult = (await this.adapter.getConnection()
         .query(countQuery)
         .get(...countParams)) as { total: number };
       const processedData = records.map((record: any) => {
@@ -1108,7 +1129,7 @@ export class BaseController<T = Record<string, any>> {
       }
 
       const query = `SELECT ${selectClause} FROM "${this.tableName}"${joinClause} WHERE "${this.tableName}"."${primaryKey}" = ?`;
-      const record = await this.adapter.query(query).get(id);
+      const record = await this.adapter.getConnection().query(query).get(id);
 
       if (!record) {
         return {
