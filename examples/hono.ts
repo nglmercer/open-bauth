@@ -27,7 +27,11 @@ import { globalErrorHandler } from './middleware/error.handler';
 import { createSuperuserAuthMethodsRouter } from './routers/auth.routes';
 
 // --- 1. Service Initialization ---
-const db = new Database('auth.db');
+// Use test database path if in test environment
+const dbPath = process.env.NODE_ENV === 'test'
+  ? (process.env.DATABASE_URL || './tests/db/auth.db')
+  : 'auth.db';
+const db = new Database(dbPath);
 //new schemes with merged.getAll() or [pointsSchema, processesSchema, notificationsSchema]
 const dbInitializer = new DatabaseInitializer({ database: db,externalSchemas: merged.getAll() });
 await dbInitializer.initialize();

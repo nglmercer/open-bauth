@@ -18,8 +18,15 @@ function generateUniqueEmail(base: string): string {
 
 // Resetear la base de datos antes de cada test
 beforeEach(async () => {
-  await dbInitializer.reset();
-  await dbInitializer.seedDefaults();
+  // Import to external schemas that application uses
+  const { merged } = await import("../examples/integrations/newSchemas");
+
+  // Update to dbInitializer to include external schemas if not already included
+  if (dbInitializer) {
+    // Pass external schemas to reset method
+    await dbInitializer.reset(merged.getAll());
+    await dbInitializer.seedDefaults();
+  }
 });
 
 describe("Public Routes", () => {

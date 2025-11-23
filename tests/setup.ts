@@ -6,6 +6,7 @@ import { initJWTService } from "../src/services/jwt";
 import { defaultLogger as logger } from "../src/logger";
 import { Database } from "bun:sqlite";
 import { DatabaseInitializer } from "../src/database/database-initializer";
+import { SchemaRegistry } from "../src/database/database-initializer";
 // Variables globales para tests
 export const TEST_DB_PATH = process.env.TEST_DB_PATH || "./tests/db/auth.db";
 export const TEST_JWT_SECRET = "test-jwt-secret-key-for-testing-only";
@@ -57,19 +58,8 @@ if (process.env.NODE_ENV === "test") {
 
 /**
  * Setup antes de cada test
+ * Database reset is now handled in individual test files to ensure proper schema initialization
  */
-beforeEach(async () => {
-  const db = new Database(TEST_DB_PATH, { create: true });
-  const initializer = new DatabaseInitializer({
-    database: db,
-    logger: logger,
-    enableWAL: true,
-    enableForeignKeys: true,
-  });
-  await initializer.reset();
-  // Seed default roles and permissions so role-based tests work after reset
-  await initializer.seedDefaults();
-});
 
 /**
  * Cleanup después de cada test

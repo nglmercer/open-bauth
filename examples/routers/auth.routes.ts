@@ -83,26 +83,19 @@ export const createSuperuserAuthMethodsRouter = (services: Services): Hono<AppCo
     const result = await services.authService.login(loginData);
 
     if (!result.success || !result.user?.id) {
-      throw new ApiError(401, {
-        name: 'AuthError',
-        message: result.error!.message,
-        type: result.error!.type,
-        timestamp: new Date(),
-        toResponse(): { success: false; error: { type: AuthErrorType; message: string; timestamp: string; context?: Record<string, any> } } {
-          return {
-            success: false,
-            error: {
-              message: result.error!.message,
-              type: result.error!.type,
-              timestamp: new Date().toISOString(),
-            },
-          };
-        }
-      });
+      // Devolver respuesta JSON directa en lugar de lanzar excepción
+      return c.json({
+        success: false,
+        error: {
+          message: result.error?.message || "Authentication failed",
+          type: result.error?.type || AuthErrorType.INVALID_CREDENTIALS,
+          timestamp: new Date().toISOString(),
+        },
+      }, 401);
     }
 
     // Generate refresh token using jwtService
-    const refreshToken = await services.jwtService.generateRefreshToken(parseInt(result.user?.id));
+    const refreshToken = await services.jwtService.generateRefreshToken(result.user?.id || '');
 
     return c.json({
       success: true,

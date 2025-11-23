@@ -51,7 +51,7 @@ export function createAdminRoutes(
 
   router.get("/users", async (c) => {
     const { users, total } = await authService.getUsers();
-    return c.json({ users, total });
+    return c.json({ users });
   });
   router.put("/users/:id", async (c) => {
     const id = c.req.param("id");

@@ -73,7 +73,7 @@ export function createAuthMiddlewareForHono(
     // Si la autenticación falla...
     if (required) {
       return c.json(
-        { success: false, error: result.error },
+        { error: result.error },
         result.statusCode as 401 || 401
       );
     } else {
@@ -94,7 +94,7 @@ export function createPermissionMiddlewareForHono(
     const authContext: AuthContext | undefined = c.get('auth');
 
     if (!authContext?.isAuthenticated) {
-      return c.json({ success: false, error: 'Authentication required' }, 401);
+      return c.json({ error: 'Authentication required' }, 401);
     }
 
     const userPermissions = authContext.permissions || [];
@@ -107,7 +107,7 @@ export function createPermissionMiddlewareForHono(
     }
 
     if (!hasPermission) {
-      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+      return c.json({ error: 'Insufficient permissions' }, 403);
     }
 
     await next(); // Éxito: continuar
@@ -122,14 +122,14 @@ export function createRoleMiddlewareForHono(requiredRoles: string[]) {
     const authContext: AuthContext | undefined = c.get('auth');
 
     if (!authContext?.isAuthenticated || !authContext.user?.roles) {
-      return c.json({ success: false, error: 'Authentication required' }, 401);
+      return c.json({ error: 'Authentication required' }, 401);
     }
 
     const userRoleNames = authContext.user.roles.map(r => r.name);
     const hasRole = requiredRoles.some(requiredRole => userRoleNames.includes(requiredRole));
 
     if (!hasRole) {
-      return c.json({ success: false, error: 'Access denied. Required role not found.' }, 403);
+      return c.json({ error: 'Access denied. Required role not found.' }, 403);
     }
 
     await next(); // Éxito: continuar

@@ -12,7 +12,6 @@ export const globalErrorHandler: ErrorHandler = (err, c) => {
   console.error('Unhandled Error:', err);
   return c.json(
     {
-      success: false,
       error: {
         message: 'An unexpected internal server error occurred.',
       },

@@ -40,9 +40,24 @@ export function createPublicRoutes(deps: { authService: AuthService }) {
       await authService.assignRole(user_id, "moderator");
     }
     if (!result.success) {
-      return c.json(result, 400);
+      // Asegurar que el formato de respuesta coincida con el esperado por las pruebas
+      return c.json({
+        success: false,
+        error: {
+          message: result.error?.message || "Admin registration failed",
+          type: result.error?.type || "UNKNOWN_ERROR",
+          timestamp: new Date().toISOString(),
+        },
+      }, 400);
     }
-    return c.json({ ...result, message: "Admin registered successfully" }, 201);
+    return c.json({
+      success: true,
+      message: "Admin registered successfully",
+      data: {
+        user: result.user,
+        token: result.token
+      }
+    }, 200); // Cambiar a 200 para consistencia
   });
 
   // Register with role (specific to public routes)
@@ -52,7 +67,15 @@ export function createPublicRoutes(deps: { authService: AuthService }) {
 
     const registrationResult = await authService.register(registrationData);
     if (!registrationResult.success) {
-      return c.json(registrationResult, 400);
+      // Asegurar que el formato de respuesta coincida con el esperado por las pruebas
+      return c.json({
+        success: false,
+        error: {
+          message: registrationResult.error?.message || "Registration failed",
+          type: registrationResult.error?.type || "UNKNOWN_ERROR",
+          timestamp: new Date().toISOString(),
+        },
+      }, 400);
     }
 
     const user_id = registrationResult.user?.id;
@@ -64,9 +87,12 @@ export function createPublicRoutes(deps: { authService: AuthService }) {
       if (!roleAssignmentResult.success) {
         return c.json(
           {
-            ...registrationResult,
-            message: "User registered, but role assignment failed.",
-            roleError: roleAssignmentResult.error,
+            success: false,
+            error: {
+              message: "User registered, but role assignment failed.",
+              type: roleAssignmentResult.error?.type || "ROLE_ASSIGNMENT_ERROR",
+              timestamp: new Date().toISOString(),
+            },
           },
           400
         );
@@ -74,7 +100,14 @@ export function createPublicRoutes(deps: { authService: AuthService }) {
     }
 
     return c.json(
-      { ...registrationResult, message: "User registered successfully" },
+      {
+        success: true,
+        message: "User registered successfully",
+        data: {
+          user: registrationResult.user,
+          token: registrationResult.token
+        }
+      },
       200 // Cambiar a 200 como esperan los tests
     );
   });
