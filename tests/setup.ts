@@ -7,7 +7,7 @@ import { defaultLogger as logger } from "../src/logger";
 import { Database } from "bun:sqlite";
 import { DatabaseInitializer } from "../src/database/database-initializer";
 // Variables globales para tests
-export const TEST_DB_PATH = "./auth.db";
+export const TEST_DB_PATH = "./tests/db/auth.db";
 export const TEST_JWT_SECRET = "test-jwt-secret-key-for-testing-only";
 
 // Configuración de entorno para tests

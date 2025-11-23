@@ -1,21 +1,27 @@
 // src/services/jwt.ts
 import type { JWTPayload, User } from '../types/auth';
+import type { OAuthJWTPayload } from '../types/oauth';
 
 /**
  * Servicio para manejar operaciones JWT
  * Utiliza Web Crypto API nativo para firmas HMAC
- * Nota: Bun.password.hash es para hashing de contraseñas, no para JWT
+ * Soporta DPoP (RFC 9449), tokens OIDC y rotación de refresh tokens
  */
 export class JWTService {
   private secret: string;
   private expiresIn: string;
+  private issuer: string;
+  private audience: string;
+  private dpopNonceCache: Map<string, number> = new Map();
 
-  constructor(secret: string, expiresIn: string = '24h') {
+  constructor(secret: string, expiresIn: string = '24h', issuer: string = 'https://your-auth-server.com', audience: string = 'your-api') {
     if (!secret) {
       throw new Error('JWT secret is required');
     }
     this.secret = secret;
     this.expiresIn = expiresIn;
+    this.issuer = issuer;
+    this.audience = audience;
   }
 
   /**
@@ -34,6 +40,7 @@ export class JWTService {
       const expirationTime = this.parseExpirationTime(this.expiresIn);
       
       const payload: JWTPayload = {
+        id: user.id,
         userId: user.id,
         email: user.email,
         roles: user.roles?.map(role => role.name) || [],
@@ -58,6 +65,161 @@ export class JWTService {
       throw new Error('Failed to generate token');
     }
   }
+
+  /**
+   * Generate token with custom payload (for OAuth 2.0)
+   * @param payload Custom payload for token
+   * @returns Token JWT
+   */
+  async generateTokenWithPayload(payload: any): Promise<string> {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const expirationTime = this.parseExpirationTime(this.expiresIn);
+      
+      const fullPayload = {
+        ...payload,
+        iat: now,
+        exp: payload.exp || (now + expirationTime),
+        iss: payload.iss || this.issuer,
+        aud: payload.aud || this.audience,
+      };
+
+      // Implementar JWT usando Web Crypto API nativo
+      const header = {
+        alg: 'HS256',
+        typ: 'JWT'
+      };
+
+      const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
+      const encodedPayload = this.base64UrlEncode(JSON.stringify(fullPayload));
+      
+      const signature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
+      
+      return `${encodedHeader}.${encodedPayload}.${signature}`;
+    } catch (error:any) {
+      console.error('Error generating JWT token:', error);
+      throw new Error('Failed to generate token');
+    }
+  }
+
+  /**
+   * Generate ID token for OpenID Connect
+   * @param user User for which to generate ID token
+   * @param nonce Nonce from the authorization request
+   * @param clientId Client ID
+   * @returns ID token JWT
+   */
+  async generateIdToken(user: User, nonce?: string, clientId?: string): Promise<string> {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const expirationTime = this.parseExpirationTime(this.expiresIn);
+      
+      const payload = {
+        iss: this.issuer,
+        sub: user.id,
+        aud: clientId || this.audience,
+        exp: now + expirationTime,
+        iat: now,
+        auth_time: now,
+        nonce: nonce,
+        name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+        email: user.email,
+        email_verified: true, // In a real implementation, check if email is verified
+        picture: (user as any).avatar_url || undefined,
+      };
+
+      // Implementar JWT usando Web Crypto API nativo
+      const header = {
+        alg: 'HS256',
+        typ: 'JWT'
+      };
+
+      const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
+      const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
+      
+      const signature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
+      
+      return `${encodedHeader}.${encodedPayload}.${signature}`;
+    } catch (error:any) {
+      console.error('Error generating ID token:', error);
+      throw new Error('Failed to generate ID token');
+    }
+  }
+
+  /**
+   * Verify DPoP proof header
+   * @param dpopProof DPoP proof header
+   * @param httpMethod HTTP method
+   * @param httpUri HTTP URI
+   * @returns Verification result
+   */
+  async verifyDPoPProof(dpopProof: string, httpMethod: string, httpUri: string): Promise<{
+    valid: boolean;
+    payload?: any;
+    error?: string;
+    jti?: string;
+  }> {
+    try {
+      const parts = dpopProof.split('.');
+      if (parts.length !== 3) {
+        return { valid: false, error: 'Invalid DPoP proof format' };
+      }
+
+      const [encodedHeader, encodedPayload, signature] = parts;
+      const header = JSON.parse(this.base64UrlDecode(encodedHeader));
+      const payload = JSON.parse(this.base64UrlDecode(encodedPayload));
+
+      // Verify required fields
+      if (!payload.htu || !payload.htm || !payload.iat || !payload.jti) {
+        return { valid: false, error: 'Missing required DPoP fields' };
+      }
+
+      // Verify HTTP method and URI match
+      if (payload.htm !== httpMethod.toUpperCase()) {
+        return { valid: false, error: 'HTTP method mismatch' };
+      }
+
+      if (payload.htu !== httpUri) {
+        return { valid: false, error: 'HTTP URI mismatch' };
+      }
+
+      // Verify timestamp (should be recent, within 5 minutes)
+      const now = Math.floor(Date.now() / 1000);
+      const maxAge = 300; // 5 minutes
+      if (payload.iat < now - maxAge || payload.iat > now + maxAge) {
+        return { valid: false, error: 'DPoP proof timestamp out of range' };
+      }
+
+      // Check for replay attacks using JTI (JWT ID)
+      if (this.dpopNonceCache.has(payload.jti)) {
+        const cachedTime = this.dpopNonceCache.get(payload.jti)!;
+        if (now - cachedTime < maxAge) {
+          return { valid: false, error: 'DPoP proof replay detected' };
+        }
+      }
+
+      // Cache the JTI to prevent replay
+      this.dpopNonceCache.set(payload.jti, now);
+
+      // Clean up old entries from cache
+      for (const [jti, time] of this.dpopNonceCache.entries()) {
+        if (now - time > maxAge * 2) {
+          this.dpopNonceCache.delete(jti);
+        }
+      }
+
+      // Verify signature
+      const expectedSignature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
+      if (signature !== expectedSignature) {
+        return { valid: false, error: 'Invalid DPoP signature' };
+      }
+
+      return { valid: true, payload, jti: payload.jti };
+    } catch (error: any) {
+      return { valid: false, error: error.message };
+    }
+  }
+
   /**
    * Verifica y decodifica un token JWT
    * @param token Token JWT a verificar
@@ -193,6 +355,102 @@ export class JWTService {
   }
 
   /**
+   * Rotate refresh token with security checks
+   * @param oldRefreshToken Old refresh token
+   * @param user User associated with the token
+   * @returns New refresh token
+   */
+  async rotateRefreshToken(oldRefreshToken: string, user: User): Promise<string> {
+    try {
+      // Verify old refresh token
+      const oldPayload = await this.verifyRefreshToken(oldRefreshToken);
+      
+      // Generate new refresh token with shorter lifetime for security
+      const now = Math.floor(Date.now() / 1000);
+      const newExpirationTime = Math.min(this.parseExpirationTime('7d'), (oldPayload as any).exp - now);
+      
+      const newPayload = {
+        userId: user.id,
+        type: 'refresh',
+        iat: now,
+        exp: now + newExpirationTime,
+        rotatedFrom: oldRefreshToken, // Track rotation for security
+      };
+
+      // Usar la misma estructura JWT estándar (header.payload.signature)
+      const header = {
+        alg: 'HS256',
+        typ: 'JWT'
+      };
+
+      const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
+      const encodedPayload = this.base64UrlEncode(JSON.stringify(newPayload));
+      
+      const signature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
+      
+      return `${encodedHeader}.${encodedPayload}.${signature}`;
+    } catch (error: any) {
+      console.error('Error rotating refresh token:', error);
+      throw new Error('Failed to rotate refresh token');
+    }
+  }
+
+  /**
+   * Verify refresh token with additional security checks
+   * @param refreshToken Refresh token to verify
+   * @returns User ID if valid
+   */
+  async verifyRefreshTokenWithSecurity(refreshToken: string): Promise<any> {
+    try {
+      if (!refreshToken) {
+        throw new Error('Refresh token is required');
+      }
+
+      const parts = refreshToken.split('.');
+      if (parts.length !== 3) {
+        throw new Error('Invalid refresh token format');
+      }
+
+      const [encodedHeader, encodedPayload, signature] = parts;
+      
+      // Verificar la firma usando la misma lógica que el JWT normal
+      const expectedSignature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
+      if (signature !== expectedSignature) {
+        throw new Error('Invalid refresh token signature');
+      }
+
+      // Decodificar y validar el payload con manejo de errores mejorado
+      let payload;
+      try {
+        const decodedPayload = this.base64UrlDecode(encodedPayload);
+        payload = JSON.parse(decodedPayload);
+      } catch (parseError) {
+        throw new Error('Invalid refresh token: malformed payload');
+      }
+      
+      // Verificar que sea un token de refresh
+      if (payload.type !== 'refresh') {
+        throw new Error('Invalid token type');
+      }
+
+      // Verificar expiración
+      const now = Math.floor(Date.now() / 1000);
+      if (payload.exp && payload.exp < now) {
+        throw new Error('Refresh token has expired');
+      }
+
+      // Verificar que tenga userId
+      if (!payload.userId) {
+        throw new Error('Invalid refresh token: missing userId');
+      }
+
+      return payload;
+    } catch (error: any) {
+      throw new Error(`Invalid refresh token: ${error.message}`);
+    }
+  }
+
+  /**
    * Codifica en Base64 URL-safe
    * @param str String a codificar
    * @returns String codificado
@@ -266,10 +524,11 @@ export class JWTService {
       'm': 60,
       'h': 3600,
       'd': 86400,
-      'w': 604800
+      'w': 604800,
+      'ms': 0.001 // Add milliseconds support
     };
 
-    const match = expiresIn.match(/^(-?\d+)([smhdw])$/);
+    const match = expiresIn.match(/^(-?\d+)([smhdw]|ms)$/);
     if (!match) {
       throw new Error(`Invalid expiration format: ${expiresIn}`);
     }
@@ -281,7 +540,7 @@ export class JWTService {
       throw new Error(`Invalid time unit: ${unit}`);
     }
 
-    return parseInt(value) * multiplier;
+    return parseFloat(value) * multiplier;
   }
 
   /**

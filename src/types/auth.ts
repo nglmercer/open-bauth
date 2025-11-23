@@ -414,6 +414,7 @@ export interface AuthResult {
  * Payload del JWT token
  */
 export interface JWTPayload {
+  id: string;
   userId: string;
   email: string;
   roles?: string[];

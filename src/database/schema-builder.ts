@@ -342,7 +342,7 @@ export function buildDatabaseSchemas(): TableSchema[] {
   const schemaExtensions = config.schemaExtensions || {};
 
   const schemas: TableSchema[] = [];
-
+  
   // Build each table schema
   const tableKeys: (keyof typeof tableNames)[] = [
     "users",
@@ -377,6 +377,37 @@ export function buildDatabaseSchemas(): TableSchema[] {
         tableName: customTableName,
         ...extendedSchema,
       });
+    }
+  }
+
+  // Include OAuth schemas if they're registered as extensions
+  const oauthTableKeys: (keyof typeof tableNames)[] = [
+    "oauthClients",
+    "authorizationCodes",
+    "refreshTokens",
+    "deviceSecrets",
+    "biometricCredentials",
+    "anonymousUsers",
+    "userDevices",
+    "mfaConfigurations",
+    "securityChallenges",
+    "oauthSessions",
+  ];
+
+  // Check if OAuth schemas are registered in extensions
+  for (const tableKey of oauthTableKeys) {
+    const extension = schemaExtensions[tableKey];
+    const customTableName = tableNames[tableKey];
+
+    if (extension && extension.additionalColumns && extension.additionalColumns.length > 0) {
+      // Create OAuth schema from extension
+      const oauthSchema: TableSchema = {
+        tableName: customTableName,
+        columns: extension.additionalColumns,
+        indexes: [],
+      };
+
+      schemas.push(oauthSchema);
     }
   }
 

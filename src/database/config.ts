@@ -16,6 +16,26 @@ export interface DatabaseTableConfig {
   rolePermissions?: string;
   /** Custom table name (default: 'sessions') */
   sessions?: string;
+  /** Custom table name (default: 'oauth_clients') */
+  oauthClients?: string;
+  /** Custom table name (default: 'authorization_codes') */
+  authorizationCodes?: string;
+  /** Custom table name (default: 'refresh_tokens') */
+  refreshTokens?: string;
+  /** Custom table name (default: 'device_secrets') */
+  deviceSecrets?: string;
+  /** Custom table name (default: 'biometric_credentials') */
+  biometricCredentials?: string;
+  /** Custom table name (default: 'anonymous_users') */
+  anonymousUsers?: string;
+  /** Custom table name (default: 'user_devices') */
+  userDevices?: string;
+  /** Custom table name (default: 'mfa_configurations') */
+  mfaConfigurations?: string;
+  /** Custom table name (default: 'security_challenges') */
+  securityChallenges?: string;
+  /** Custom table name (default: 'oauth_sessions') */
+  oauthSessions?: string;
 }
 
 /**
@@ -46,6 +66,26 @@ export interface DatabaseSchemaExtensions {
   rolePermissions?: SchemaExtension;
   /** Extensions for sessions table */
   sessions?: SchemaExtension;
+  /** Extensions for oauth_clients table */
+  oauthClients?: SchemaExtension;
+  /** Extensions for authorization_codes table */
+  authorizationCodes?: SchemaExtension;
+  /** Extensions for refresh_tokens table */
+  refreshTokens?: SchemaExtension;
+  /** Extensions for device_secrets table */
+  deviceSecrets?: SchemaExtension;
+  /** Extensions for biometric_credentials table */
+  biometricCredentials?: SchemaExtension;
+  /** Extensions for anonymous_users table */
+  anonymousUsers?: SchemaExtension;
+  /** Extensions for user_devices table */
+  userDevices?: SchemaExtension;
+  /** Extensions for mfa_configurations table */
+  mfaConfigurations?: SchemaExtension;
+  /** Extensions for security_challenges table */
+  securityChallenges?: SchemaExtension;
+  /** Extensions for oauth_sessions table */
+  oauthSessions?: SchemaExtension;
 }
 
 /**
@@ -72,6 +112,16 @@ export const DEFAULT_TABLE_NAMES: Required<DatabaseTableConfig> = {
   userRoles: "user_roles",
   rolePermissions: "role_permissions",
   sessions: "sessions",
+  oauthClients: "oauth_clients",
+  authorizationCodes: "authorization_codes",
+  refreshTokens: "refresh_tokens",
+  deviceSecrets: "device_secrets",
+  biometricCredentials: "biometric_credentials",
+  anonymousUsers: "anonymous_users",
+  userDevices: "user_devices",
+  mfaConfigurations: "mfa_configurations",
+  securityChallenges: "security_challenges",
+  oauthSessions: "oauth_sessions",
 };
 
 /**

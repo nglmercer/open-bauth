@@ -465,4 +465,77 @@ export class PermissionService {
 
     return !!permission.data;
   }
+
+  /**
+   * Assign a role to a user
+   * @param userId User ID
+   * @param roleId Role ID
+   * @returns Result of the assignment
+   */
+  async assignRoleToUser(
+    userId: string,
+    roleId: string,
+  ): Promise<{ success: boolean; error?: any }> {
+    try {
+      // Check if user exists
+      const user = await this.userController.findById(userId);
+      if (!user.data) {
+        return {
+          success: false,
+          error: {
+            type: "NOT_FOUND",
+            message: "User not found",
+          },
+        };
+      }
+
+      // Check if role exists
+      const role = await this.roleController.findById(roleId);
+      if (!role.data) {
+        return {
+          success: false,
+          error: {
+            type: "NOT_FOUND",
+            message: "Role not found",
+          },
+        };
+      }
+
+      // Check if assignment already exists
+      const existingAssignment = await this.userRoleController.findFirst({
+        user_id: userId,
+        role_id: roleId,
+      });
+
+      if (existingAssignment.data) {
+        return { success: true }; // Already assigned
+      }
+
+      // Create assignment
+      const result = await this.userRoleController.create({
+        user_id: userId,
+        role_id: roleId,
+      });
+
+      if (!result.success) {
+        return {
+          success: false,
+          error: {
+            type: "DATABASE_ERROR",
+            message: result.error || "Failed to assign role to user",
+          },
+        };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: {
+          type: "DATABASE_ERROR",
+          message: error.message,
+        },
+      };
+    }
+  }
 }

@@ -765,7 +765,7 @@ describe("Advanced BIT Field Filtering (isTruthy, isFalsy, isSet)", () => {
     console.log("Fallback test environment:", JSON.stringify(envInfo, null, 2));
 
     // Use file-based database instead of in-memory for better CI compatibility
-    const testDbPath = `./test_fallback_${Date.now()}.db`;
+    const testDbPath = `./tests/db/test_fallback_${Date.now()}.db`;
     const db = new Database(testDbPath);
 
     try {

@@ -21,7 +21,7 @@ import { defaultLogger as logger } from "../../../../src/logger";
 describe("Database Schema Extensions", () => {
   let testDb: Database;
   let initializer: DatabaseInitializer;
-  const TEST_DB_PATH = "./test_schema_extensions.db";
+  const TEST_DB_PATH = "./tests/db/test_schema_extensions.db";
 
   beforeEach(async () => {
     // Clean up any existing test database
