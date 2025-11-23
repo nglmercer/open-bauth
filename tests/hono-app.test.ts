@@ -7,7 +7,8 @@ import {
   beforeEach,
   afterEach,
 } from "bun:test";
-import app, { dbInitializer, db } from "./utils/test-hono-app";
+import app, { dbInitializer, db } from "../examples/hono";
+
 import { testUtils } from "./setup";
 
 // Función para generar emails únicos
