@@ -100,3 +100,4 @@ app.route('/api', productRoutes);
 //app.route('/api/collections/')
 // --- 5. Export for Bun ---
 export default app;
+export {db,dbInitializer}
