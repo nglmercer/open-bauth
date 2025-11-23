@@ -47,6 +47,17 @@ export class JWTService {
         iat: now,
         exp: now + expirationTime
       };
+      
+      // Log para depuración en CI
+      if (process.env.NODE_ENV === 'test') {
+        console.log('JWT Token Generation:', {
+          userId: user.id,
+          email: user.email,
+          now,
+          exp: now + expirationTime,
+          expirationTime
+        });
+      }
 
       // Implementar JWT usando Web Crypto API nativo
       const header = {
