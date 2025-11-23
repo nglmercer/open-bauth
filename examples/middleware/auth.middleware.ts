@@ -8,7 +8,7 @@ import type {
   PermissionOptions,
   AuthRequest,
   User,
-} from "../../dist/index";
+} from "../../src/index";
 import type { Context, Next } from "hono"; // <-- Importar tipos de Hono
 
 async function authenticateRequest(
