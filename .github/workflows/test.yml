@@ -51,6 +51,9 @@ jobs:
       - name: Create test database directory
         run: mkdir -p tests/db
 
+      - name: Create test database file for Hono app
+        run: touch ./tests/db/auth.db
+
       - name: Run type checking
         run: bun run type-check
 
@@ -61,6 +64,9 @@ jobs:
           echo "SQLite version:"
           bun -e "const { Database } = require('bun:sqlite'); const db = new Database(':memory:'); console.log(db.query('SELECT sqlite_version() as version').get().version); db.close();"
           echo "Running tests..."
+          echo "TEST_DB_PATH: $TEST_DB_PATH"
+          echo "NODE_ENV: $NODE_ENV"
+          ls -la ./tests/db/ || echo "Directory does not exist"
           bun test --coverage --reporter=junit --reporter-outfile=test-results.xml --preload ./tests/setup.ts --timeout 60000
         env:
           NODE_ENV: test
