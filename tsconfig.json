@@ -20,13 +20,6 @@
     "noEmitOnError": false,
     "types": ["bun-types"]
   },
-  "include": [
-    "src/**/*",
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "examples/**/*",
-    "tests/**/*"
-  ]
+  "include": ["src/**/*", "examples/**/*"],
+  "exclude": ["node_modules", "dist", "tests/**/*"]
 }

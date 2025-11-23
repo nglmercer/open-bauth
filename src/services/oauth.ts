@@ -33,7 +33,6 @@ import { JWTService } from "./jwt";
  * OAuth 2.0 Service for handling complete OAuth 2.0 flows
  */
 export class OAuthService {
-  
   private clientController: BaseController<OAuthClient>;
   private authCodeController: BaseController<AuthorizationCode>;
   private refreshTokenController: BaseController<RefreshToken>;
@@ -43,16 +42,25 @@ export class OAuthService {
   constructor(
     dbInitializer: DatabaseInitializer,
     securityService: SecurityService,
-    jwtService: JWTService
+    jwtService: JWTService,
   ) {
-    this.clientController = dbInitializer.createController<OAuthClient>("oauth_clients");
-    this.authCodeController = dbInitializer.createController<AuthorizationCode>("authorization_codes");
-    this.refreshTokenController = dbInitializer.createController<RefreshToken>("refresh_tokens");
+    this.clientController =
+      dbInitializer.createController<OAuthClient>("oauth_clients");
+    this.authCodeController = dbInitializer.createController<AuthorizationCode>(
+      "authorization_codes",
+    );
+    this.refreshTokenController =
+      dbInitializer.createController<RefreshToken>("refresh_tokens");
     this.securityService = securityService;
     this.jwtService = jwtService;
   }
 
   // --- OAuth Client Management ---
+
+  async findAllClients(): Promise<OAuthClient[]> {
+    const result = await this.clientController.findAll();
+    return result.data || [];
+  }
 
   async findClientById(id: string): Promise<OAuthClient | null> {
     const result = await this.clientController.findById(id);
@@ -60,7 +68,9 @@ export class OAuthService {
   }
 
   async findClientByClientId(clientId: string): Promise<OAuthClient | null> {
-    const result = await this.clientController.findFirst({ client_id: clientId });
+    const result = await this.clientController.findFirst({
+      client_id: clientId,
+    });
     return result.data || null;
   }
 
@@ -69,7 +79,8 @@ export class OAuthService {
     let clientSecret = data.client_secret;
     let clientSecretSalt = "";
     if (clientSecret) {
-      const { hash, salt } = await this.securityService.hashPassword(clientSecret);
+      const { hash, salt } =
+        await this.securityService.hashPassword(clientSecret);
       clientSecret = hash;
       clientSecretSalt = salt;
     }
@@ -78,10 +89,16 @@ export class OAuthService {
       ...data,
       client_secret: clientSecret,
       client_secret_salt: clientSecretSalt,
-      grant_types: JSON.stringify(data.grant_types || [OAuthGrantType.AUTHORIZATION_CODE]),
-      response_types: JSON.stringify(data.response_types || [OAuthResponseType.CODE]),
+      grant_types: JSON.stringify(
+        data.grant_types || [OAuthGrantType.AUTHORIZATION_CODE],
+      ),
+      response_types: JSON.stringify(
+        data.response_types || [OAuthResponseType.CODE],
+      ),
       redirect_uris: JSON.stringify(data.redirect_uris),
-      token_endpoint_auth_method: data.token_endpoint_auth_method || TokenEndpointAuthMethod.CLIENT_SECRET_BASIC,
+      token_endpoint_auth_method:
+        data.token_endpoint_auth_method ||
+        TokenEndpointAuthMethod.CLIENT_SECRET_BASIC,
       is_active: data.is_active !== undefined ? data.is_active : true,
     });
 
@@ -92,11 +109,16 @@ export class OAuthService {
     return result.data;
   }
 
-  async updateClient(id: string, data: UpdateOAuthClientData): Promise<OAuthClient> {
+  async updateClient(
+    id: string,
+    data: UpdateOAuthClientData,
+  ): Promise<OAuthClient> {
     // Hash client secret if provided
     let updateData: any = { ...data };
     if ((data as any).client_secret) {
-      const { hash, salt } = await this.securityService.hashPassword((data as any).client_secret);
+      const { hash, salt } = await this.securityService.hashPassword(
+        (data as any).client_secret,
+      );
       updateData.client_secret = hash;
       updateData.client_secret_salt = salt;
     }
@@ -114,7 +136,7 @@ export class OAuthService {
     }
 
     const result = await this.clientController.update(id, updateData);
-    
+
     if (!result.success || !result.data) {
       throw new Error("Failed to update OAuth client");
     }
@@ -127,9 +149,12 @@ export class OAuthService {
     return result.success;
   }
 
-  async authenticateClient(clientId: string, clientSecret?: string): Promise<OAuthClient | null> {
+  async authenticateClient(
+    clientId: string,
+    clientSecret?: string,
+  ): Promise<OAuthClient | null> {
     const client = await this.findClientByClientId(clientId);
-    
+
     if (!client || !client.is_active) {
       return null;
     }
@@ -147,15 +172,18 @@ export class OAuthService {
     const isValid = await this.securityService.verifyPassword(
       clientSecret,
       client.client_secret,
-      (client as any).client_secret_salt || ""
+      (client as any).client_secret_salt || "",
     );
 
     return isValid ? client : null;
   }
 
-  async validateRedirectUri(clientId: string, redirectUri: string): Promise<boolean> {
+  async validateRedirectUri(
+    clientId: string,
+    redirectUri: string,
+  ): Promise<boolean> {
     const client = await this.findClientByClientId(clientId);
-    
+
     if (!client) {
       return false;
     }
@@ -176,7 +204,9 @@ export class OAuthService {
     return result.data || null;
   }
 
-  async createAuthCode(data: Partial<AuthorizationCode>): Promise<AuthorizationCode> {
+  async createAuthCode(
+    data: Partial<AuthorizationCode>,
+  ): Promise<AuthorizationCode> {
     const code = this.securityService.generateSecureToken(64);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
@@ -269,7 +299,10 @@ export class OAuthService {
     return 0;
   }
 
-  async rotateRefreshToken(id: string, newToken: string): Promise<RefreshToken> {
+  async rotateRefreshToken(
+    id: string,
+    newToken: string,
+  ): Promise<RefreshToken> {
     const currentToken = await this.findRefreshTokenById(id);
     if (!currentToken) {
       throw new Error("Refresh token not found");
@@ -306,7 +339,7 @@ export class OAuthService {
    */
   async handleAuthorizationRequest(
     request: AuthorizationRequest,
-    user?: User
+    user?: User,
   ): Promise<AuthorizationResponse> {
     try {
       // Validate client
@@ -320,7 +353,13 @@ export class OAuthService {
       }
 
       // Validate redirect URI
-      if (request.redirect_uri && !await this.validateRedirectUri(request.client_id, request.redirect_uri)) {
+      if (
+        request.redirect_uri &&
+        !(await this.validateRedirectUri(
+          request.client_id,
+          request.redirect_uri,
+        ))
+      ) {
         return {
           error: OAuthErrorType.INVALID_REQUEST,
           error_description: "Invalid redirect URI",
@@ -375,14 +414,17 @@ export class OAuthService {
   private async grantAuthorization(
     request: AuthorizationRequest,
     client: OAuthClient,
-    user: User
+    user: User,
   ): Promise<AuthorizationResponse> {
     if (request.response_type === OAuthResponseType.CODE) {
       // Authorization Code Flow
       const authCode = await this.createAuthCode({
         client_id: client.client_id,
         user_id: user.id,
-        redirect_uri: request.redirect_uri || (JSON.parse((client as any).redirect_uris || "[]") as string[])[0] || "",
+        redirect_uri:
+          request.redirect_uri ||
+          (JSON.parse((client as any).redirect_uris || "[]") as string[])[0] ||
+          "",
         scope: request.scope || client.scope,
         state: request.state,
         nonce: request.nonce,
@@ -396,8 +438,12 @@ export class OAuthService {
       };
     } else if (request.response_type === OAuthResponseType.TOKEN) {
       // Implicit Flow (not recommended)
-      const accessToken = await this.generateAccessToken(client, user, request.scope || client.scope);
-      
+      const accessToken = await this.generateAccessToken(
+        client,
+        user,
+        request.scope || client.scope,
+      );
+
       return {
         access_token: accessToken,
         token_type: "Bearer",
@@ -451,7 +497,9 @@ export class OAuthService {
   /**
    * Handle Authorization Code Grant
    */
-  private async handleAuthorizationCodeGrant(request: TokenRequest): Promise<TokenResponse> {
+  private async handleAuthorizationCodeGrant(
+    request: TokenRequest,
+  ): Promise<TokenResponse> {
     if (!request.code) {
       return {
         error: OAuthErrorType.INVALID_REQUEST,
@@ -464,7 +512,11 @@ export class OAuthService {
 
     // Validate authorization code
     const authCode = await this.findAuthCodeByCode(request.code);
-    if (!authCode || authCode.is_used || new Date() > new Date(authCode.expires_at)) {
+    if (
+      !authCode ||
+      authCode.is_used ||
+      new Date() > new Date(authCode.expires_at)
+    ) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
         error_description: "Invalid or expired authorization code",
@@ -475,7 +527,10 @@ export class OAuthService {
     }
 
     // Validate client
-    const client = await this.authenticateClient(request.client_id!, request.client_secret);
+    const client = await this.authenticateClient(
+      request.client_id!,
+      request.client_secret,
+    );
     if (!client) {
       return {
         error: OAuthErrorType.INVALID_CLIENT,
@@ -487,7 +542,10 @@ export class OAuthService {
     }
 
     // Validate redirect URI
-    if (request.redirect_uri && request.redirect_uri !== authCode.redirect_uri) {
+    if (
+      request.redirect_uri &&
+      request.redirect_uri !== authCode.redirect_uri
+    ) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
         error_description: "Redirect URI mismatch",
@@ -502,7 +560,7 @@ export class OAuthService {
       const isValid = this.securityService.verifyPKCEChallenge(
         request.code_verifier,
         authCode.code_challenge,
-        authCode.code_challenge_method || PKCEMethod.PLAIN
+        authCode.code_challenge_method || PKCEMethod.PLAIN,
       );
 
       if (!isValid) {
@@ -524,7 +582,11 @@ export class OAuthService {
     const user = { id: authCode.user_id, email: "user@example.com" } as User;
 
     // Generate tokens
-    const accessToken = await this.generateAccessToken(client, user, authCode.scope);
+    const accessToken = await this.generateAccessToken(
+      client,
+      user,
+      authCode.scope,
+    );
     const refreshToken = await this.createRefreshToken({
       client_id: client.client_id,
       user_id: user.id,
@@ -543,7 +605,9 @@ export class OAuthService {
   /**
    * Handle Refresh Token Grant
    */
-  private async handleRefreshTokenGrant(request: TokenRequest): Promise<TokenResponse> {
+  private async handleRefreshTokenGrant(
+    request: TokenRequest,
+  ): Promise<TokenResponse> {
     if (!request.refresh_token) {
       return {
         error: OAuthErrorType.INVALID_REQUEST,
@@ -555,8 +619,14 @@ export class OAuthService {
     }
 
     // Validate refresh token
-    const refreshToken = await this.findRefreshTokenByToken(request.refresh_token);
-    if (!refreshToken || refreshToken.is_revoked || new Date() > new Date(refreshToken.expires_at)) {
+    const refreshToken = await this.findRefreshTokenByToken(
+      request.refresh_token,
+    );
+    if (
+      !refreshToken ||
+      refreshToken.is_revoked ||
+      new Date() > new Date(refreshToken.expires_at)
+    ) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
         error_description: "Invalid or expired refresh token",
@@ -567,7 +637,10 @@ export class OAuthService {
     }
 
     // Validate client
-    const client = await this.authenticateClient(request.client_id!, request.client_secret);
+    const client = await this.authenticateClient(
+      request.client_id!,
+      request.client_secret,
+    );
     if (!client || client.client_id !== refreshToken.client_id) {
       return {
         error: OAuthErrorType.INVALID_CLIENT,
@@ -579,13 +652,23 @@ export class OAuthService {
     }
 
     // Rotate refresh token
-    const newRefreshToken = await this.rotateRefreshToken(refreshToken.id, refreshToken.token);
+    const newRefreshToken = await this.rotateRefreshToken(
+      refreshToken.id,
+      refreshToken.token,
+    );
 
     // Get user (this would typically use the AuthService)
-    const user = { id: refreshToken.user_id, email: "user@example.com" } as User;
+    const user = {
+      id: refreshToken.user_id,
+      email: "user@example.com",
+    } as User;
 
     // Generate new access token
-    const accessToken = await this.generateAccessToken(client, user, request.scope || refreshToken.scope);
+    const accessToken = await this.generateAccessToken(
+      client,
+      user,
+      request.scope || refreshToken.scope,
+    );
 
     return {
       access_token: accessToken,
@@ -599,9 +682,14 @@ export class OAuthService {
   /**
    * Handle Client Credentials Grant
    */
-  private async handleClientCredentialsGrant(request: TokenRequest): Promise<TokenResponse> {
+  private async handleClientCredentialsGrant(
+    request: TokenRequest,
+  ): Promise<TokenResponse> {
     // Validate client
-    const client = await this.authenticateClient(request.client_id!, request.client_secret);
+    const client = await this.authenticateClient(
+      request.client_id!,
+      request.client_secret,
+    );
     if (!client) {
       return {
         error: OAuthErrorType.INVALID_CLIENT,
@@ -613,7 +701,11 @@ export class OAuthService {
     }
 
     // Generate access token (no user context)
-    const accessToken = await this.generateAccessToken(client, undefined, request.scope || client.scope);
+    const accessToken = await this.generateAccessToken(
+      client,
+      undefined,
+      request.scope || client.scope,
+    );
 
     return {
       access_token: accessToken,
@@ -626,12 +718,15 @@ export class OAuthService {
   /**
    * Handle Resource Owner Password Credentials Grant
    */
-  private async handlePasswordGrant(request: TokenRequest): Promise<TokenResponse> {
+  private async handlePasswordGrant(
+    request: TokenRequest,
+  ): Promise<TokenResponse> {
     // This would typically use the AuthService to validate credentials
     // For now, we'll return an error as this grant type is not recommended
     return {
       error: OAuthErrorType.UNSUPPORTED_GRANT_TYPE,
-      error_description: "Resource owner password credentials grant is not supported",
+      error_description:
+        "Resource owner password credentials grant is not supported",
       access_token: "",
       token_type: "Bearer",
       expires_in: 0,
@@ -644,7 +739,7 @@ export class OAuthService {
   private async generateAccessToken(
     client: OAuthClient,
     user?: User,
-    scope?: string
+    scope?: string,
   ): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
     const payload: OAuthJWTPayload = {
@@ -672,7 +767,7 @@ export class OAuthService {
    * Handle device authorization request
    */
   async handleDeviceAuthorizationRequest(
-    request: DeviceAuthorizationRequest
+    request: DeviceAuthorizationRequest,
   ): Promise<DeviceAuthorizationResponse> {
     // Validate client
     const client = await this.findClientByClientId(request.client_id);
@@ -721,7 +816,7 @@ export class OAuthService {
    * Handle introspection request
    */
   async handleIntrospectionRequest(
-    request: IntrospectionRequest
+    request: IntrospectionRequest,
   ): Promise<IntrospectionResponse> {
     try {
       // Try to verify as access token first
@@ -732,18 +827,24 @@ export class OAuthService {
           scope: (payload as unknown as { scope?: string }).scope || "",
           client_id: (payload as unknown as { client_id?: string }).client_id,
           username: (payload as unknown as { email?: string }).email,
-          token_type: (payload as unknown as { token_type?: string }).token_type,
+          token_type: (payload as unknown as { token_type?: string })
+            .token_type,
           exp: (payload as unknown as { exp?: number }).exp,
           iat: (payload as unknown as { iat?: number }).iat,
           sub: (payload as unknown as { sub?: string }).sub,
-          aud: (payload as unknown as { aud?: string | string[] }).aud as string,
+          aud: (payload as unknown as { aud?: string | string[] })
+            .aud as string,
           iss: (payload as unknown as { iss?: string }).iss,
           jti: (payload as unknown as { jti?: string }).jti,
         };
       } catch (error) {
         // Not a valid access token, try refresh token
         const refreshToken = await this.findRefreshTokenByToken(request.token);
-        if (refreshToken && !refreshToken.is_revoked && new Date() <= new Date(refreshToken.expires_at)) {
+        if (
+          refreshToken &&
+          !refreshToken.is_revoked &&
+          new Date() <= new Date(refreshToken.expires_at)
+        ) {
           return {
             active: true,
             scope: refreshToken.scope,
@@ -764,7 +865,9 @@ export class OAuthService {
   /**
    * Handle revocation request
    */
-  async handleRevocationRequest(request: RevocationRequest): Promise<{ success: boolean; error?: string }> {
+  async handleRevocationRequest(
+    request: RevocationRequest,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       // Try to revoke as access token first
       try {

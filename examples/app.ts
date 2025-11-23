@@ -1,11 +1,13 @@
 // src/types/app.ts
 
-import { MiddlewareHandler } from 'hono';
-import { AuthContext } from '../dist/index';
-import { AuthService } from '../dist/index';
-import { JWTService } from '../dist/index';
-import { PermissionService } from '../dist/index';
-
+import { MiddlewareHandler } from "hono";
+import { AuthContext } from "../src/index";
+import { AuthService } from "../src/index";
+import { JWTService } from "../src/index";
+import { PermissionService } from "../src/index";
+import { registerOAuthSchemaExtensions } from "../src/database/oauth-schema-extensions";
+import { OAuthService } from "../src/services/oauth";
+import { SecurityService } from "../src/services/security";
 // Hono's context typing for this specific application
 export type AppContext = {
   Variables: {
@@ -18,6 +20,8 @@ export type Services = {
   jwtService: JWTService;
   authService: AuthService;
   permissionService: PermissionService;
+  oauthService: OAuthService;
+  securityService: SecurityService;
 };
 
 // The type for our middleware factory

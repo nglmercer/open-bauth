@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
-import type { AuthContext } from "../../dist/index";
-import type { AuthService, PermissionService } from "../../dist/index";
+import type { AuthContext } from "../../src/index";
+import type { AuthService, PermissionService } from "../../src/index";
 
 export type AppContext = {
   Variables: {
@@ -11,7 +11,7 @@ export type AppContext = {
 
 async function getAllPermissions(
   permissionService: PermissionService,
-  array: any[]
+  array: any[],
 ): Promise<any[]> {
   let Result: any[] = [];
   await Promise.all(
@@ -21,18 +21,18 @@ async function getAllPermissions(
         ...item,
         permissions: permissions,
       });
-    })
+    }),
   );
   return Result;
 }
 async function assignPermissionsToRole(
   id: string,
   permissions: string | string[],
-  permissionService: PermissionService
+  permissionService: PermissionService,
 ) {
   return await permissionService.updateRolePermissions(
     id,
-    Array.isArray(permissions) ? permissions : [permissions]
+    Array.isArray(permissions) ? permissions : [permissions],
   );
 }
 export function createAdminRoutes(
@@ -40,7 +40,7 @@ export function createAdminRoutes(
   middlewares: {
     requireAuth: (c: Context, next: Next) => Promise<Response | void>;
     requireAdminRole: (c: Context, next: Next) => Promise<Response | void>;
-  }
+  },
 ) {
   const { authService, permissionService } = deps;
   const { requireAuth, requireAdminRole } = middlewares;
@@ -66,7 +66,7 @@ export function createAdminRoutes(
     // Mapear permisos a cada rol usando la función auxiliar
     const rolesWithPermissions = await getAllPermissions(
       permissionService,
-      roles
+      roles,
     );
     return c.json({
       roles: rolesWithPermissions,
@@ -101,7 +101,7 @@ export function createAdminRoutes(
     } catch (error) {
       return c.json(
         { error: "Role not found or error fetching permissions" },
-        404
+        404,
       );
     }
   });
@@ -116,14 +116,14 @@ export function createAdminRoutes(
       const result = await assignPermissionsToRole(
         role?.id || data.id,
         permissions,
-        permissionService
+        permissionService,
       );
 
       return c.json({ role, data: role, success: success || false, result });
     } catch (error: any) {
       return c.json(
         { error: "Error creating role", message: error?.message || "" },
-        400
+        400,
       );
     }
   });
@@ -139,13 +139,13 @@ export function createAdminRoutes(
       const result = await assignPermissionsToRole(
         role?.id || data.id,
         permissions,
-        permissionService
+        permissionService,
       );
       return c.json({ role, data: role, success: success || false, result });
     } catch (error: any) {
       return c.json(
         { error: "Error updating role", message: error?.message || "" },
-        400
+        400,
       );
     }
   });
@@ -174,7 +174,7 @@ export function createAdminRoutes(
     // verify is account is ['moderator', 'admin'] to make a required confirmation
     const verifyRoles = ["moderator", "admin"];
     const isRestrictedRole = data.some((role) =>
-      verifyRoles.includes(role.name)
+      verifyRoles.includes(role.name),
     );
     if (isRestrictedRole) {
       return c.json(
@@ -182,7 +182,7 @@ export function createAdminRoutes(
           error: "can not deactivate user with role " + verifyRoles.join(", "),
           success: false,
         },
-        403
+        403,
       );
     }
     const transaccion = await authService.deactivateUser(id);

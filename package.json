@@ -1,6 +1,6 @@
 {
   "name": "open-bauth",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "Framework-agnostic authentication library built with Bun, TypeScript, and SQLite",
   "main": "dist/index.js",
   "types": "dist/src/index.d.ts",
@@ -8,6 +8,7 @@
     "dev": "bun run --hot ./examples/hono.ts",
     "build": "tsc && bun build src/index.ts --outdir dist --target bun --format esm --sourcemap",
     "test": "bun test --preload ./tests/setup.ts",
+    "typecheck": "tsc --noEmit",
     "test:watch": "bun test --watch --preload ./tests/setup.ts",
     "test:adapters": "bun test tests/adapters --preload ./tests/setup.ts",
     "test:services": "bun test tests/services/ --preload ./tests/setup.ts",
@@ -27,10 +28,8 @@
     "fix-types": "bun run type-check --noEmit false",
     "ci": "bun install && bun run test:build:types"
   },
-  "dependencies": {
-    "hono": "^4.9.2"
-  },
   "devDependencies": {
+    "hono": "^4.9.2",
     "@types/bun": "latest",
     "typescript": "^5.3.3"
   },

@@ -7,6 +7,7 @@ export {
   SchemaRegistry,
   getCurrentSchemas,
   DEFAULT_SCHEMAS,
+  DATABASE_SCHEMAS,
 } from "./database-initializer";
 
 // Export types from database-initializer using export type for isolatedModules
