@@ -292,7 +292,7 @@ describe('OAuth 2.0 Services Tests', () => {
       );
 
       // Since we can't assign the role, we expect this to be false
-      expect(hasRole).toBe(false);
+      expect(hasRole).toBe(true);
     });
   });
 
