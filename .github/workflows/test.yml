@@ -66,6 +66,7 @@ jobs:
           echo "Running tests..."
           echo "TEST_DB_PATH: $TEST_DB_PATH"
           echo "NODE_ENV: $NODE_ENV"
+          echo "JWT_SECRET: $JWT_SECRET"
           ls -la ./tests/db/ || echo "Directory does not exist"
           bun test --coverage --reporter=junit --reporter-outfile=test-results.xml --preload ./tests/setup.ts --timeout 60000
         env:

@@ -257,6 +257,12 @@ export class JWTService {
       // Verificar expiración
       const now = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < now) {
+        console.log('Token expired check:', {
+          now,
+          payloadExp: payload.exp,
+          timeDiff: now - payload.exp,
+          isExpired: payload.exp < now
+        });
         throw new Error('Token has expired');
       }
 
@@ -558,6 +564,12 @@ export class JWTService {
         iat: now,
         exp: now + (30 * 24 * 60 * 60) // 30 días
       };
+      
+      console.log('Generating refresh token with payload:', {
+        now,
+        exp: payload.exp,
+        userId
+      });
 
       // Usar la misma estructura JWT estándar (header.payload.signature)
       const header = {
@@ -618,6 +630,12 @@ export class JWTService {
       // Verificar expiración
       const now = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < now) {
+        console.log('Refresh token expired:', {
+          now,
+          payloadExp: payload.exp,
+          timeDiff: now - payload.exp,
+          isExpired: payload.exp < now
+        });
         throw new Error('Refresh token has expired');
       }
 
