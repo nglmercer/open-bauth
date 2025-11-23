@@ -548,7 +548,7 @@ export class JWTService {
    * @param userId ID del usuario
    * @returns Token de refresh
    */
-  async generateRefreshToken(userId: number): Promise<string> {
+  async generateRefreshToken(userId: string | number): Promise<string> {
     try {
       const now = Math.floor(Date.now() / 1000);
       
@@ -582,7 +582,7 @@ export class JWTService {
    * @param refreshToken Token de refresh
    * @returns User ID si es válido
    */
-  async verifyRefreshToken(refreshToken: string): Promise<number> {
+  async verifyRefreshToken(refreshToken: string): Promise<string | number> {
     try {
       if (!refreshToken) {
         throw new Error('Refresh token is required');

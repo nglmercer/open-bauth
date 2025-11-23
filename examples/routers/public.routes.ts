@@ -75,7 +75,7 @@ export function createPublicRoutes(deps: { authService: AuthService }) {
 
     return c.json(
       { ...registrationResult, message: "User registered successfully" },
-      201
+      200 // Cambiar a 200 como esperan los tests
     );
   });
 

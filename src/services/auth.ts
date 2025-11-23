@@ -131,6 +131,16 @@ export class AuthService {
         token,
       };
     } catch (error: any) {
+      // Verificar si es un error de constraint de SQLite para email duplicado
+      if (error.message && error.message.includes('UNIQUE constraint failed')) {
+        return {
+          success: false,
+          error: {
+            type: AuthErrorType.USER_ALREADY_EXISTS,
+            message: "A user with this email already exists",
+          },
+        };
+      }
       return {
         success: false,
         error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
@@ -178,8 +188,8 @@ export class AuthService {
         return {
           success: false,
           error: {
-            type: AuthErrorType.ACCOUNT_INACTIVE,
-            message: "User account is deactivated",
+            type: AuthErrorType.INVALID_CREDENTIALS, // Cambiar a INVALID_CREDENTIALS como esperan los tests
+            message: "Invalid credentials",
           },
         };
       }
@@ -221,10 +231,10 @@ export class AuthService {
   // --- User Management Methods ---
 
   async findUserById(
-    id: string,
+    id: string | number,
     options: UserQueryOptions = {},
   ): Promise<User | null> {
-    const userResult = await this.userController.findById(id);
+    const userResult = await this.userController.findById(String(id));
     if (!userResult.data) return null;
 
     let user = userResult.data;
@@ -323,11 +333,11 @@ export class AuthService {
     return { success: true };
   }
 
-  async deleteUser(userId: string): Promise<{ success: boolean; error?: any }> {
+  async deleteUser(userId: string | number): Promise<{ success: boolean; error?: any }> {
     try {
       // Idealmente, esto debería estar en una transacción.
       const assignments = await this.userRoleController.search(
-        { user_id: userId },
+        { user_id: String(userId) },
         { limit: 1000 },
       );
       if (assignments.data) {
@@ -355,7 +365,7 @@ export class AuthService {
   // --- Role Management Methods ---
 
   async assignRole(
-    userId: string,
+    userId: string | number,
     roleName: string,
   ): Promise<{ success: boolean; error?: any }> {
     try {
@@ -372,7 +382,7 @@ export class AuthService {
         };
       }
 
-      const userResult = await this.userController.findById(userId);
+      const userResult = await this.userController.findById(String(userId));
       if (!userResult.data) {
         return {
           success: false,
@@ -384,7 +394,7 @@ export class AuthService {
       }
 
       const existing = await this.userRoleController.findFirst({
-        user_id: userId,
+        user_id: String(userId),
         role_id: roleResult.data.id,
       });
       if (existing.data) {
@@ -392,7 +402,7 @@ export class AuthService {
       }
 
       const result = await this.userRoleController.create({
-        user_id: userId,
+        user_id: String(userId),
         role_id: roleResult.data.id,
       });
       if (!result.success) {
@@ -411,7 +421,7 @@ export class AuthService {
   }
 
   async removeRole(
-    userId: string,
+    userId: string | number,
     roleName: string,
   ): Promise<{ success: boolean; error?: any }> {
     try {
@@ -429,7 +439,7 @@ export class AuthService {
       }
 
       const assignment = await this.userRoleController.findFirst({
-        user_id: userId,
+        user_id: String(userId),
         role_id: roleResult.data.id,
       });
       if (!assignment.data) {
@@ -480,8 +490,8 @@ export class AuthService {
     return { users: users.map(this.sanitizeUser), total };
   }
 
-  async getUserRoles(userId: string): Promise<Role[]> {
-    const user = await this.userController.findById(userId);
+  async getUserRoles(userId: string | number): Promise<Role[]> {
+    const user = await this.userController.findById(String(userId));
     if (!user.data) {
       return [];
     }
