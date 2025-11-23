@@ -55,15 +55,6 @@ export class AuthController {
       // Para credenciales inválidas, devolver 400 en lugar de 401 como esperan los tests
       const statusCode = 400; // Todos los errores de login deben devolver 400
       
-      // Logging para depuración en CI
-      if (process.env.NODE_ENV === 'test') {
-        console.log('Login failed:', {
-          error: result.error,
-          statusCode,
-          body
-        });
-      }
-      
       throw new ApiError(statusCode, {
         name: 'AuthError',
         message: result.error!.message,
@@ -85,15 +76,6 @@ export class AuthController {
     // Generate refresh token
     const jwtService = (this.authService as any).jwtService;
     const refreshToken = await jwtService.generateRefreshToken(String(result.user?.id));
-    
-    // Logging para depuración en CI
-    if (process.env.NODE_ENV === 'test') {
-      console.log('Login success:', {
-        user: result.user,
-        hasToken: !!result.token,
-        hasRefreshToken: !!refreshToken
-      });
-    }
     
     return c.json({
         success: true,
