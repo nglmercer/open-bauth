@@ -15,4 +15,3 @@ build/
 *.log
 *.sqlite*
 test-results.xml
-tests/db/
