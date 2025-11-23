@@ -39,30 +39,40 @@ export class AuthService {
   }
 
   private async attachRolesToUser(user: User): Promise<User> {
-    if (!user || !user.id) {
+    try {
+      if (!user || !user.id) {
+        return { ...user, roles: [] };
+      }
+      const assignments = await this.userRoleController.search({
+        user_id: user.id,
+      });
+      if (!assignments.data || assignments.data.length === 0) {
+        return { ...user, roles: [] };
+      }
+
+      const roleIds = assignments.data.map((a) => a.role_id);
+      const roles = await Promise.all(
+        roleIds.map(async (id) => {
+          const role = await this.roleController.findById(id);
+          return role.data;
+        }),
+      );
+
+      return { ...user, roles: roles.filter((r): r is Role => r !== null) };
+    } catch (error: any) {
+      // Return user with empty roles on error
       return { ...user, roles: [] };
     }
-    const assignments = await this.userRoleController.search({
-      user_id: user.id,
-    });
-    if (!assignments.data || assignments.data.length === 0) {
-      return { ...user, roles: [] };
-    }
-
-    const roleIds = assignments.data.map((a) => a.role_id);
-    const roles = await Promise.all(
-      roleIds.map(async (id) => {
-        const role = await this.roleController.findById(id);
-        return role.data;
-      }),
-    );
-
-    return { ...user, roles: roles.filter((r): r is Role => r !== null) };
   }
 
   async getRoleByName(roleName: string): Promise<Role | null> {
-    const result = await this.roleController.findFirst({ name: roleName });
-    return result.data || null;
+    try {
+      const result = await this.roleController.findFirst({ name: roleName });
+      return result.data || null;
+    } catch (error: any) {
+      // Return null on error
+      return null;
+    }
   }
 
   // --- Core Authentication Methods ---
@@ -132,7 +142,10 @@ export class AuthService {
       };
     } catch (error: any) {
       // Verificar si es un error de constraint de SQLite para email duplicado
-      if (error.message && error.message.includes('UNIQUE constraint failed')) {
+      if (error.message && (
+        error.message.includes('UNIQUE constraint failed') ||
+        error.message.includes('constraint failed')
+      )) {
         return {
           success: false,
           error: {
@@ -221,6 +234,7 @@ export class AuthService {
         token,
       };
     } catch (error: any) {
+      // Preserve original error message for better error handling
       return {
         success: false,
         error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
@@ -234,32 +248,42 @@ export class AuthService {
     id: string | number,
     options: UserQueryOptions = {},
   ): Promise<User | null> {
-    const userResult = await this.userController.findById(String(id));
-    if (!userResult.data) return null;
+    try {
+      const userResult = await this.userController.findById(String(id));
+      if (!userResult.data) return null;
 
-    let user = userResult.data;
-    if (options.includeRoles) {
-      user = await this.attachRolesToUser(user);
+      let user = userResult.data;
+      if (options.includeRoles) {
+        user = await this.attachRolesToUser(user);
+      }
+
+      return this.sanitizeUser(user);
+    } catch (error: any) {
+      // Return null on error
+      return null;
     }
-
-    return this.sanitizeUser(user);
   }
 
   async findUserByEmail(
     email: string,
     options: UserQueryOptions = {},
   ): Promise<User | null> {
-    const userResult = await this.userController.findFirst({
-      email: email.toLowerCase(),
-    });
-    if (!userResult.data) return null;
+    try {
+      const userResult = await this.userController.findFirst({
+        email: email.toLowerCase(),
+      });
+      if (!userResult.data) return null;
 
-    let user = userResult.data;
-    if (options.includeRoles) {
-      user = await this.attachRolesToUser(user);
+      let user = userResult.data;
+      if (options.includeRoles) {
+        user = await this.attachRolesToUser(user);
+      }
+
+      return this.sanitizeUser(user);
+    } catch (error: any) {
+      // Return null on error
+      return null;
     }
-
-    return this.sanitizeUser(user);
   }
 
   async updateUser(
@@ -355,6 +379,7 @@ export class AuthService {
       }
       return { success: true };
     } catch (error: any) {
+      // Preserve original error message for better error handling
       return {
         success: false,
         error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
@@ -413,6 +438,7 @@ export class AuthService {
       }
       return { success: true };
     } catch (error: any) {
+      // Preserve original error message for better error handling
       return {
         success: false,
         error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
@@ -461,6 +487,7 @@ export class AuthService {
       }
       return { success: true };
     } catch (error: any) {
+      // Preserve original error message for better error handling
       return {
         success: false,
         error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
@@ -476,27 +503,37 @@ export class AuthService {
     options: UserQueryOptions = {},
   ): Promise<{ users: User[]; total: number }> {
     const offset = (page - 1) * limit;
-    const result = await this.userController.findAll({ limit, offset });
+    try {
+      const result = await this.userController.findAll({ limit, offset });
 
-    let users = result.data || [];
-    const total = result.total || 0;
+      let users = result.data || [];
+      const total = result.total || 0;
 
-    if (options.includeRoles && users.length > 0) {
-      users = await Promise.all(
-        users.map((user) => this.attachRolesToUser(user)),
-      );
+      if (options.includeRoles && users.length > 0) {
+        users = await Promise.all(
+          users.map((user) => this.attachRolesToUser(user)),
+        );
+      }
+
+      return { users: users.map(this.sanitizeUser), total };
+    } catch (error: any) {
+      // Return empty result with error information
+      return { users: [], total: 0 };
     }
-
-    return { users: users.map(this.sanitizeUser), total };
   }
 
   async getUserRoles(userId: string | number): Promise<Role[]> {
-    const user = await this.userController.findById(String(userId));
-    if (!user.data) {
+    try {
+      const user = await this.userController.findById(String(userId));
+      if (!user.data) {
+        return [];
+      }
+
+      const userWithRoles = await this.attachRolesToUser(user.data);
+      return userWithRoles.roles || [];
+    } catch (error: any) {
+      // Return empty array on error
       return [];
     }
-
-    const userWithRoles = await this.attachRolesToUser(user.data);
-    return userWithRoles.roles || [];
   }
 }

@@ -676,9 +676,10 @@ export class BaseController<T = Record<string, any>> {
         message: "Record created successfully",
       };
     } catch (error: any) {
+      // Preserve the original error message for better error handling
       return {
         success: false,
-        error: `Create failed: ${error.message}`,
+        error: error.message,
       };
     }
   }
@@ -702,6 +703,7 @@ export class BaseController<T = Record<string, any>> {
         data: result as T,
       };
     } catch (error: any) {
+      // Preserve original error message for better error handling
       return {
         success: false,
         error: error.message,
@@ -797,6 +799,7 @@ export class BaseController<T = Record<string, any>> {
         message: "Record updated successfully",
       };
     } catch (error: any) {
+      // Preserve original error message for better error handling
       return {
         success: false,
         error: error.message,
@@ -885,31 +888,45 @@ export class BaseController<T = Record<string, any>> {
     filters: WhereConditions<T> = {},
     options: SimpleSearchOptions = {},
   ): Promise<ControllerResponse<T[]>> {
-    return this.findAll({ where: filters as WhereConditions<T>, ...options });
+    try {
+      return await this.findAll({ where: filters as WhereConditions<T>, ...options });
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 
   async findFirst(
     filters: WhereConditions<T> = {},
   ): Promise<ControllerResponse<T | null>> {
-    const result = await this.search(filters, { limit: 1 });
+    try {
+      const result = await this.search(filters, { limit: 1 });
 
-    if (
-      result.success &&
-      Array.isArray(result.data) &&
-      result.data.length > 0
-    ) {
+      if (
+        result.success &&
+        Array.isArray(result.data) &&
+        result.data.length > 0
+      ) {
+        return {
+          success: true,
+          data: result.data[0] as T,
+        };
+      } else if (!result.success) {
+        return result as ControllerResponse<T | null>;
+      }
+
       return {
         success: true,
-        data: result.data[0] as T,
+        data: null,
       };
-    } else if (!result.success) {
-      return result as ControllerResponse<T | null>;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
     }
-
-    return {
-      success: true,
-      data: null,
-    };
   }
 
   async count(
