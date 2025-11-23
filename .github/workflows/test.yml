@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/package.json', '**/bunfig.toml') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 
@@ -49,7 +49,7 @@ jobs:
         run: bun install --no-frozen-lockfile
 
       - name: Create test database directory
-        run: mkdir -p tests/data
+        run: mkdir -p tests/db
 
       - name: Run type checking
         run: bun run type-check
@@ -64,7 +64,7 @@ jobs:
           bun test --coverage --reporter=junit --reporter-outfile=test-results.xml --preload ./tests/setup.ts --timeout 60000
         env:
           NODE_ENV: test
-          TEST_DB_PATH: ./tests/data/auth.db
+          TEST_DB_PATH: ./tests/db/auth.db
           JWT_SECRET: test-secret-key-for-ci
           CI: true
 
