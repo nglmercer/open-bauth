@@ -50,6 +50,7 @@ async function basicUsageExample() {
   const registerResult = await authService.register({
     email: "user@example.com",
     password: "password123",
+    username: "johndoe",
     first_name: "John",
     last_name: "Doe",
   });
@@ -94,6 +95,7 @@ async function customTableNamesExample() {
   const registerResult = await authService.register({
     email: "user2@example.com",
     password: "password123",
+    username: "janesmith",
     first_name: "Jane",
     last_name: "Smith",
   });
@@ -162,6 +164,7 @@ async function schemaExtensionsExample() {
   const registerResult = await authService.register({
     email: "user3@example.com",
     password: "password123",
+    username: "bobwilson",
     first_name: "Bob",
     last_name: "Wilson",
   });
@@ -221,6 +224,7 @@ async function completeCustomExample() {
   const registerResult = await authService.register({
     email: "admin@example.com",
     password: "admin123",
+    username: "adminuser",
     first_name: "Admin",
     last_name: "User",
   });
@@ -278,6 +282,7 @@ async function dynamicConfigurationExample() {
   const registerResult = await authService.register({
     email: "final@example.com",
     password: "password123",
+    username: "finaluser",
     first_name: "Final",
     last_name: "User",
   });
@@ -379,6 +384,7 @@ async function advancedSchemaExample() {
   const result = await authService.register({
     email: "advanced@example.com",
     password: "password123",
+    username: "advanceduser",
     first_name: "Advanced",
     last_name: "User",
   });

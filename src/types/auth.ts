@@ -55,6 +55,7 @@ export interface User {
   id: string;
   email: string;
   password_hash?: string; // Es opcional porque lo eliminamos en las respuestas
+  username?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   created_at?: string;
@@ -70,6 +71,7 @@ export interface User {
 export interface CreateUserData {
   email: string;
   password: string;
+  username?: string;
   first_name?: string;
   last_name?: string;
   is_active?: boolean;
@@ -81,6 +83,7 @@ export interface CreateUserData {
  */
 export interface UpdateUserData {
   email?: string;
+  username?: string;
   first_name?: string;
   last_name?: string;
   is_active?: boolean;
@@ -383,6 +386,7 @@ export interface AuthResponse {
 export interface RegisterData {
   email: string;
   password: string;
+  username?: string;
   first_name?: string;
   last_name?: string;
   is_active?: boolean;

@@ -66,9 +66,10 @@ const permissionService = new PermissionService(dbInitializer);
 ### 3) Register and login:
 
 ```typescript
-const register = await authService.register({ 
-  email: 'user@example.com', 
+const register = await authService.register({
+  email: 'user@example.com',
   password: 'StrongP@ssw0rd',
+  username: 'johndoe',
   first_name: 'John',
   last_name: 'Doe'
 });

@@ -18,10 +18,10 @@ The library provides a comprehensive set of services for authentication, authori
 
 **Key Methods**:
 - `register(data)` → [`AuthResult`](src/types/auth.ts:402)
-  - Registers a new user with email, password, and optional data
+  - Registers a new user with email, password, username, and optional data
   - Validates unique email and automatically hashes password
 - `login(data)` → [`AuthResult`](src/types/auth.ts:402)
-  - Authenticates user with email and password
+  - Authenticates user with email or username and password
   - Returns JWT token on successful authentication
 - `findUserById(id)` → `User | null`
   - Finds user by ID with optional role/permission inclusion
@@ -48,6 +48,7 @@ const authService = new AuthService(dbInitializer, jwtService);
 const registerResult = await authService.register({
   email: 'user@example.com',
   password: 'SecurePass123!',
+  username: 'johndoe',
   first_name: 'John',
   last_name: 'Doe'
 });
@@ -408,6 +409,7 @@ const promoteResult = await enhancedUserService.promoteAnonymousUser(
   {
     email: 'user@example.com',
     password: 'SecurePass123!',
+    username: 'johndoe',
     first_name: 'John',
     last_name: 'Doe'
   }
@@ -486,6 +488,7 @@ JWT payload structure with user information and roles.
 interface JWTPayload {
   userId: string;
   email: string;
+  username?: string;
   roles: string[];
   permissions: string[];
   iat: number;
@@ -579,6 +582,7 @@ const { authService, jwtService, permissionService, oauthService, securityServic
 const registerResult = await authService.register({
   email: 'user@example.com',
   password: 'SecurePass123!',
+  username: 'johndoe',
   first_name: 'John',
   last_name: 'Doe'
 });
