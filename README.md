@@ -1,5 +1,10 @@
 # Framework-Agnostic Authentication Library
 
+[![Bun](https://img.shields.io/badge/Bun-%23FFEB3A?style=for-the-badge&logo=bun&logoColor=white)](https://bun.sh/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=json-web-tokens&logoColor=white)](https://jwt.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 A comprehensive, framework-agnostic authentication and authorization library built with TypeScript, Bun, and SQLite. It provides JWT-based auth, RBAC (roles and permissions), framework-neutral middleware, and a flexible database layer.
 
 - Runtime: Bun (Node.js compatible for most features)
@@ -529,6 +534,20 @@ const unreadHighPriority = await notifications.search({
 
 console.log('Unread high priority notifications:', unreadHighPriority.data);
 ```
+
+## 📚 Detailed Documentation
+
+For in-depth guides and specifications, see the [docs/](./docs/) directory:
+
+- [Adapter Usage](./docs/adapter-usage.md) - Custom database adapters
+- [Database Extension Specification](./docs/database-extension-spec.md) - Extending schema
+- [OAuth 2.0 Implementation](./docs/oauth-2.0-implementation.md) - Full OAuth 2.0 guide
+- [Logger](./docs/logger.md) - Logging system
+- [Services Overview](./docs/services.md) - Core services API
+- [Middleware](./docs/middleware.md) - Framework-agnostic middleware
+- [Testing](./docs/testing.md) - Running and writing tests
+- [Deployment](./docs/deployment.md) - Production setup
+- [Docs Index](./docs/README.md)
 
 ## Library Info
 

@@ -1,104 +1,52 @@
-# Documentación de la Librería de Autenticación
+# Framework-Agnostic Authentication Library - Documentation
 
-## 📚 Índice de Documentación
+## 📚 Overview
 
-Bienvenido a la documentación completa de la **Librería de Autenticación Framework-Agnóstica**. Esta documentación está organizada en secciones para facilitar la navegación y el aprendizaje progresivo.
+Detailed guides for advanced features.
 
----
+Root [README](../README.md) for basics.
 
-## 🚀 Inicio Rápido
+## 🚀 Quick Navigation
 
-- **[Guía de Inicio Rápido](./01-quick-start.md)** - Comienza a usar la librería en 5 minutos
-- **[Instalación y Configuración](./02-installation-config.md)** - Configuración detallada paso a paso
+### Beginner
+- [Root README](../README.md)
+- [Services Overview](./services.md)
+- [Middleware](./middleware.md)
 
----
+### Intermediate
+- [Adapter Usage](./adapter-usage.md)
+- [OAuth 2.0](./oauth-2.0-implementation.md)
 
-## 📖 Documentación Principal
+### Advanced
+- [Database Extensions](./database-extension-spec.md)
+- [Logger](./logger.md)
 
-### Conceptos Fundamentales
-- **[Clase Principal AuthLibrary](./03-auth-library.md)** - Punto de entrada y gestión principal
-- **[Servicios Principales](./04-services.md)** - AuthService, JWTService y PermissionService
-- **[Adaptadores de Frameworks](./05-framework-adapters.md)** - Integración con Hono, Express y WebSockets
+### Development
+- [Testing](./testing.md)
+- [Deployment](./deployment.md)
 
-### Configuración y Uso
-- **[Middleware Agnóstico](./06-middleware.md)** - Middleware independiente de framework
-- **[Ejemplos Prácticos](./07-examples.md)** - Implementaciones completas y casos de uso
-- **[Referencia de API](./08-api-reference.md)** - Documentación completa de métodos
-- **[Troubleshooting](./09-troubleshooting.md)** - Solución de problemas comunes
+## 📖 Guides
 
----
+- [Logger](./logger.md)
+- [Services](./services.md)
+- [Middleware](./middleware.md)
+- [Adapter Usage](./adapter-usage.md)
+- [Database Extension Spec](./database-extension-spec.md)
+- [OAuth 2.0 Implementation](./oauth-2.0-implementation.md)
+- [Testing](./testing.md)
+- [Deployment](./deployment.md)
 
-## 💡 Documentación Completa
+## 💻 Examples
+- [Hono](../examples/hono.ts)
+- [OAuth](../examples/oauth-usage-example.ts)
 
-Toda la documentación está organizada en los archivos numerados del 01 al 09, cubriendo desde la instalación básica hasta la resolución de problemas avanzados.
-
----
-
-## 🎯 Navegación por Nivel de Experiencia
-
-### 🟢 Principiante
-1. [Guía de Inicio Rápido](./01-quick-start.md)
-2. [Instalación y Configuración](./02-installation-config.md)
-3. [Ejemplos Prácticos](./07-examples.md)
-4. [Troubleshooting](./09-troubleshooting.md)
-
-### 🟡 Intermedio
-1. [Clase Principal AuthLibrary](./03-auth-library.md)
-2. [Servicios Principales](./04-services.md)
-3. [Adaptadores de Frameworks](./05-framework-adapters.md)
-4. [Middleware Agnóstico](./06-middleware.md)
-
-### 🔴 Avanzado
-1. [Referencia de API](./08-api-reference.md)
-2. [Configuración Avanzada y Personalización](./03-auth-library.md)
-3. [Integración Completa](./05-framework-adapters.md)
-4. [Resolución de Problemas Avanzados](./09-troubleshooting.md)
+## 📋 Info
+| Feature | Description |
+|---------|-------------|
+| Version | 1.3.2 |
+| Runtime | Bun |
+| DB | SQLite + adapters |
+| Auth | JWT + RBAC + OAuth 2.0 |
 
 ---
-
-## 📋 Información de la Librería
-
-| Característica | Descripción |
-|----------------|-------------|
-| **Versión** | 1.1.2 |
-| **Frameworks Soportados** | Hono, Express, WebSockets, Socket.IO, Fastify |
-| **Runtime** | Bun (recomendado), Node.js |
-| **Base de Datos** | SQLite |
-| **Autenticación** | JWT + Bun.password |
-| **Autorización** | RBAC (Role-Based Access Control) |
-| **TypeScript** | Soporte nativo completo |
-
----
-
-## 🌟 Características Principales
-
-- ✅ **Framework Agnóstico** - Funciona con cualquier framework web
-- ✅ **TypeScript Nativo** - Tipado completo y seguro
-- ✅ **SQLite Optimizado** - Base de datos embebida con Bun
-- ✅ **JWT Seguro** - Implementación nativa con Web Crypto API
-- ✅ **RBAC Completo** - Sistema de roles y permisos granular
-- ✅ **Middleware Flexible** - Autenticación opcional y requerida
-- ✅ **Rate Limiting** - Protección contra ataques
-- ✅ **Logging Avanzado** - Registro detallado de eventos
-- ✅ **Validación Robusta** - Sanitización y validación de datos
-- ✅ **Configuración Flexible** - Altamente personalizable
-
----
-
-## 🔗 Enlaces Útiles
-
-- **[Repositorio GitHub](https://github.com/nglmercer/open-bauth/framework-agnostic-auth)**
-
----
-
-## 📝 Contribuir
-
-Esta documentación es un proyecto vivo. Si encuentras errores, tienes sugerencias o quieres contribuir:
-
-1. **[Reportar Issues](https://github.com/nglmercer/open-bauth/docs/issues)**
-2. **[Proponer Mejoras](https://github.com/nglmercer/open-bauth/docs/pulls)**
-
----
-
-*Documentación generada para la Librería de Autenticación v1.0.7*
-*Última actualización: $(date)*
+*Updated: 2025*
