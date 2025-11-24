@@ -5,12 +5,13 @@
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=json-web-tokens&logoColor=white)](https://jwt.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+
 A comprehensive, framework-agnostic authentication and authorization library built with TypeScript, Bun, and SQLite. It provides JWT-based auth, RBAC (roles and permissions), framework-neutral middleware, and a flexible database layer.
 
-- Runtime: Bun (Node.js compatible for most features)
-- Storage: SQLite by default (via Bun), **extensible to other databases via adapter system**
-- Language: TypeScript, with full type definitions
-- Features: Schema extensions, BIT type support, advanced filtering, RBAC, JWT auth, **custom database adapters**
+- **Runtime**: Bun (Node.js compatible for most features)
+- **Storage**: SQLite by default (via Bun), **extensible to other databases via adapter system**
+- **Language**: TypeScript, with full type definitions
+- **Features**: Schema extensions, BIT type support, advanced filtering, RBAC, JWT auth, **custom database adapters**
 
 ---
 
@@ -18,21 +19,31 @@ A comprehensive, framework-agnostic authentication and authorization library bui
 
 Using Bun:
 
-- Install as a dependency: `bun add open-bauth`
-- Or clone this repository and work locally: `git clone https://github.com/nglmercer/open-bauth.git`
+```bash
+# Install as a dependency
+bun add open-bauth
+
+# Or clone this repository and work locally
+git clone https://github.com/nglmercer/open-bauth.git
+```
 
 Build and test locally:
 
-- Build: `bun run build`
-- Test: `bun test`
+```bash
+# Build
+bun run build
+
+# Test
+bun test
+```
 
 ---
 
 ## Quick Start
 
-1) Initialize the database and seed defaults (users/roles/permissions tables):
+### 1) Initialize database and seed defaults (users/roles/permissions tables):
 
-```ts
+```typescript
 import { Database } from 'bun:sqlite';
 import { DatabaseInitializer } from 'open-bauth';
 
@@ -42,9 +53,9 @@ await dbInitializer.initialize();
 await dbInitializer.seedDefaults();
 ```
 
-2) Initialize services (JWT, Auth, Permissions):
+### 2) Initialize services (JWT, Auth, Permissions):
 
-```ts
+```typescript
 import { JWTService, AuthService, PermissionService } from 'open-bauth';
 
 const jwtService = new JWTService(process.env.JWT_SECRET || 'dev-secret', '24h');
@@ -52,19 +63,30 @@ const authService = new AuthService(dbInitializer, jwtService);
 const permissionService = new PermissionService(dbInitializer);
 ```
 
-3) Register and login:
+### 3) Register and login:
 
-```ts
-const register = await authService.register({ email: 'user@example.com', password: 'StrongP@ssw0rd' });
+```typescript
+const register = await authService.register({ 
+  email: 'user@example.com', 
+  password: 'StrongP@ssw0rd',
+  first_name: 'John',
+  last_name: 'Doe'
+});
+
 if (!register.success) throw new Error(register.error?.message);
 
-const login = await authService.login({ email: 'user@example.com', password: 'StrongP@ssw0rd' });
+const login = await authService.login({ 
+  email: 'user@example.com', 
+  password: 'StrongP@ssw0rd' 
+});
+
 if (!login.success) throw new Error(login.error?.message);
 console.log('JWT:', login.token);
 ```
 
-4) Use advanced schema extensions and BIT type support:
-```ts
+### 4) Use advanced schema extensions and BIT type support:
+
+```typescript
 import { setDatabaseConfig, SchemaExtensions } from 'open-bauth';
 
 // Configure schema extensions
@@ -87,9 +109,9 @@ const activeNotifications = await notifications.search({
 });
 ```
 
-5) Use framework-agnostic middleware (example with Hono):
+### 5) Use framework-agnostic middleware (example with Hono):
 
-```ts
+```typescript
 import { Hono } from 'hono';
 import { createAuthMiddleware, createPermissionMiddleware } from 'open-bauth';
 
@@ -109,37 +131,50 @@ app.get('/moderate', async (c) => canEditContent(c));
 
 ---
 
-## What’s Exported from the Library
+## What's Exported from Library
 
-This library’s public API is re-exported from the entrypoint so you can import from a single place.
+This library's public API is re-exported from the entrypoint so you can import from a single place.
 
-- Middleware
-  - authenticateRequest(request, services)
-  - createAuthMiddleware(services, required?)
-  - createPermissionMiddleware(services, requiredPermissions, options?)
-  - createRoleMiddleware(requiredRoles)
+### Middleware
+- [`authenticateRequest(request, services)`](docs/middleware.md#basic-authentication)
+- [`createAuthMiddleware(services, required?)`](docs/middleware.md#authentication-middleware)
+- [`createPermissionMiddleware(services, requiredPermissions, options?)`](docs/middleware.md#permission-middleware)
+- [`createRoleMiddleware(requiredRoles)`](docs/middleware.md#role-middleware)
 
-- Services
-  - AuthService
-  - JWTService, initJWTService(secret, expiresIn?), getJWTService()
-  - PermissionService
+### Services
+- [`AuthService`](docs/services.md#authservice) - Registration, login, user management, role assignment
+- [`JWTService, initJWTService(secret, expiresIn?), getJWTService()`](docs/services.md#jwtservice) - JWT generation/verification, DPoP, refresh rotation
+- [`PermissionService`](docs/services.md#permissionservice) - RBAC - roles, permissions, checks
+- [`OAuthService`](docs/services.md#oauthservice) - Full OAuth 2.0 flows, clients, tokens
+- [`SecurityService`](docs/services.md#securityservice) - PKCE, DPoP, challenges, hashing
+- [`EnhancedUserService`](docs/services.md#enhanceduserservice) - MFA, biometrics, devices
 
-- Database
-  - BaseController (generic CRUD + query helpers)
-  - DatabaseInitializer (migrations, integrity checks, seeds, controllers)
-  - Schema Extensions (addUserProfileFields, addSoftDelete, addMetadata, etc.)
+### Database
+- [`BaseController`](docs/database-extension-spec.md#basecontroller) (generic CRUD + query helpers)
+- [`DatabaseInitializer`](docs/database-extension-spec.md#databaseinitializer) (migrations, integrity checks, seeds, controllers)
+- [`Schema Extensions`](docs/database-extension-spec.md#predefined-extensions) (addUserProfileFields, addSoftDelete, addMetadata, etc.)
 
-- Configuration
-  - setDatabaseConfig(), getDatabaseConfig()
-  - SchemaExtensions helper functions
-  - Custom table names support
+### Configuration
+- [`setDatabaseConfig(), getDatabaseConfig()`](docs/database-extension-spec.md#global-configuration)
+- [`SchemaExtensions`](docs/database-extension-spec.md#extension-functions) helper functions
+- [`Custom table names`](docs/database-extension-spec.md#custom-table-names) support
 
-- Logger
-  - Logger class, getLogger(), defaultLogger, convenience log methods, configuration helpers
+### Database Adapters
+- [`IDatabaseAdapter`](docs/adapter-usage.md#idatabaseadapter-interface) - Interface for custom database adapters
+- [`JsonFileAdapter`](docs/adapter-usage.md#jsonfileadapter) - File-based JSON adapter
+- [`MemoryAdapter`](docs/adapter-usage.md#memoryadapter) - In-memory adapter
+- [`AdapterFactory`](docs/adapter-usage.md#adapter-factory) - Factory for creating adapters
 
-- Types (from src/types/auth)
-  - User, Role, Permission, RegisterData, LoginData, UpdateUserData, AuthResult, AuthErrorType, AuthContext, AuthRequest, AuthResponse, PermissionOptions, AssignRoleData, JWTPayload, SessionInfo, and more
+### Logger
+- [`Logger class, getLogger(), defaultLogger`](docs/logger.md#logger-class) - Complete logging system
+- [`convenience log methods`](docs/logger.md#convenience-functions) - Quick logging functions
+- [`configuration helpers`](docs/logger.md#configuration) - Setup and management helpers
 
+### Types (from src/types/auth)
+- [`User, Role, Permission`](docs/services.md#main-types) - Main entities
+- [`RegisterData, LoginData, AuthResult`](docs/services.md#authresult) - Authentication types
+- [`JWTPayload, OAuthClient, TokenResponse`](docs/services.md#oauth-types) - JWT and OAuth types
+- [`AuthContext, AuthRequest`](docs/middleware.md#authentication-context) - Middleware context types
 
 ---
 
@@ -149,7 +184,7 @@ The library now includes a flexible adapter system that allows you to use custom
 
 ### Using Custom Adapters
 
-```ts
+```typescript
 import { BaseController } from 'open-bauth';
 import { SimpleCustomAdapter } from './examples/custom-adapter-example';
 
@@ -170,7 +205,7 @@ const user = await userController.findById(1);
 
 ### Creating Your Own Adapter
 
-```ts
+```typescript
 import { IDatabaseAdapter, DatabaseConnection } from 'open-bauth';
 
 export class MyCustomAdapter implements IDatabaseAdapter {
@@ -230,7 +265,7 @@ export class MyCustomAdapter implements IDatabaseAdapter {
 }
 ```
 
-**Documentation**: See `docs/adapter-usage.md` for complete adapter documentation and examples.
+**Documentation**: See [`docs/adapter-usage.md`](docs/adapter-usage.md) for complete adapter documentation and examples.
 
 ---
 
@@ -239,27 +274,27 @@ export class MyCustomAdapter implements IDatabaseAdapter {
 ### AuthService
 High-level auth flows: register, login, user lookup/update, role assignment, etc. Depends on the database layer and JWT service.
 
-- register(data: RegisterData) -> AuthResult
-- login(data: LoginData) -> AuthResult
-- findUserById(id, options?) -> User | null
-- assignRole(userId, roleName) / removeRole(userId, roleName)
-- getUsers(page?, limit?, options?) -> { users, total }
+- `register(data: RegisterData) -> AuthResult`
+- `login(data: LoginData) -> AuthResult`
+- `findUserById(id, options?) -> User | null`
+- `assignRole(userId, roleName) / removeRole(userId, roleName)`
+- `getUsers(page?, limit?, options?) -> { users, total }`
 
 ### JWTService
 Minimal, native Web Crypto–based JWT operations.
 
-- generateToken(user)
-- verifyToken(token)
-- extractTokenFromHeader('Bearer ...')
-- getTokenRemainingTime(token), isTokenExpired(token)
-- refreshTokenIfNeeded(token, user, threshold?)
+- `generateToken(user)`
+- `verifyToken(token)`
+- `extractTokenFromHeader('Bearer ...')`
+- `getTokenRemainingTime(token), isTokenExpired(token)`
+- `refreshTokenIfNeeded(token, user, threshold?)`
 
 ### PermissionService
 Queries and helpers for roles and permissions (e.g., getRolePermissions, user permission checks).
 
 ### DatabaseInitializer and BaseController
-- DatabaseInitializer handles table creation/migrations, integrity checks, seeding defaults, and creating controllers for tables.
-- BaseController<T> provides CRUD and query utilities (findFirst, search, count, random, etc.).
+- `DatabaseInitializer` handles table creation/migrations, integrity checks, seeding defaults, and creating controllers for tables.
+- `BaseController<T>` provides CRUD and query utilities (findFirst, search, count, random, etc.).
 
 ---
 
@@ -269,7 +304,7 @@ The library includes a powerful schema extension system that allows you to custo
 
 ### Basic Schema Extensions
 
-```ts
+```typescript
 import { setDatabaseConfig, SchemaExtensions } from 'open-bauth';
 
 // Add profile fields to users table
@@ -284,15 +319,15 @@ setDatabaseConfig({
 
 ### Available Schema Extensions
 
-- **addUserProfileFields()**: Adds phone_number, avatar_url, timezone, language
-- **addSoftDelete()**: Adds deleted_at and is_deleted fields
-- **addAuditFields()**: Adds created_by and updated_by fields
-- **addMetadata()**: Adds metadata field for storing JSON data
-- **useStatusField()**: Replaces is_active with status field
+- **`addUserProfileFields()`**: Adds phone_number, avatar_url, timezone, language
+- **`addSoftDelete()`**: Adds deleted_at and is_deleted fields
+- **`addAuditFields()`**: Adds created_by and updated_by fields
+- **`addMetadata()`**: Adds metadata field for storing JSON data
+- **`useStatusField()`**: Replaces is_active with status field
 
 ### Custom Schema Extensions
 
-```ts
+```typescript
 setDatabaseConfig({
   schemaExtensions: {
     users: {
@@ -311,7 +346,7 @@ setDatabaseConfig({
 
 ### Custom Table Names
 
-```ts
+```typescript
 setDatabaseConfig({
   tableNames: {
     users: "app_users",
@@ -331,7 +366,7 @@ The library supports BIT type fields for SQL Server compatibility and provides a
 
 BIT fields automatically handle multiple boolean representations:
 
-```ts
+```typescript
 // All these are equivalent for BIT fields
 create({ priority: true })
 create({ priority: 1 })
@@ -343,7 +378,7 @@ create({ priority: Buffer.from([1]) })
 
 Use advanced filters for complex boolean logic:
 
-```ts
+```typescript
 // Find records where field is truthy (equals 1 or true)
 controller.search({ read: { isTruthy: true } })
 
@@ -361,7 +396,7 @@ controller.search({ archived: { isSet: false } })
 
 Search with mixed boolean representations in IN queries:
 
-```ts
+```typescript
 // All these representations work together
 controller.search({
   read: [true, 1, new Uint8Array([1]), Buffer.from([1])]
@@ -372,12 +407,12 @@ controller.search({
 
 Add completely custom tables to your database:
 
-```ts
+```typescript
 const customSchema = {
   tableName: "notifications",
   columns: [
     { name: "id", type: "TEXT", primaryKey: true },
-    { name: "user_id", type: "TEXT", notNull: true },
+    { name: "user_id", type: "TEXT", notNull: true, references: { table: "users", column: "id" } },
     { name: "title", type: "TEXT", notNull: true },
     { name: "read", type: "BIT", defaultValue: false },
     { name: "priority", type: "BIT" }
@@ -398,7 +433,8 @@ const dbInitializer = new DatabaseInitializer({
 The library provides several helper functions for managing database configuration:
 
 ### Global Configuration
-```ts
+
+```typescript
 import { setDatabaseConfig, getDatabaseConfig, getAllTableNames } from 'open-bauth';
 
 // Set global configuration
@@ -415,7 +451,8 @@ const tableNames = getAllTableNames();
 ```
 
 ### Common Columns
-```ts
+
+```typescript
 import { COMMON_COLUMNS } from 'open-bauth';
 
 // Access predefined column definitions
@@ -429,7 +466,8 @@ const customExtension = {
 ```
 
 ### Schema Registry
-```ts
+
+```typescript
 import { SchemaRegistry } from 'open-bauth';
 
 // Create and manage schema registries
@@ -447,28 +485,28 @@ registry1.registerMany([schema5, schema6]);
 
 ## Middleware (Framework-Agnostic)
 
-- authenticateRequest(request, { jwtService, authService, permissionService })
+- `authenticateRequest(request, { jwtService, authService, permissionService })`
   - Verifies JWT from Authorization header, loads user and permissions, returns an AuthContext.
-- createAuthMiddleware(services, required = true)
+- `createAuthMiddleware(services, required = true)`
   - Attaches auth context to request. When required is true, rejects if unauthenticated.
-- createPermissionMiddleware(services, permissions, { requireAll = false })
-  - Ensures the user has at least one (or all) of the required permissions.
-- createRoleMiddleware(requiredRoles)
-  - Ensures the user has at least one required role.
+- `createPermissionMiddleware(services, permissions, { requireAll = false })`
+  - Ensures user has at least one (or all) of required permissions.
+- `createRoleMiddleware(requiredRoles)`
+  - Ensures user has at least one required role.
 
 ---
 
 ## Logging
 
 A simple yet flexible logger is included:
-- getLogger(), defaultLogger, convenience log.debug/info/warn/error/fatal
-- Configuration helpers via createConfig and ENVIRONMENT_CONFIGS
+- `getLogger(), defaultLogger, convenience log.debug/info/warn/error/fatal`
+- Configuration helpers via `createConfig` and `ENVIRONMENT_CONFIGS`
 
 ---
 
 ## Type Safety
 
-The library ships with rich TypeScript types for requests, responses, entities, config, and utility types. Import what you need from the package to get end-to-end type safety in your app.
+The library ships with rich TypeScript types for requests, responses, entities, config, and utility types. Import what you need from package to get end-to-end type safety in your app.
 
 ---
 
@@ -476,7 +514,7 @@ The library ships with rich TypeScript types for requests, responses, entities, 
 
 Here's a complete example using schema extensions and BIT type support:
 
-```ts
+```typescript
 import { Database } from 'bun:sqlite';
 import { 
   DatabaseInitializer, 
@@ -539,14 +577,21 @@ console.log('Unread high priority notifications:', unreadHighPriority.data);
 
 For in-depth guides and specifications, see the [docs/](./docs/) directory:
 
-- [Adapter Usage](./docs/adapter-usage.md) - Custom database adapters
-- [Database Extension Specification](./docs/database-extension-spec.md) - Extending schema
-- [OAuth 2.0 Implementation](./docs/oauth-2.0-implementation.md) - Full OAuth 2.0 guide
-- [Logger](./docs/logger.md) - Logging system
-- [Services Overview](./docs/services.md) - Core services API
-- [Middleware](./docs/middleware.md) - Framework-agnostic middleware
-- [Testing](./docs/testing.md) - Running and writing tests
-- [Docs Index](./docs/README.md)
+### 📖 Main Guides
+- [**Services**](./docs/services.md) - Complete API of all services
+- [**Middleware**](./docs/middleware.md) - Framework-agnostic middleware
+- [**Database Adapters**](./docs/adapter-usage.md) - Custom database adapters
+- [**Database Extensions**](./docs/database-extension-spec.md) - Schema extension specification
+
+### 🔐 Security & Authentication
+- [**OAuth 2.0 Implementation**](./docs/oauth-2.0-implementation.md) - Complete OAuth 2.0 guide
+- [**Logger**](./docs/logger.md) - Logging system documentation
+- [**Testing**](./docs/testing.md) - Running and writing tests
+
+### 📋 Reference
+- [**Docs Index**](./docs/README.md) - Complete documentation navigation
+
+---
 
 ## Library Info
 
@@ -559,12 +604,13 @@ You can inspect metadata at runtime:
 The library includes comprehensive test coverage for all features including schema extensions and BIT type support.
 
 ### Running Tests
+
 ```bash
 # Run all tests
-bun test
+bun test --preload tests/setup.ts
 
 # Run tests with coverage
-bun test --coverage
+bun test --coverage --preload tests/setup.ts
 
 # Run specific test files
 bun test tests/bit-data.test.ts
@@ -572,6 +618,7 @@ bun test tests/schema-extension.test.ts
 ```
 
 ### Test Features
+
 - **Schema Extensions**: Tests all predefined extensions and custom schema modifications
 - **BIT Type Support**: Tests boolean representations, IN queries, and advanced filtering
 - **Database Integration**: Tests foreign key constraints, table relationships, and migrations
@@ -579,14 +626,16 @@ bun test tests/schema-extension.test.ts
 - **JWT Authentication**: Tests token generation, verification, and middleware integration
 
 ### Development Examples
-See the `examples/` and `docs/` directories for comprehensive usage examples:
 
-- `docs/usage-example.ts` - Complete usage examples with all features
-- `docs/example-config.ts` - Configuration examples for different scenarios
-- `examples/integrations/` - Framework integration examples
+See `examples/` and `docs/` directories for comprehensive usage examples:
+
+- [`docs/usage-example.ts`](./docs/usage-example.ts) - Complete usage examples with all features
+- [`docs/example-config.ts`](./docs/example-config.ts) - Configuration examples for different scenarios
+- [`examples/integrations/`](./examples/integrations/) - Framework integration examples
 
 ### BIT Type Testing Examples
-```ts
+
+```typescript
 // Test mixed boolean representations
 const results = await controller.search({
   read: [true, false, 1, 0, new Uint8Array([1]), Buffer.from([0])]

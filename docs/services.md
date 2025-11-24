@@ -2,77 +2,657 @@
 
 The library provides a comprehensive set of services for authentication, authorization, OAuth 2.0, security, and more. All services are initialized with [`DatabaseInitializer`](src/database/database-initializer.ts) and follow a consistent API.
 
-## Core Services
+## 📋 Table of Contents
+
+- [Core Services](#core-services)
+- [Service Factory](#service-factory)
+- [Type Definitions](#type-definitions)
+- [Usage Examples](#usage-examples)
+- [Best Practices](#best-practices)
+
+## 🏗️ Core Services
 
 ### [`AuthService`](src/services/auth.ts:18)
-**Purpose**: User registration, login, management, role assignment.
+
+**Purpose**: User registration, login, management, and role assignment.
 
 **Key Methods**:
-- `register(data)` → [`AuthResult`](src/types/auth.ts)
-- `login(data)` → [`AuthResult`](src/types/auth.ts)
+- `register(data)` → [`AuthResult`](src/types/auth.ts:402)
+  - Registers a new user with email, password, and optional data
+  - Validates unique email and automatically hashes password
+- `login(data)` → [`AuthResult`](src/types/auth.ts:402)
+  - Authenticates user with email and password
+  - Returns JWT token on successful authentication
 - `findUserById(id)` → `User | null`
-- `assignRole(userId, roleName)`
-- `getUsers(page, limit)`
+  - Finds user by ID with optional role/permission inclusion
+- `assignRole(userId, roleName)` → `Result`
+  - Assigns role to user with validation
+- `removeRole(userId, roleName)` → `Result`
+  - Removes role from user with cleanup
+- `getUsers(page?, limit?, options?)` → `{ users: User[], total: number }`
+  - Paginated user listing with filtering options
+- `updateUser(userId, data)` → `AuthResult`
+  - Updates user data with validation
+- `changePassword(userId, oldPassword, newPassword)` → `Result`
+  - Secure password change with validation
+- `deactivateUser(userId)` → `Result`
+  - Deactivates user account
+- `activateUser(userId)` → `Result`
+  - Activates user account
 
-### [`JWTService`](src/services/jwt.ts:10)
-**Purpose**: JWT generation/verification, DPoP, refresh rotation.
-
-**Key Methods**:
-- `generateToken(user)` → `string`
-- `verifyToken(token)` → [`JWTPayload`](src/types/auth.ts)
-- `verifyDPoPProof(dpop, method, uri)`
-- `rotateRefreshToken(oldToken, user)`
-- `extractTokenFromHeader(header)`
-
-### [`PermissionService`](src/services/permissions.ts:20)
-**Purpose**: RBAC - roles, permissions, checks.
-
-**Key Methods**:
-- `createPermission(data)`
-- `assignPermissionToRole(roleId, permId)`
-- `userHasPermission(userId, permName)` → `boolean`
-- `userCanAccessResource(userId, resource, action)` → `boolean`
-
-### [`OAuthService`](src/services/oauth.ts:35)
-**Purpose**: Full OAuth 2.0 flows, clients, tokens.
-
-**Key Methods**:
-- `createClient(data)` → [`OAuthClient`](src/types/oauth.ts)
-- `handleAuthorizationRequest(req, user)`
-- `handleTokenRequest(req)` → [`TokenResponse`](src/types/oauth.ts)
-- `handleIntrospectionRequest(req)`
-
-### [`SecurityService`](src/services/security.ts:16)
-**Purpose**: PKCE, DPoP, challenges, hashing.
-
-**Key Methods**:
-- `generatePKCEChallenge(method)`
-- `verifyPKCEChallenge(verifier, challenge, method)` → `boolean`
-- `generateDPoPProof(method, uri, key)`
-- `createChallenge(type, data)`
-- `hashPassword(password)` → `{hash, salt}`
-
-### [`EnhancedUserService`](src/services/enhanced-user.ts)
-**Purpose**: Advanced user features (MFA, biometrics, devices).
-
-### Factory
-- [`serviceFactory`](src/services/service-factory.ts): Dependency injection.
-
-## Initialization Example
+**Usage Example**:
 ```typescript
-const dbInitializer = new DatabaseInitializer({ database: db });
-await dbInitializer.initialize();
-
-const jwtService = new JWTService(secret);
 const authService = new AuthService(dbInitializer, jwtService);
-const permissionService = new PermissionService(dbInitializer);
-const oauthService = new OAuthService(dbInitializer, securityService, jwtService);
+
+// Register new user
+const registerResult = await authService.register({
+  email: 'user@example.com',
+  password: 'SecurePass123!',
+  first_name: 'John',
+  last_name: 'Doe'
+});
+
+if (!registerResult.success) {
+  console.error('Registration failed:', registerResult.error);
+  return;
+}
+
+// Login user
+const loginResult = await authService.login({
+  email: 'user@example.com',
+  password: 'SecurePass123!'
+});
+
+if (loginResult.success) {
+  console.log('JWT Token:', loginResult.token);
+  console.log('User:', loginResult.user);
+}
 ```
 
-## Best Practices
-- Initialize services after DB setup.
-- Use structured logging with services.
-- Validate inputs with types.
-- Handle `AuthResult.error` in all calls.
+### [`JWTService`](src/services/jwt.ts:10)
 
-See individual source files for full API.
+**Purpose**: JWT generation/verification, DPoP, and refresh token rotation.
+
+**Key Methods**:
+- `generateToken(user, expiresIn?)` → `string`
+  - Generates JWT access token with user payload
+  - Supports custom expiration time
+  - Includes ID token for OpenID Connect
+- `verifyToken(token)` → [`JWTPayload`](src/types/auth.ts:416)
+  - Verifies and decodes JWT token
+  - Validates signature and expiration
+  - Returns user payload with roles/permissions
+- `generateRefreshToken(userId, expiresIn?)` → `string`
+  - Generates secure refresh token
+  - Uses cryptographic random generation
+- `verifyRefreshToken(token)` → `string | null`
+  - Verifies refresh token validity
+  - Returns user ID on success
+- `rotateRefreshToken(oldToken, newToken)` → `Result`
+  - Rotates refresh token securely
+  - Invalidates old token immediately
+- `extractTokenFromHeader(header)` → `string | null`
+  - Extracts token from Authorization header
+  - Supports Bearer and custom schemes
+- `getTokenRemainingTime(token)` → `number`
+  - Returns remaining time in seconds
+- `isTokenExpired(token)` → `boolean`
+  - Checks if token is expired
+- `refreshTokenIfNeeded(token, user, threshold?)` → `string | null`
+  - Auto-refreshes token if near expiration
+- `verifyDPoPProof(dpop, method, uri)` → `Result`
+  - Verifies DPoP proof according to RFC 9449
+
+**Usage Example**:
+```typescript
+const jwtService = new JWTService('your-secret-key', '24h');
+
+// Generate access token
+const token = await jwtService.generateToken({
+  id: user.id,
+  email: user.email,
+  roles: user.roles,
+  permissions: user.permissions
+});
+
+// Verify token
+const payload = await jwtService.verifyToken(token);
+console.log('User ID:', payload.userId);
+console.log('Roles:', payload.roles);
+
+// Generate refresh token
+const refreshToken = await jwtService.generateRefreshToken(user.id);
+```
+
+### [`PermissionService`](src/services/permissions.ts:20)
+
+**Purpose**: RBAC - role management, permissions, and access checks.
+
+**Key Methods**:
+- `createPermission(data)` → [`PermissionResult`](src/types/auth.ts:444)
+  - Creates new permission with name, resource, and action
+  - Validates permission uniqueness
+- `updatePermission(permissionId, data)` → [`PermissionResult`](src/types/auth.ts:444)
+  - Updates existing permission
+  - Maintains audit trail
+- `deletePermission(permissionId)` → [`PermissionResult`](src/types/auth.ts:444)
+  - Deletes permission and its assignments
+  - Cleans up role associations
+- `createRole(data)` → [`RoleResult`](src/types/auth.ts:458)
+  - Creates new role with name and description
+- `updateRole(roleId, data)` → [`RoleResult`](src/types/auth.ts:458)
+  - Updates existing role
+  - Preserves permissions
+- `deleteRole(roleId)` → [`RoleResult`](src/types/auth.ts:458)
+  - Deletes role and its assignments
+  - Removes from all users
+- `assignPermissionToRole(roleId, permissionId)` → [`PermissionResult`](src/types/auth.ts:444)
+  - Assigns permission to role
+  - Validates existence of both
+- `removePermissionFromRole(roleId, permissionId)` → [`PermissionResult`](src/types/auth.ts:444)
+  - Removes permission from role
+  - Maintains consistency
+- `updateRolePermissions(roleId, permissionIds)` → [`PermissionResult`](src/types/auth.ts:444)
+  - Updates all permissions for a role
+  - Replaces entire permission set
+- `assignRoleToUser(userId, roleId)` → `Result`
+  - Assigns role to user
+  - Validates role existence
+- `removeRoleFromUser(userId, roleId)` → `Result`
+  - Removes role from user
+  - Updates user permissions cache
+- `userHasPermission(userId, permissionName)` → `boolean`
+  - Checks if user has specific permission
+  - Evaluates through role assignments
+- `userCanAccessResource(userId, resource, action)` → `boolean`
+  - Checks resource-level access
+  - Supports wildcard permissions
+- `getUserRoles(userId)` → `Role[]`
+  - Gets all user roles
+  - Includes inherited roles
+- `getUserPermissions(userId)` → `Permission[]`
+  - Gets all user permissions
+  - Includes role-based and direct permissions
+- `getRolePermissions(roleId)` → `Permission[]`
+  - Gets all permissions for a role
+  - Resolves permission hierarchy
+
+**Usage Example**:
+```typescript
+const permissionService = new PermissionService(dbInitializer);
+
+// Create permission
+const createResult = await permissionService.createPermission({
+  name: 'users:read',
+  resource: 'users',
+  action: 'read',
+  description: 'Read user information'
+});
+
+// Create role
+const roleResult = await permissionService.createRole({
+  name: 'admin',
+  description: 'Administrator with full access'
+});
+
+// Assign permission to role
+await permissionService.assignPermissionToRole(roleResult.role!.id, createResult.permission!.id);
+
+// Check user permission
+const canRead = await permissionService.userHasPermission(userId, 'users:read');
+```
+
+### [`OAuthService`](src/services/oauth.ts:35)
+
+**Purpose**: Complete OAuth 2.0 flows, client management, and token handling.
+
+**Key Methods**:
+- `createClient(data)` → [`OAuthClient`](src/types/oauth.ts:8)
+  - Creates new OAuth client with full configuration
+  - Validates client metadata
+- `updateClient(id, data)` → [`OAuthClient`](src/types/oauth.ts:8)
+  - Updates existing OAuth client
+  - Maintains client secrets
+- `findClientByClientId(clientId)` → `OAuthClient | null`
+  - Finds client by client ID
+  - Includes active status check
+- `authenticateClient(clientId, clientSecret)` → `OAuthClient | null`
+  - Authenticates client credentials
+  - Validates secret hash
+- `validateRedirectUri(clientId, redirectUri)` → `boolean`
+  - Validates client redirect URI
+  - Prevents open redirect attacks
+- `handleAuthorizationRequest(request, user)` → [`AuthorizationResponse`](src/types/oauth.ts:255)
+  - Handles OAuth 2.0 authorization request
+  - Supports PKCE and state parameters
+- `handleTokenRequest(request)` → [`TokenResponse`](src/types/oauth.ts:282)
+  - Handles OAuth 2.0 token request
+  - Supports all grant types
+- `handleDeviceAuthorizationRequest(request)` → [`DeviceAuthorizationResponse`](src/types/oauth.ts:299)
+  - Handles device authorization flow
+  - RFC 8628 compliant
+- `handleIntrospectionRequest(request)` → [`IntrospectionResponse`](src/types/oauth.ts:313)
+  - Handles token introspection
+  - RFC 7662 compliant
+- `handleRevocationRequest(request)` → `Result`
+  - Handles token revocation
+  - RFC 7009 compliant
+- `createAuthCode(data)` → [`AuthorizationCode`](src/types/oauth.ts:65)
+  - Creates authorization code
+  - Supports PKCE binding
+- `createRefreshToken(data)` → [`RefreshToken`](src/types/oauth.ts:84)
+  - Creates refresh token
+  - With rotation support
+- `rotateRefreshToken(id, newToken)` → [`RefreshToken`](src/types/oauth.ts:84)
+  - Rotates refresh token
+  - Invalidates previous token
+
+**Usage Example**:
+```typescript
+const oauthService = new OAuthService(dbInitializer, securityService, jwtService);
+
+// Create OAuth client
+const client = await oauthService.createClient({
+  client_id: 'my-app',
+  client_secret: 'secret-key',
+  client_name: 'My Application',
+  redirect_uris: ['https://myapp.com/callback'],
+  grant_types: [OAuthGrantType.AUTHORIZATION_CODE, OAuthGrantType.REFRESH_TOKEN],
+  response_types: [OAuthResponseType.CODE],
+  scope: 'read write profile'
+});
+
+// Handle authorization request
+const authResponse = await oauthService.handleAuthorizationRequest({
+  response_type: OAuthResponseType.CODE,
+  client_id: 'my-app',
+  redirect_uri: 'https://myapp.com/callback',
+  scope: 'read write',
+  state: 'random-state',
+  code_challenge: pkceChallenge.code_challenge,
+  code_challenge_method: PKCEMethod.S256
+}, user);
+```
+
+### [`SecurityService`](src/services/security.ts:16)
+
+**Purpose**: PKCE, DPoP, security challenges, hashing, and encryption.
+
+**Key Methods**:
+- `generatePKCEChallenge(method)` → [`PKCEChallenge`](src/types/oauth.ts:376)
+  - Generates PKCE challenge (RFC 7636)
+  - Supports S256 and plain methods
+- `verifyPKCEChallenge(verifier, challenge, method)` → `boolean`
+  - Verifies PKCE challenge
+  - Cryptographically secure validation
+- `generateState(length?)` → `string`
+  - Generates cryptographically secure state
+  - For CSRF protection
+- `generateNonce(length?)` → `string`
+  - Generates nonce for replay protection
+  - With entropy validation
+- `generateDPoPProof(method, uri, key, jwkThumbprint?)` → `string`
+  - Generates DPoP proof
+  - RFC 9449 compliant
+- `verifyDPoPProof(dpop, method, uri)` → `Result`
+  - Verifies DPoP proof
+  - With header validation
+- `createChallenge(type, data, expirationMinutes?)` → [`SecurityChallenge`](src/types/oauth.ts:400)
+  - Creates security challenge
+  - Supports multiple challenge types
+- `verifyChallenge(challengeId, solution)` → `Result`
+  - Verifies challenge solution
+  - With rate limiting
+- `hashPassword(password)` → `{ hash: string, salt: string }`
+  - Secure password hashing
+  - Uses bcrypt with configurable rounds
+- `verifyPassword(password, hash, salt)` → `boolean`
+  - Verifies password against hash
+  - Constant-time comparison
+- `encrypt(data, key)` → `string`
+  - Encrypts data with AES-GCM
+  - With authenticated encryption
+- `decrypt(encryptedData, key)` → `string`
+  - Decrypts AES-GCM encrypted data
+  - With authentication verification
+- `generateSecureToken(length?)` → `string`
+  - Generates cryptographically secure token
+  - Uses Web Crypto API
+
+**Usage Example**:
+```typescript
+const securityService = new SecurityService();
+
+// Generate PKCE challenge
+const pkceChallenge = securityService.generatePKCEChallenge(PKCEMethod.S256);
+console.log('Code Challenge:', pkceChallenge.code_challenge);
+console.log('Code Verifier:', pkceChallenge.code_verifier);
+
+// Verify PKCE
+const isValid = securityService.verifyPKCEChallenge(
+  pkceChallenge.code_verifier,
+  pkceChallenge.code_challenge,
+  PKCEMethod.S256
+);
+
+// Hash password
+const { hash, salt } = await securityService.hashPassword('user-password');
+console.log('Hash:', hash);
+console.log('Salt:', salt);
+```
+
+### [`EnhancedUserService`](src/services/enhanced-user.ts:21)
+
+**Purpose**: Advanced user features (MFA, biometrics, device management).
+
+**Key Methods**:
+- `createAnonymousUser(sessionData)` → `Result`
+  - Creates anonymous user with session data
+  - Supports promotion to full user
+- `promoteAnonymousUser(anonymousId, userData)` → `Result`
+  - Promotes anonymous user to full user
+  - Preserves session data
+- `registerDevice(userId, deviceId, deviceName, deviceType)` → `Result`
+  - Registers device for user
+  - With trust level tracking
+- `trustDevice(userId, deviceId)` → `Result`
+  - Marks device as trusted
+  - For SSO purposes
+- `removeDevice(userId, deviceId)` → `Result`
+  - Removes device from user
+  - Revokes all sessions for device
+- `getUserDevices(userId)` → `UserDevice[]`
+  - Gets all user devices
+  - With trust status
+- `createDeviceSecret(userId, deviceId, deviceName, deviceType)` → `Result`
+  - Creates device secret for SSO
+  - One-time return of secret
+- `verifyDeviceSecret(deviceId, secret)` → `Result`
+  - Verifies device secret for SSO
+  - With rate limiting
+- `registerBiometricCredential(userId, biometricType, encryptedData, deviceId)` → `Result`
+  - Registers biometric credential
+  - With secure storage
+- `verifyBiometricCredential(userId, biometricType, providedData)` → `Result`
+  - Verifies biometric authentication
+  - With anti-replay protection
+- `getUserBiometricCredentials(userId)` → `BiometricCredential[]`
+  - Gets all user biometric credentials
+  - With device association
+- `setupMFA(userId, mfaType, config)` → `Result`
+  - Sets up MFA for user
+  - Supports TOTP, SMS, email
+- `verifyMFA(userId, mfaType, code)` → `Result`
+  - Verifies MFA code
+  - With attempt tracking
+- `getEnabledMFAConfigurations(userId)` → `MFAConfiguration[]`
+  - Gets user's active MFA configurations
+  - With backup methods
+- `disableMFA(userId, mfaType)` → `Result`
+  - Disables MFA method
+  - Requires re-authentication
+
+**Usage Example**:
+```typescript
+const enhancedUserService = new EnhancedUserService(dbInitializer, securityService);
+
+// Create anonymous user
+const anonymousResult = await enhancedUserService.createAnonymousUser({
+  sessionId: 'session-123',
+  preferences: { theme: 'dark', language: 'en' }
+});
+
+// Promote to full user
+const promoteResult = await enhancedUserService.promoteAnonymousUser(
+  anonymousResult.anonymousUser!.anonymous_id,
+  {
+    email: 'user@example.com',
+    password: 'SecurePass123!',
+    first_name: 'John',
+    last_name: 'Doe'
+  }
+);
+
+// Setup MFA
+const mfaResult = await enhancedUserService.setupMFA(
+  promoteResult.user!.id,
+  MFAType.TOTP,
+  {
+    secret: 'JBSWY3DPEHPK3PXP',
+    is_primary: true,
+    backup_codes: ['123456', '789012']
+  }
+);
+```
+
+## 🏭 Service Factory
+
+### [`ServiceFactory`](src/services/service-factory.ts:11)
+
+**Purpose**: Dependency injection and centralized service management.
+
+**Key Methods**:
+- `createServices(config)` → `ServiceContainer`
+  - Creates all services with dependencies
+  - Ensures proper initialization order
+- `getService<T>(serviceName)` → `T`
+  - Gets service instance by name
+  - With type safety
+- `registerService(name, service)` → `void`
+  - Registers custom service
+  - With dependency injection
+- `initializeServices(config)` → `Promise<void>`
+  - Initializes all registered services
+  - With error handling
+
+**Usage Example**:
+```typescript
+import { ServiceFactory, createServices } from './src/services/service-factory';
+
+// Create service container
+const services = createServices({
+  database: db,
+  jwtSecret: 'your-secret',
+  jwtExpiration: '24h'
+});
+
+// Get services
+const authService = services.getService<AuthService>('auth');
+const jwtService = services.getService<JWTService>('jwt');
+```
+
+## 📝 Type Definitions
+
+### [`AuthResult`](src/types/auth.ts:402)
+Result of authentication operations with success/failure status.
+
+```typescript
+interface AuthResult {
+  success: boolean;
+  user?: User;
+  token?: string;
+  error?: {
+    type: AuthErrorType;
+    message: string;
+    details?: any;
+  };
+}
+```
+
+### [`JWTPayload`](src/types/auth.ts:416)
+JWT payload structure with user information and roles.
+
+```typescript
+interface JWTPayload {
+  userId: string;
+  email: string;
+  roles: string[];
+  permissions: string[];
+  iat: number;
+  exp: number;
+  iss?: string;
+  aud?: string;
+}
+```
+
+### [`OAuthClient`](src/types/oauth.ts:8)
+Complete OAuth 2.0 client configuration.
+
+```typescript
+interface OAuthClient {
+  client_id: string;
+  client_secret?: string;
+  client_name: string;
+  redirect_uris: string[];
+  grant_types: OAuthGrantType[];
+  response_types: OAuthResponseType[];
+  scope: string;
+  is_public: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+### [`TokenResponse`](src/types/oauth.ts:282)
+Standard OAuth 2.0 token response.
+
+```typescript
+interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token?: string;
+  scope?: string;
+  id_token?: string;
+}
+```
+
+### [`PermissionResult`](src/types/auth.ts:444) and [`RoleResult`](src/types/auth.ts:458)
+Results of permission and role operations.
+
+```typescript
+interface PermissionResult {
+  success: boolean;
+  permission?: Permission;
+  error?: {
+    type: string;
+    message: string;
+  };
+}
+
+interface RoleResult {
+  success: boolean;
+  role?: Role;
+  error?: {
+    type: string;
+    message: string;
+  };
+}
+```
+
+## 💡 Usage Examples
+
+### Complete Authentication Setup
+
+```typescript
+import { DatabaseInitializer } from './src/database/database-initializer';
+import { initializeServices } from './src/services/service-factory';
+import { SecurityService } from './src/services/security';
+
+// Initialize database
+const dbInitializer = new DatabaseInitializer({ database: db });
+await dbInitializer.initialize();
+await dbInitializer.seedDefaults();
+
+// Create all services
+const services = await initializeServices({
+  database: db,
+  jwtSecret: process.env.JWT_SECRET || 'dev-secret',
+  jwtExpiration: '24h'
+});
+
+// Extract services
+const { authService, jwtService, permissionService, oauthService, securityService, enhancedUserService } = services;
+
+// Use services
+const registerResult = await authService.register({
+  email: 'user@example.com',
+  password: 'SecurePass123!',
+  first_name: 'John',
+  last_name: 'Doe'
+});
+
+if (registerResult.success) {
+  console.log('User registered successfully');
+  console.log('JWT Token:', registerResult.token);
+}
+```
+
+### OAuth 2.0 Flow
+
+```typescript
+// Create OAuth service
+import { OAuthService } from './src/services/oauth';
+const oauthService = new OAuthService(dbInitializer, securityService, jwtService);
+
+// Create enhanced user service
+import { EnhancedUserService } from './src/services/enhanced-user';
+const enhancedUserService = new EnhancedUserService(dbInitializer, securityService);
+
+// Setup MFA for user
+const mfaResult = await enhancedUserService.setupMFA(
+  userId,
+  MFAType.TOTP,
+  {
+    secret: 'JBSWY3DPEHPK3PXP',
+    is_primary: true
+  }
+);
+
+// Handle OAuth authorization
+const authResponse = await oauthService.handleAuthorizationRequest({
+  response_type: OAuthResponseType.CODE,
+  client_id: 'my-app',
+  redirect_uri: 'https://myapp.com/callback',
+  scope: 'read write profile',
+  state: securityService.generateState(),
+  code_challenge: pkceChallenge.code_challenge,
+  code_challenge_method: PKCEMethod.S256
+}, user);
+```
+
+## 🎯 Best Practices
+
+### Service Initialization
+
+1. **Initialize Database First**: Always initialize database before services
+2. **Use Service Factory**: Prefer factory over manual instantiation
+3. **Handle Dependencies**: Let factory manage service dependencies
+4. **Error Handling**: Always check `success` property in results
+
+### Security Considerations
+
+1. **JWT Security**: Use strong secrets and appropriate expiration
+2. **Password Security**: Always hash passwords with salt
+3. **OAuth Security**: Implement PKCE for public clients
+4. **Rate Limiting**: Implement rate limiting for sensitive operations
+5. **Audit Logging**: Log all security-relevant events
+
+### Performance Optimization
+
+1. **Connection Pooling**: Use database connection pooling
+2. **Caching**: Cache frequently accessed permissions
+3. **Lazy Loading**: Load services only when needed
+4. **Batch Operations**: Use batch operations for multiple items
+
+### Error Handling
+
+1. **Consistent Errors**: Use standardized error format
+2. **Error Types**: Provide specific error types for different scenarios
+3. **Logging**: Log errors with appropriate context
+4. **User-Friendly**: Return user-friendly error messages
+
+---
+
+For complete implementation examples, see the [examples directory](../examples/) and [usage examples](./usage-example.ts).

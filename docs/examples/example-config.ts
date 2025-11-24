@@ -7,7 +7,7 @@ import {
   setDatabaseConfig,
   SchemaExtensions,
   COMMON_COLUMNS,
-} from "../src/database/config";
+} from "../../src/database/config";
 
 // Example 1: Custom table names with Spanish names
 const spanishTableNames = {

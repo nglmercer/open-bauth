@@ -4,7 +4,7 @@
  */
 
 import { Database } from "bun:sqlite";
-import { DatabaseInitializer } from "../src/database/database-initializer";
+import { DatabaseInitializer } from "../../src/database/database-initializer";
 import {
   setDatabaseConfig,
   getDatabaseConfig,
@@ -12,11 +12,11 @@ import {
   COMMON_COLUMNS,
   SchemaExtensions,
   createSchemaExtension,
-} from "../src/database/config";
+} from "../../src/database/config";
 import {
   initializeServices,
   getServices,
-} from "../src/services/service-factory";
+} from "../../src/services/service-factory";
 import { spanishTableNames, completeCustomConfig } from "./example-config";
 
 // ============================================================================
