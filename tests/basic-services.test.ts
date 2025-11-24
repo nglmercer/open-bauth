@@ -38,6 +38,7 @@ describe('Basic Services Tests', () => {
       const userData = {
         first_name: 'Test',
         last_name: 'User',
+        username: 'testuser',
         email: 'test@example.com',
         password: 'password123',
       };
@@ -46,6 +47,7 @@ describe('Basic Services Tests', () => {
       expect(result.success).toBe(true);
       expect(result.user).toBeDefined();
       expect(result.user!.email).toBe(userData.email);
+      expect(result.user!.username).toBe(userData.username);
       expect(result.token).toBeDefined();
     });
 
@@ -54,6 +56,7 @@ describe('Basic Services Tests', () => {
       const userData = {
         first_name: 'Login',
         last_name: 'User',
+        username: 'loginuser',
         email: 'login@example.com',
         password: 'password123',
       };
@@ -70,6 +73,7 @@ describe('Basic Services Tests', () => {
       const loginResult = await authService.login(loginData);
       expect(loginResult.success).toBe(true);
       expect(loginResult.user).toBeDefined();
+      expect(loginResult.user!.username).toBe(userData.username);
       expect(loginResult.token).toBeDefined();
     });
 
@@ -88,6 +92,7 @@ describe('Basic Services Tests', () => {
       const userData = {
         first_name: 'Duplicate',
         last_name: 'User',
+        username: 'duplicateuser',
         email: 'duplicate@example.com',
         password: 'password123',
       };
@@ -189,6 +194,7 @@ describe('Basic Services Tests', () => {
       const userData = {
         first_name: 'Role',
         last_name: 'User',
+        username: 'roleuser',
         email: 'role@example.com',
         password: 'password123',
       };

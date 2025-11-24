@@ -10,36 +10,38 @@ import {
  * Base schema definitions that will be customized based on configuration
  */
 const BASE_SCHEMAS: Record<string, Omit<TableSchema, "tableName">> = {
-  users: {
-    columns: [
-      {
-        name: "id",
-        type: "TEXT",
-        primaryKey: true,
-        defaultValue: "(lower(hex(randomblob(16))))",
-      },
-      { name: "email", type: "TEXT", unique: true, notNull: true },
-      { name: "password_hash", type: "TEXT", notNull: true },
-      { name: "first_name", type: "TEXT" },
-      { name: "last_name", type: "TEXT" },
-      {
-        name: "created_at",
-        type: "DATETIME",
-        defaultValue: "CURRENT_TIMESTAMP",
-      },
-      {
-        name: "updated_at",
-        type: "DATETIME",
-        defaultValue: "CURRENT_TIMESTAMP",
-      },
-      { name: "last_login_at", type: "DATETIME" },
-      { name: "is_active", type: "BOOLEAN", defaultValue: true },
-    ],
-    indexes: [
-      { name: "idx_users_email", columns: ["email"], unique: true },
-      { name: "idx_users_active", columns: ["is_active"] },
-    ],
-  },
+users: {
+  columns: [
+    {
+      name: "id",
+      type: "TEXT",
+      primaryKey: true,
+      defaultValue: "(lower(hex(randomblob(16))))",
+    },
+    { name: "email", type: "TEXT", unique: true, notNull: true },
+    { name: "username", type: "TEXT" },
+    { name: "password_hash", type: "TEXT", notNull: true },
+    { name: "first_name", type: "TEXT" },
+    { name: "last_name", type: "TEXT" },
+    {
+      name: "created_at",
+      type: "DATETIME",
+      defaultValue: "CURRENT_TIMESTAMP",
+    },
+    {
+      name: "updated_at",
+      type: "DATETIME",
+      defaultValue: "CURRENT_TIMESTAMP",
+    },
+    { name: "last_login_at", type: "DATETIME" },
+    { name: "is_active", type: "BOOLEAN", defaultValue: true },
+  ],
+  indexes: [
+    { name: "idx_users_email", columns: ["email"], unique: true },
+    { name: "idx_users_username", columns: ["username"], unique: true },
+    { name: "idx_users_active", columns: ["is_active"] },
+  ],
+},
   roles: {
     columns: [
       {

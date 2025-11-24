@@ -65,11 +65,12 @@ describe("Database Schema Extensions", () => {
 
       const usersSchema = schemas.find((s) => s.tableName === "users");
       expect(usersSchema).toBeDefined();
-      expect(usersSchema!.columns).toHaveLength(9);
+      expect(usersSchema!.columns).toHaveLength(10); // Now includes username field
       expect(usersSchema!.columns.map((c) => c.name)).toContain("email");
       expect(usersSchema!.columns.map((c) => c.name)).toContain(
         "password_hash",
       );
+      expect(usersSchema!.columns.map((c) => c.name)).toContain("username");
     });
 
     it("should add additional columns to users table", () => {
@@ -88,7 +89,7 @@ describe("Database Schema Extensions", () => {
       const usersSchema = schemas.find((s) => s.tableName === "users");
 
       expect(usersSchema).toBeDefined();
-      expect(usersSchema!.columns).toHaveLength(12); // 9 original + 3 additional
+      expect(usersSchema!.columns).toHaveLength(13); // 10 original + 3 additional
       expect(usersSchema!.columns.map((c) => c.name)).toContain("phone_number");
       expect(usersSchema!.columns.map((c) => c.name)).toContain("avatar_url");
       expect(usersSchema!.columns.map((c) => c.name)).toContain("bio");
@@ -179,7 +180,7 @@ describe("Database Schema Extensions", () => {
       const usersSchema = schemas.find((s) => s.tableName === "users");
 
       expect(usersSchema).toBeDefined();
-      expect(usersSchema!.columns).toHaveLength(10); // 9 original - 1 removed + 2 added
+      expect(usersSchema!.columns).toHaveLength(11); // 10 original - 1 removed + 2 added
 
       // Check additions
       expect(usersSchema!.columns.map((c) => c.name)).toContain("phone_number");
@@ -209,7 +210,7 @@ describe("Database Schema Extensions", () => {
       const usersSchema = schemas.find((s) => s.tableName === "users");
 
       expect(usersSchema).toBeDefined();
-      expect(usersSchema!.columns).toHaveLength(11); // 9 original + 2 soft delete columns
+      expect(usersSchema!.columns).toHaveLength(12); // 10 original + 2 soft delete columns
       expect(usersSchema!.columns.map((c) => c.name)).toContain("deleted_at");
       expect(usersSchema!.columns.map((c) => c.name)).toContain("is_deleted");
     });
@@ -243,7 +244,7 @@ describe("Database Schema Extensions", () => {
       const usersSchema = schemas.find((s) => s.tableName === "users");
 
       expect(usersSchema).toBeDefined();
-      expect(usersSchema!.columns).toHaveLength(13); // 9 original + 4 profile fields
+      expect(usersSchema!.columns).toHaveLength(14); // 10 original + 4 profile fields
       expect(usersSchema!.columns.map((c) => c.name)).toContain("phone_number");
       expect(usersSchema!.columns.map((c) => c.name)).toContain("avatar_url");
       expect(usersSchema!.columns.map((c) => c.name)).toContain("timezone");
@@ -563,7 +564,7 @@ describe("Database Schema Extensions", () => {
       const usersSchema = schemas.find((s) => s.tableName === "users");
 
       // Should have all original columns intact
-      expect(usersSchema!.columns).toHaveLength(9);
+      expect(usersSchema!.columns).toHaveLength(10);
     });
   });
 

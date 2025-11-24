@@ -116,6 +116,7 @@ export class AuthService {
       const createResult = await this.userController.create({
         email: data.email.toLowerCase(),
         password_hash,
+        username: data.username,
         first_name: data.first_name,
         last_name: data.last_name,
         is_active: data.is_active !== undefined ? data.is_active : true,

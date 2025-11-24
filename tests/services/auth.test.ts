@@ -32,6 +32,7 @@ describe("AuthService", () => {
     const userData = {
       email: "test@example.com",
       password: "password123",
+      username: "testuser",
       first_name: "Test",
     };
     const result = await authService.register(userData);
@@ -39,6 +40,7 @@ describe("AuthService", () => {
     expect(result.success).toBe(true);
     expect(result.user).toBeDefined();
     expect(result.user?.email).toBe(userData.email);
+    expect(result.user?.username).toBe(userData.username);
     expect(result.user?.first_name).toBe("Test");
     expect(result.token).toBeString();
     expect(result.error).toBeUndefined();
@@ -48,6 +50,7 @@ describe("AuthService", () => {
     const userData = {
       email: "login@example.com",
       password: "securepassword",
+      username: "loginuser",
     };
 
     // El beforeEach ya nos dio una DB limpia, así que podemos registrar sin miedo.
@@ -61,6 +64,7 @@ describe("AuthService", () => {
     expect(result.success).toBe(true);
     expect(result.user).toBeDefined();
     expect(result.user?.email).toBe(userData.email);
+    expect(result.user?.username).toBe(userData.username);
     expect(result.token).toBeString();
     expect(result.error).toBeUndefined();
   });
@@ -69,6 +73,7 @@ describe("AuthService", () => {
     const userData = {
       email: "fail@example.com",
       password: "correctpassword",
+      username: "failuser",
     };
     await authService.register(userData);
     const result = await authService.login({
@@ -90,6 +95,7 @@ describe("AuthService", () => {
     const userData = {
       email: "duplicate@example.com",
       password: "password123",
+      username: "duplicateuser",
     };
 
     // Primer registro en una DB limpia. Debe funcionar.
