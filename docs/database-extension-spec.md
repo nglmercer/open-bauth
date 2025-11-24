@@ -1,53 +1,90 @@
 # Technical Specification for Extending Initial Tables (Template)
 
-This document defines the standardized way to add new tables to the project's base schema, ensuring they always exist and are created/migrated safely through the database initializer.
+Defines standardized addition of new tables to base schema, ensuring safe creation/migration via initializer.
 
-Relevant files:
-- Initializer and schema registration: [`src/database/database-initializer.ts`](src/database/database-initializer.ts)
-- Generic controller and SQL utilities: [`src/database/base-controller.ts`](src/database/base-controller.ts)
-- Database re-exports: [`src/database/index.ts`](src/database/index.ts) and [`src/index.ts`](src/index.ts)
+**Relevant files**:
+- [`src/database/database-initializer.ts`](src/database/database-initializer.ts)
+- [`src/database/base-controller.ts`](src/database/base-controller.ts)
 
 ## Objective
-- Incorporate new tables (e.g., points, notifications, processes) in a safe and repeatable manner.
-- Ensure creation via `DatabaseInitializer.initialize/migrate/repair`.
-- Maintain consistency in names, data types, keys, relationships, and indexes.
-- Allow schema extension from outside the library via minimal API (`externalSchemas`, `registerSchemas`, and `SchemaRegistry`), without modifying the base `DATABASE_SCHEMAS` array.
+- Add tables (points, notifications) safely.
+- Creation via `initialize/migrate/repair`.
+- Consistency: names, types, keys, indexes.
+- External extension without modifying core.
 
-## Core Concepts
-- `TableSchema`: describes the table (columns, indexes). Consumed by `BaseController.initializeDatabase` to generate and execute `CREATE TABLE/INDEX IF NOT EXISTS`.
-- `ColumnDefinition`: defines name, type, PK, UNIQUE, NOT NULL, DEFAULT, and references (FK).
-- `DEFAULT_SCHEMAS`: exported alias of the internal default set (backward compatibility). Do not modify it; use it as base if you need to compose.
-- Effective schemas: `DatabaseInitializer` combines by default `DEFAULT_SCHEMAS` + optional `externalSchemas` for `initialize`, `checkIntegrity`, `reset`, and `getStatistics` unless an explicit array is passed.
-- Extension API:
-  - `externalSchemas` (constructor): allows passing a `TableSchema[]` array from outside to combine with base ones.
-  - `registerSchemas(schemas)`: method to dynamically register new schemas after construction; deduplicates by `tableName` and overrides existing if duplicates.
-  - `SchemaRegistry`: lightweight utility for modular registration, merging, and retrieving schemas, useful for external packages/plugins.
-- Type and default handling:
-  - `mapDataType` adapts types for SQLite and other engines.
-  - `formatDefaultValue` ensures correct defaults: booleans → 1/0 in SQLite; SQL functions/keywords without quotes (e.g., `CURRENT_TIMESTAMP`, expressions in parentheses); string literals with single quotes.
-- Integrity and migration:
-  - `DatabaseInitializer.checkIntegrity` detects missing tables/indexes.
-  - `DatabaseInitializer.initialize` creates the full schema set.
-  - `DatabaseInitializer.migrate/repair` re-creates missing components.
+## Concepts
+- `TableSchema`: table description.
+- `ColumnDefinition`: column spec.
+- `DEFAULT_SCHEMAS`: base (don't modify).
+- Effective: base + external.
+- API: `externalSchemas`, `registerSchemas()`, `SchemaRegistry`.
 
-## Extension Flow
-1. Define your new table as `TableSchema` in your own package or app code (outside the library).
-2. Register it using one of these options (without touching `DATABASE_SCHEMAS`):
-   - Pass via `externalSchemas` in constructor.
-   - Call `initializer.registerSchemas(schema | schema[])` after constructing `DatabaseInitializer`.
-   - Compose a `SchemaRegistry`, pass `registry.getAll()` to constructor or `registerSchemas`.
-3. Run `initialize()` or `migrate()/repair()` on startup to ensure existence.
-4. Consume the table via `BaseController` or `DatabaseInitializer.createController`.
+## Flow
+1. Define `TableSchema`.
+2. Register (externalSchemas/registerSchemas/SchemaRegistry).
+3. `initialize()`.
+4. Use `createController(table)`.
 
-## TableSchema Template (copy and adapt)
+## Template
 ```ts
-// Reference file: src/database/database-initializer.ts
 export const NEW_SCHEMAS: TableSchema[] = [
   {
-    tableName: "<table_name>",
+    tableName: "points",
     columns: [
-      // Recommended PK (UUID-like via randomblob hex in SQLite):
       { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+      { name: "user_id", type: "TEXT", notNull: true, references: { table: "users", column: "id" } },
+      { name: "points", type: "INTEGER", notNull: true, defaultValue: 0 },
+      { name: "reason", type: "TEXT" },
+      { name: "created_at", type: "DATETIME", defaultValue: "CURRENT_TIMESTAMP" }
+    ],
+    indexes: [
+      { name: "idx_points_user_id", columns: ["user_id"] }
+    ]
+  },
+  // notifications, processes examples...
+];
+```
 
-      // Examples:
-      // { name:
+Register:
+```ts
+const initializer = new DatabaseInitializer({ database: db, externalSchemas: NEW_SCHEMAS });
+await initializer.initialize();
+```
+
+## Examples
+1. **Points**:
+   - Columns: id, user_id (FK), points, reason, created_at
+   - Indexes: user_id, created_at
+
+2. **Notifications**:
+   - id, user_id, title, body, channel, status, read_at, created_at
+   - Indexes: user_id, status
+
+3. **Processes**:
+   - id, name, status, retries, payload, last_error, started_at, finished_at
+
+Defaults: literals "'pending'", functions `CURRENT_TIMESTAMP` no quotes.
+
+## Conventions
+- snake_case columns
+- TEXT PK with randomblob
+- DATETIME CURRENT_TIMESTAMP
+- BOOLEAN → 1/0 SQLite
+- Indexes on FK/frequent filters
+
+## Checklist
+- [ ] TableSchema with PK/FK/indexes
+- [ ] Register external
+- [ ] Test initialize/integrity
+- [ ] Defaults/types validated
+
+## Common Issues
+- Defaults: "'text'", `CURRENT_TIMESTAMP` no quotes
+- UNIQUE/FK: indexes/references
+- Booleans: BOOLEAN type
+
+## Validation
+bun test tests/schema-extension.test.ts
+
+---
+Template for consistent, safe schema extension.

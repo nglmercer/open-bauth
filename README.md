@@ -546,7 +546,6 @@ For in-depth guides and specifications, see the [docs/](./docs/) directory:
 - [Services Overview](./docs/services.md) - Core services API
 - [Middleware](./docs/middleware.md) - Framework-agnostic middleware
 - [Testing](./docs/testing.md) - Running and writing tests
-- [Deployment](./docs/deployment.md) - Production setup
 - [Docs Index](./docs/README.md)
 
 ## Library Info

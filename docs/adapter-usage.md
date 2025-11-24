@@ -1,50 +1,49 @@
 # Database Adapter System
 
-This documentation explains how to use the database adapter system of the library, which provides complete flexibility to work with different types of databases.
+This documentation explains the library's database adapter system, providing full flexibility for different databases.
 
 ## Overview
 
 The adapter system allows:
-- Use Bun SQL database by default
-- Integrate custom adapters for other databases
-- Maintain compatibility with existing code
-- Extend functionality according to specific needs
+- Default Bun SQL database
+- Custom adapters for other DBs
+- Existing code compatibility
+- Functionality extension
 
 ## Basic Usage
 
-### 1. Using Default Adapter (Bun SQL)
+### 1. Default Adapter (Bun SQL)
 
 ```typescript
-import { BaseController } from "./src/database/base-controller";
-import { SQL } from "bun";
+import { BaseController } from "open-bauth/src/database/base-controller";
+import { Database } from "bun:sqlite";
 
-const db = SQL("my-database.sqlite");
+const db = new Database("my-database.sqlite");
 const userController = new BaseController("users", {
   database: db,
   isSQLite: true
 });
+
+// All methods work the same
+const users = await userController.findAll();
 ```
 
-### 2. Using Custom Adapter
+### 2. Custom Adapter
 
 ```typescript
-import { BaseController } from "./src/database/base-controller";
-import { SimpleCustomAdapter } from "./examples/custom-adapter-example";
+import { BaseController } from "open-bauth/src/database/base-controller";
+import { JsonFileAdapter } from "./examples/custom-adapter-example";
 
-const customAdapter = new SimpleCustomAdapter({
-  connectionString: "custom://localhost"
-});
+const adapter = new JsonFileAdapter({ filePath: './data.json' });
+await adapter.initialize();
 
-const customController = new BaseController("users", {
-  adapter: customAdapter
-});
+const controller = new BaseController("users", { adapter });
+const users = await controller.findAll();
 ```
 
-## Creating a Custom Adapter
+## Creating Custom Adapter
 
-### Basic Interface
-
-Every adapter must implement the `IDatabaseAdapter` interface:
+### Interface
 
 ```typescript
 interface IDatabaseAdapter {
@@ -58,38 +57,57 @@ interface IDatabaseAdapter {
 }
 ```
 
-### Complete Example
+### Full Example: JsonFileAdapter
+
+See [`examples/custom-adapter-example.ts`](examples/custom-adapter-example.ts:11) for JsonFileAdapter and MemoryAdapter with real methods (getCurrentCounter, incrementCounter).
+
+### BaseController Options
 
 ```typescript
-import { IDatabaseAdapter, DatabaseConnection } from "./src/database/adapter";
+interface BaseControllerOptions {
+  database?: Database;
+  adapter?: IDatabaseAdapter;
+  schemas?: SchemaCollection;
+  isSQLite?: boolean;
+}
+```
 
-export class MyCustomAdapter implements IDatabaseAdapter {
-  private connection: DatabaseConnection;
-  private config: any;
+## Best Practices
 
-  constructor(config: any) {
-    this.config = config;
-    this.connection = this.createConnection();
-  }
-
+### Error Handling
+```typescript
+class RobustAdapter implements IDatabaseAdapter {
   async initialize(): Promise<void> {
-    console.log('Adapter initialized');
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        await this.connect();
+        break;
+      } catch (error) {
+        retries--;
+        if (retries === 0) throw error;
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
   }
+}
+```
 
-  async close(): Promise<void> {
-    console.log('Adapter closed');
-  }
+### Connection Pool
+Use pools for high concurrency.
 
-  isConnected(): boolean {
-    return true;
-  }
+### Logging & Metrics
+Track query count, latency.
 
-  getConnection(): DatabaseConnection {
-    return this.connection;
-  }
+## Complete Example
+```typescript
+const adapter = new JsonFileAdapter({ filePath: './data.json' });
+await adapter.initialize();
 
-  getDatabaseType() {
-    return {
-      isSQLite: false,
-      isSQLServer: false,
-      isPostgreSQL
+const controller = new BaseController("users", { adapter });
+const users = await controller.findAll();
+
+await adapter.close();
+```
+
+This system provides flexibility while maintaining API consistency.

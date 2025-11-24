@@ -23,7 +23,6 @@ Root [README](../README.md) for basics.
 
 ### Development
 - [Testing](./testing.md)
-- [Deployment](./deployment.md)
 
 ## 📖 Guides
 
@@ -34,7 +33,6 @@ Root [README](../README.md) for basics.
 - [Database Extension Spec](./database-extension-spec.md)
 - [OAuth 2.0 Implementation](./oauth-2.0-implementation.md)
 - [Testing](./testing.md)
-- [Deployment](./deployment.md)
 
 ## 💻 Examples
 - [Hono](../examples/hono.ts)
