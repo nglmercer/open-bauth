@@ -27,7 +27,7 @@ Esta guía documenta la implementación completa de OAuth 2.0 y funcionalidades 
 - **Security Challenges**: `SecurityChallenge` para validaciones adicionales
 - **OAuth 2.0 Requests/Responses**: Tipos completos para todos los flujos
 
-### Base de Datos (`src/database/oauth-schema-extensions.ts`)
+### Base de Datos (`src/database/schema/oauth-schema-extensions.ts`)
 - **oauth_clients**: Clientes OAuth 2.0 con configuración completa
 - **authorization_codes**: Códigos de autorización con PKCE
 - **refresh_tokens**: Tokens de refresco con rotación

@@ -400,7 +400,7 @@ setDatabaseConfig({
 Complete OAuth 2.0 implementation:
 
 ```typescript
-import { registerOAuthSchemaExtensions, getOAuthSchemas } from 'open-bauth/src/database/oauth-schema-extensions';
+import { registerOAuthSchemaExtensions, getOAuthSchemas } from 'open-bauth/src/database/schema/oauth-schema-extensions';
 
 // Register OAuth extensions
 registerOAuthSchemaExtensions();
@@ -743,5 +743,6 @@ const computedSchema: TableSchema = {
 **Relevant files**:
 - [`src/database/database-initializer.ts`](src/database/database-initializer.ts:136) - Main initialization class
 - [`src/database/base-controller.ts`](src/database/base-controller.ts) - Type definitions and base controller
-- [`src/database/schema-builder.ts`](src/database/schema-builder.ts:339) - Dynamic schema builder
-- [`src/database/oauth-schema-extensions.ts`](src/database/oauth-schema-extensions.ts:308) - OAuth 2.0 extensions
+- [`src/database/schema/schema-builder.ts`](src/database/schema/schema-builder.ts:339) - Dynamic schema builder
+- [`src/database/schema/oauth-schema-extensions.ts`](src/database/schema/oauth-schema-extensions.ts:308) - OAuth 2.0 extensions
+- [`src/database/schema/schema.ts`](src/database/schema/schema.ts:1) - Core Schema class and type definitions
