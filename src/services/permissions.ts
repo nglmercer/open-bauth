@@ -82,7 +82,7 @@ export class PermissionService {
           },
         };
       }
-      return { success: true, permission: result.data };
+      return { success: true, data: result.data };
     } catch (error: any) {
       return {
         success: false,
@@ -105,7 +105,7 @@ export class PermissionService {
         },
       };
     }
-    return { success: true, permission: result.data };
+    return { success: true, data: result.data };
   }
 
   async deletePermission(permissionId: string): Promise<PermissionResult> {

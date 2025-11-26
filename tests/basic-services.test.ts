@@ -181,8 +181,8 @@ describe('Basic Services Tests', () => {
 
       const createResult = await permissionService.createPermission(permissionData);
       expect(createResult.success).toBe(true);
-      expect(createResult.permission).toBeDefined();
-      expect(createResult.permission!.name).toBe(permissionData.name);
+      expect(createResult.data).toBeDefined();
+      expect(createResult.data!.name).toBe(permissionData.name);
 
       const findResult = await permissionService.findPermissionByName('test-permission');
       expect(findResult).toBeDefined();

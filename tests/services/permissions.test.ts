@@ -44,7 +44,7 @@ describe("PermissionService", () => {
       description: "Allows editing articles",
     });
     expect(permResult.success).toBe(true);
-    const editPerm = permResult.permission!;
+    const editPerm = permResult.data!;
     expect(editPerm.name).toBe("edit-article");
 
     // 3. Asignar Permiso al Rol

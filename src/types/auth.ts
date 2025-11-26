@@ -445,11 +445,9 @@ export interface AssignRoleData {
 /**
  * Generic response for permission operations
  */
-export interface PermissionResult<T = unknown> {
+export interface PermissionResult {
   success: boolean;
-  data?: T;
-  permission?: Permission;
-  role?: Role;
+  data?: Permission;
   error?: {
     type: AuthErrorType;
     message: string;
@@ -600,26 +598,6 @@ export enum AuthErrorType {
   ROLE_ERROR = "ROLE_ERROR",
 }
 
-// Note: The main AuthError class is defined in src/errors/auth.ts
-// This is kept for backward compatibility
-export class LegacyAuthError extends Error {
-  public readonly type: AuthErrorType;
-  public readonly statusCode: number;
-  public readonly metadata?: Record<string, unknown>;
-
-  constructor(
-    type: AuthErrorType,
-    message: string,
-    statusCode: number = 400,
-    metadata?: Record<string, unknown>,
-  ) {
-    super(message);
-    this.name = "LegacyAuthError";
-    this.type = type;
-    this.statusCode = statusCode;
-    this.metadata = metadata;
-  }
-}
 export abstract class AuthError extends Error {
   public abstract readonly type: AuthErrorType;
   public readonly timestamp: Date;

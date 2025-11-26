@@ -152,8 +152,8 @@ export async function seedDatabase(dbPath?: string): Promise<void> {
     for (const permission of initialPermissions) {
       try {
         const result = await permissionService.createPermission(permission);
-        if (result && result.permission) {
-          createdPermissions.set(permission.name, result.permission.id);
+        if (result && result.data) {
+          createdPermissions.set(permission.name, result.data.id);
           console.log(`  ✅ Permiso creado: ${permission.name}`);
         }
       } catch (error: any) {

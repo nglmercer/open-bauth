@@ -251,7 +251,7 @@ describe('OAuth 2.0 Services Tests', () => {
       });
 
       expect(permissionResult.success).toBe(true);
-      expect(permissionResult.permission).toBeDefined();
+      expect(permissionResult.data).toBeDefined();
 
       // Assign permission to role
       // Note: This method doesn't exist in the current implementation
