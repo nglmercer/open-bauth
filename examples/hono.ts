@@ -12,7 +12,7 @@ import { DatabaseInitializer } from "../src/index";
 import { JWTService } from "../src/index";
 import { AuthService } from "../src/index";
 import { PermissionService } from "../src/index";
-import { registerOAuthSchemaExtensions } from "../src/database/oauth-schema-extensions";
+import { registerOAuthSchemaExtensions } from "../src/database/schema/oauth-schema-extensions";
 import { AppContext, AppDependencies, Services } from "./app";
 import { merged } from "./integrations/newSchemas";
 //,pointsSchema, processesSchema, notificationsSchema

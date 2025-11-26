@@ -8,7 +8,7 @@ import { SecurityService } from '../src/services/security';
 import { EnhancedUserService } from '../src/services/enhanced-user';
 import { OAuthSecurityMiddleware } from '../src/middleware/oauth-security';
 import { OAuthGrantType, OAuthResponseType, PKCEMethod, BiometricType, MFAType } from '../src/types/oauth';
-import { registerOAuthSchemaExtensions, getOAuthSchemaExtensions, getOAuthSchemas } from '../src/database/oauth-schema-extensions';
+import { registerOAuthSchemaExtensions, getOAuthSchemaExtensions, getOAuthSchemas } from '../src/database/schema/oauth-schema-extensions';
 
 describe('OAuth 2.0 Basic Service Tests', () => {
   let db: Database;

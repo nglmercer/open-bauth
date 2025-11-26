@@ -79,20 +79,20 @@ export interface SchemaCollection {
     read?: ValidationSchema;
   };
 }
-
+export type ColumnType =
+  | "INTEGER"
+  | "TEXT"
+  | "REAL"
+  | "BLOB"
+  | "BOOLEAN"
+  | "BIT"
+  | "DATE"
+  | "DATETIME"
+  | "VARCHAR"
+  | "SERIAL";
 export interface ColumnDefinition {
   name: string;
-  type:
-    | "INTEGER"
-    | "TEXT"
-    | "REAL"
-    | "BLOB"
-    | "BOOLEAN"
-    | "BIT"
-    | "DATE"
-    | "DATETIME"
-    | "VARCHAR"
-    | "SERIAL";
+  type: ColumnType;
   primaryKey?: boolean;
   notNull?: boolean;
   unique?: boolean;
@@ -1226,4 +1226,4 @@ export class BaseController<T = Record<string, any>> {
 
 // Export configuration system for external use
 export * from "./config";
-export * from "./schema-builder";
+export * from "./schema/schema-builder";

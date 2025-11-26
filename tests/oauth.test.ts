@@ -24,7 +24,7 @@ describe('OAuth 2.0 Service Tests', () => {
 
   beforeAll(async () => {
     // Register OAuth schema extensions first
-    const { registerOAuthSchemaExtensions, getOAuthSchemas } = await import('../src/database/oauth-schema-extensions');
+    const { registerOAuthSchemaExtensions, getOAuthSchemas } = await import('../src/database/schema/oauth-schema-extensions');
     registerOAuthSchemaExtensions();
     
     // Initialize database with OAuth schemas

@@ -56,7 +56,7 @@ const silenceLogger: DatabaseLogger = {
 };
 // Database table schemas using your existing structure
 // Import dynamic schema builder
-import { buildDatabaseSchemas } from "./schema-builder";
+import { buildDatabaseSchemas } from "./schema/schema-builder";
 
 // Legacy export for backward compatibility - now uses dynamic schemas
 export const DATABASE_SCHEMAS: TableSchema[] = [];

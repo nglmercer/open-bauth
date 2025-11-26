@@ -15,7 +15,7 @@ import {
 import {
   buildDatabaseSchemas,
   getTableSchemaByKey,
-} from "../../../../src/database/schema-builder";
+} from "../../../../src/database/schema/schema-builder";
 import { defaultLogger as logger } from "../../../../src/logger";
 
 describe("Database Schema Extensions", () => {

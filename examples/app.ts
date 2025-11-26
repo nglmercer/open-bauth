@@ -5,7 +5,7 @@ import { AuthContext } from "../src/index";
 import { AuthService } from "../src/index";
 import { JWTService } from "../src/index";
 import { PermissionService } from "../src/index";
-import { registerOAuthSchemaExtensions } from "../src/database/oauth-schema-extensions";
+import { registerOAuthSchemaExtensions } from "../src/database/schema/oauth-schema-extensions";
 import { OAuthService } from "../src/services/oauth";
 import { SecurityService } from "../src/services/security";
 // Hono's context typing for this specific application

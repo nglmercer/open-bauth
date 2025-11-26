@@ -14,9 +14,9 @@ import {
   buildDatabaseSchemas,
   getTableSchema,
   getTableSchemaByKey,
-} from "../../../../src/database/schema-builder";
+} from "../../../../src/database/schema/schema-builder";
 import { defaultLogger as logger } from "../../../../src/logger";
-import { registerOAuthSchemaExtensions } from "../../../../src/database/oauth-schema-extensions";
+import { registerOAuthSchemaExtensions } from "../../../../src/database/schema/oauth-schema-extensions";
 
 describe("Custom Table Names and Service-Specific Schemas", () => {
   let testDb: Database;
