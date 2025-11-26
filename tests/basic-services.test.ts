@@ -163,8 +163,8 @@ describe('Basic Services Tests', () => {
 
       const createResult = await permissionService.createRole(roleData);
       expect(createResult.success).toBe(true);
-      expect(createResult.role).toBeDefined();
-      expect(createResult.role!.name).toBe(roleData.name);
+      expect(createResult.data).toBeDefined();
+      expect(createResult.data!.name).toBe(roleData.name);
 
       const findResult = await permissionService.findRoleByName('test-role');
       expect(findResult).toBeDefined();

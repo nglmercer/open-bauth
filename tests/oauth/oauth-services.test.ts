@@ -239,8 +239,8 @@ describe('OAuth 2.0 Services Tests', () => {
       });
 
       expect(roleResult.success).toBe(true);
-      expect(roleResult.role).toBeDefined();
-      expect(roleResult.role!.name).toBe('test-role');
+      expect(roleResult.data).toBeDefined();
+      expect(roleResult.data!.name).toBe('test-role');
 
       // Create a permission
       const permissionResult = await permissionService.createPermission({
@@ -281,7 +281,7 @@ describe('OAuth 2.0 Services Tests', () => {
 
       const assignResult = await permissionService.assignRoleToUser(
         userResult.user!.id,
-        roleResult.role!.id
+        roleResult.data!.id
       );
       expect(assignResult.success).toBe(true);
 

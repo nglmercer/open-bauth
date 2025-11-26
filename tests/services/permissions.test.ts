@@ -33,7 +33,7 @@ describe("PermissionService", () => {
       description: "Can edit content",
     });
     expect(roleResult.success).toBe(true);
-    const editorRole = roleResult.role!;
+    const editorRole = roleResult.data!;
     expect(editorRole.name).toBe("editor");
 
     // 2. Crear un Permiso
@@ -104,7 +104,7 @@ describe("PermissionService", () => {
     // Setup: Crear rol, permiso, usuario y asignarlos todos
     const role = (
       await permissionService.createRole({ name: "temporary-role" })
-    ).role!;
+    ).data!;
     const user = (
       await authService.register({ email: "temp@user.com", password: "pw" })
     ).user!;

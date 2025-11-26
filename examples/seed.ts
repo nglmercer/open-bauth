@@ -169,15 +169,15 @@ export async function seedDatabase(dbPath?: string): Promise<void> {
       try {
         const result = await permissionService.createRole(role);
         
-        if (result && result.role) {
-          createdRoles.set(role.name, result.role.id);
+        if (result && result.data) {
+          createdRoles.set(role.name, result.data.id);
           console.log(`  ✅ Rol creado: ${role.name}`);
           
           // Asignar permisos al rol
           for (const permissionName of role.permissions || []) {
             const permissionId = createdPermissions.get(permissionName);
             if (permissionId) {
-              await permissionService.assignPermissionToRole(result.role.id, permissionId);
+              await permissionService.assignPermissionToRole(result.data.id, permissionId);
             }
           }
           console.log(`    🎭 Permisos asignados al rol ${role.name}`);
