@@ -6,8 +6,9 @@
 
 import { SQL } from "bun";
 import type { Database } from "bun:sqlite";
-import type { IDatabaseAdapter, DatabaseAdapterConfig } from "./adapter";
+import type { IDatabaseAdapter, DatabaseAdapterConfig, IDatabaseConnection } from "./adapter";
 import { AdapterFactory } from "./adapter";
+import { createErrorResponse, DatabaseErrorType, type ControllerError } from "../types/errors";
 
 export type TruthyFilter = { isTruthy: true };
 export type FalsyFilter = { isFalsy: true };
@@ -38,7 +39,7 @@ export interface ColumnInfo {
   name: string;
   type: string;
   notNull: boolean;
-  defaultValue: any;
+  defaultValue: unknown;
   primaryKey: boolean;
 }
 export interface JoinOptions {
@@ -64,6 +65,7 @@ export interface ControllerResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
+  errorType?: DatabaseErrorType;
   message?: string;
   total?: number;
 }
@@ -96,7 +98,7 @@ export interface ColumnDefinition {
   primaryKey?: boolean;
   notNull?: boolean;
   unique?: boolean;
-  defaultValue?: any;
+  defaultValue?: unknown;
   autoIncrement?: boolean;
   check?: string;
   references?: {
@@ -584,7 +586,7 @@ export class BaseController<T = Record<string, any>> {
           .query(`PRAGMA table_info("${this.tableName}")`)
           .all();
         return Array.isArray(result)
-          ? result.map((col: any) => ({ name: col.name, pk: col.pk }))
+          ? (result as any[]).map((col: any) => ({ name: col.name, pk: col.pk }))
           : [];
       } else {
         // Generic SQL for PostgreSQL
@@ -605,7 +607,7 @@ export class BaseController<T = Record<string, any>> {
         `,
           )
           .all(this.tableName);
-        return Array.isArray(result) ? result : [];
+        return Array.isArray(result) ? (result as any[]) : [];
       }
     } catch (error) {
       // Fallback for other systems or errors
@@ -628,7 +630,11 @@ export class BaseController<T = Record<string, any>> {
         ),
       );
       if (Object.keys(cleanData).length === 0) {
-        return { success: false, error: "No valid data provided" };
+        return { 
+          success: false, 
+          error: "No valid data provided",
+          errorType: DatabaseErrorType.VALIDATION_ERROR
+        };
       }
 
       const columns = Object.keys(cleanData).map((c) => `"${c}"`);
@@ -667,6 +673,7 @@ export class BaseController<T = Record<string, any>> {
           success: false,
           error:
             "Failed to create record or retrieve the created data from database",
+          errorType: DatabaseErrorType.QUERY_ERROR
         };
       }
 
@@ -675,12 +682,11 @@ export class BaseController<T = Record<string, any>> {
         data: result as T,
         message: "Record created successfully",
       };
-    } catch (error: any) {
-      // Preserve the original error message for better error handling
-      return {
-        success: false,
-        error: error.message,
-      };
+    } catch (error: unknown) {
+      return createErrorResponse<T>(error, {
+        operation: "create",
+        table: this.tableName
+      });
     }
   }
 
@@ -695,6 +701,7 @@ export class BaseController<T = Record<string, any>> {
         return {
           success: false,
           error: "Record not found",
+          errorType: DatabaseErrorType.NOT_FOUND
         };
       }
 
@@ -702,12 +709,12 @@ export class BaseController<T = Record<string, any>> {
         success: true,
         data: result as T,
       };
-    } catch (error: any) {
-      // Preserve original error message for better error handling
-      return {
-        success: false,
-        error: error.message,
-      };
+    } catch (error: unknown) {
+      return createErrorResponse<T>(error, {
+        operation: "findById",
+        table: this.tableName,
+        id
+      });
     }
   }
 
@@ -768,6 +775,7 @@ export class BaseController<T = Record<string, any>> {
         return {
           success: false,
           error: "No valid data provided for update",
+          errorType: DatabaseErrorType.VALIDATION_ERROR
         };
       }
 
@@ -788,6 +796,7 @@ export class BaseController<T = Record<string, any>> {
         return {
           success: false,
           error: "Record not found or no changes made",
+          errorType: DatabaseErrorType.NOT_FOUND
         };
       }
 
@@ -798,12 +807,12 @@ export class BaseController<T = Record<string, any>> {
         data: updatedRecord.data,
         message: "Record updated successfully",
       };
-    } catch (error: any) {
-      // Preserve original error message for better error handling
-      return {
-        success: false,
-        error: error.message,
-      };
+    } catch (error: unknown) {
+      return createErrorResponse<T>(error, {
+        operation: "update",
+        table: this.tableName,
+        id
+      });
     }
   }
 
@@ -817,6 +826,7 @@ export class BaseController<T = Record<string, any>> {
         return {
           success: false,
           error: "Record not found",
+          errorType: DatabaseErrorType.NOT_FOUND
         };
       }
 
@@ -824,11 +834,12 @@ export class BaseController<T = Record<string, any>> {
         success: true,
         message: "Record deleted successfully",
       };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.message,
-      };
+    } catch (error: unknown) {
+      return createErrorResponse(error, {
+        operation: "delete",
+        table: this.tableName,
+        id
+      });
     }
   }
 

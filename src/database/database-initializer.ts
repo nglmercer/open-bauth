@@ -21,11 +21,15 @@ export interface DatabaseConfig {
   externalSchemas?: TableSchema[];
 }
 
-export interface DatabaseLogger {
-  info(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
+export interface ILogger {
+  info(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  error(message: string, error?: Error | unknown, ...args: unknown[]): void;
+  debug?(message: string, ...args: unknown[]): void;
 }
+
+// Maintain backward compatibility
+export interface DatabaseLogger extends ILogger {}
 
 export interface MigrationResult {
   success: boolean;

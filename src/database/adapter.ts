@@ -3,21 +3,33 @@
  * Allows users to provide custom database adapters while defaulting to Bun SQLite
  */
 
-export interface DatabaseConnection {
-  query(sql: string): {
-    all(...params: any[]): Promise<any[]>;
-    get(...params: any[]): Promise<any>;
-    run(...params: any[]): Promise<{ changes: number; lastInsertRowid?: number }>;
-  };
-  prepare?(sql: string): any;
+import type { Database } from "bun:sqlite";
+import { SQL } from "bun";
+
+// Interface unificada para conexión de base de datos
+export interface IQueryResult {
+  all(...params: unknown[]): Promise<unknown[]>;
+  get(...params: unknown[]): Promise<unknown>;
+  run(...params: unknown[]): Promise<{ changes: number; lastInsertRowid?: number }>;
 }
 
+export interface IDatabaseConnection {
+  query(sql: string): IQueryResult;
+  prepare?(sql: string): unknown;
+}
+
+// Mantener compatibilidad con exports existentes
+export type DatabaseConnection = IDatabaseConnection;
+
+export type SupportedDatabase = Database | SQL;
+
 export interface DatabaseAdapterConfig {
-  database: any; // Can be Database, SQL, or any custom connection
+  database: SupportedDatabase;
   isSQLite?: boolean;
   isSQLServer?: boolean;
   isPostgreSQL?: boolean;
   isMySQL?: boolean;
+  connectionString?: string;
 }
 
 /**
@@ -92,34 +104,124 @@ export class BunSQLiteAdapter implements IDatabaseAdapter {
   private createConnection(): DatabaseConnection {
     const { database } = this.config;
     
+    // Type guard para SQLite
+    if (this.isSQLiteDatabase(database)) {
+      return {
+        query: (sql: string) => ({
+          all: async (...params: unknown[]): Promise<unknown[]> => {
+            const stmt = database.prepare(sql);
+            return stmt.all(...(params as any[]));
+          },
+          get: async (...params: unknown[]): Promise<unknown> => {
+            const stmt = database.prepare(sql);
+            return stmt.get(...(params as any[]));
+          },
+          run: async (...params: unknown[]): Promise<{ changes: number; lastInsertRowid?: number }> => {
+            const stmt = database.prepare(sql);
+            const result = stmt.run(...(params as any[]));
+            return {
+              changes: result.changes,
+              lastInsertRowid: result.lastInsertRowid != null ? Number(result.lastInsertRowid) : undefined,
+            };
+          },
+        }),
+        prepare: (sql: string) => database.prepare(sql),
+      };
+    }
+    
+    // Para SQL (PostgreSQL/MySQL), implementación genérica
     return {
       query: (sql: string) => ({
-        all: async (...params: any[]): Promise<any[]> => {
-          const stmt = database.prepare(sql);
-          return stmt.all(...params);
+        all: async (...params: unknown[]): Promise<unknown[]> => {
+          try {
+            // Convertir unknown[] a tipos compatibles con SQL
+            const sqlParams = params.map(param => {
+              if (param === null || param === undefined) return null;
+              if (typeof param === 'string' || typeof param === 'number' || 
+                  typeof param === 'boolean' || typeof param === 'bigint') {
+                return param;
+              }
+              if (param instanceof Uint8Array || param instanceof Buffer) {
+                return param;
+              }
+              if (param instanceof Date) {
+                return param.toISOString();
+              }
+              // Para otros tipos, convertir a string
+              return String(param);
+            });
+            const result = await (database as SQL).unsafe(sql, sqlParams as any[]);
+            return Array.isArray(result) ? result : [result];
+          } catch (error: unknown) {
+            console.error("SQL query.all error:", error);
+            throw error;
+          }
         },
-        get: async (...params: any[]): Promise<any> => {
-          const stmt = database.prepare(sql);
-          return stmt.get(...params);
+        get: async (...params: unknown[]): Promise<unknown> => {
+          try {
+            // Convertir unknown[] a tipos compatibles con SQL
+            const sqlParams = params.map(param => {
+              if (param === null || param === undefined) return null;
+              if (typeof param === 'string' || typeof param === 'number' || 
+                  typeof param === 'boolean' || typeof param === 'bigint') {
+                return param;
+              }
+              if (param instanceof Uint8Array || param instanceof Buffer) {
+                return param;
+              }
+              if (param instanceof Date) {
+                return param.toISOString();
+              }
+              return String(param);
+            });
+            const result = await (database as SQL).unsafe(sql, sqlParams as any[]);
+            return Array.isArray(result) ? result[0] : result;
+          } catch (error: unknown) {
+            console.error("SQL query.get error:", error);
+            throw error;
+          }
         },
-        run: async (...params: any[]): Promise<{ changes: number; lastInsertRowid?: number }> => {
-          const stmt = database.prepare(sql);
-          const result = stmt.run(...params);
-          return {
-            changes: result.changes,
-            lastInsertRowid: result.lastInsertRowid != null ? Number(result.lastInsertRowid) : undefined,
-          };
+        run: async (...params: unknown[]): Promise<{ changes: number; lastInsertRowid?: number }> => {
+          try {
+            // Convertir unknown[] a tipos compatibles con SQL
+            const sqlParams = params.map(param => {
+              if (param === null || param === undefined) return null;
+              if (typeof param === 'string' || typeof param === 'number' || 
+                  typeof param === 'boolean' || typeof param === 'bigint') {
+                return param;
+              }
+              if (param instanceof Uint8Array || param instanceof Buffer) {
+                return param;
+              }
+              if (param instanceof Date) {
+                return param.toISOString();
+              }
+              return String(param);
+            });
+            await (database as SQL).unsafe(sql, sqlParams as any[]);
+            return { changes: 1, lastInsertRowid: undefined };
+          } catch (error: unknown) {
+            console.error("SQL query.run error:", error);
+            throw error;
+          }
         },
       }),
-      prepare: (sql: string) => database.prepare(sql),
+      prepare: () => {
+        throw new Error("Prepared statements not supported for SQL databases in this adapter");
+      },
     };
   }
 
+  private isSQLiteDatabase(db: SupportedDatabase): db is Database {
+    return this.config.isSQLite === true;
+  }
+
   async initialize(): Promise<void> {
-    // SQLite doesn't need special initialization
-    // Could enable WAL mode, foreign keys, etc. here
-    if (this.config.database.exec) {
-      this.config.database.exec("PRAGMA foreign_keys = ON");
+    // SQLite initialization
+    if (this.isSQLiteDatabase(this.config.database)) {
+      if (this.config.database.exec) {
+        this.config.database.exec("PRAGMA foreign_keys = ON");
+      }
     }
   }
 
