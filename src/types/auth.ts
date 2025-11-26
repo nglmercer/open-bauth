@@ -20,8 +20,8 @@ import type {
  * User metadata interface
  */
 export interface UserMetadata {
-  preferences?: Record<string, any>;
-  settings?: Record<string, any>;
+  preferences?: Record<string, unknown>;
+  settings?: Record<string, unknown>;
   profile?: {
     avatar?: string;
     bio?: string;
@@ -360,11 +360,11 @@ export interface AuthRequest {
   headers: Record<string, string>;
   url?: string;
   method?: string;
-  query?: any;
+  query?: Record<string, unknown>;
   auth?: AuthContext;
   user?: User;
   authContext?: AuthContext;
-  params?: any;
+  params?: Record<string, unknown>;
 }
 
 /**
@@ -377,7 +377,7 @@ export type NextFunction = () => void;
  */
 export interface AuthResponse {
   status: (code: number) => AuthResponse;
-  json: (data: any) => void;
+  json: (data: unknown) => void;
 }
 
 /**
@@ -445,7 +445,7 @@ export interface AssignRoleData {
 /**
  * Generic response for permission operations
  */
-export interface PermissionResult<T = any> {
+export interface PermissionResult<T = unknown> {
   success: boolean;
   data?: T;
   permission?: Permission;
@@ -459,7 +459,7 @@ export interface PermissionResult<T = any> {
 /**
  * Response for role operations
  */
-export interface RoleResult<T = any> {
+export interface RoleResult<T = unknown> {
   success: boolean;
   data?: T;
   role?: Role;
@@ -483,7 +483,7 @@ export interface AdapterConfig extends AuthConfig {
  */
 export interface DatabaseResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 
@@ -606,13 +606,13 @@ export enum AuthErrorType {
 export class LegacyAuthError extends Error {
   public readonly type: AuthErrorType;
   public readonly statusCode: number;
-  public readonly metadata?: Record<string, any>;
+  public readonly metadata?: Record<string, unknown>;
 
   constructor(
     type: AuthErrorType,
     message: string,
     statusCode: number = 400,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "LegacyAuthError";
@@ -624,7 +624,7 @@ export class LegacyAuthError extends Error {
 export abstract class AuthError extends Error {
   public abstract readonly type: AuthErrorType;
   public readonly timestamp: Date;
-  public readonly context?: Record<string, any>;
+  public readonly context?: Record<string, unknown>;
 
   constructor(message: string, context?: Record<string, any>) {
     super(message);
@@ -645,7 +645,7 @@ export abstract class AuthError extends Error {
       type: AuthErrorType;
       message: string;
       timestamp: string;
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
     };
   } {
     return {

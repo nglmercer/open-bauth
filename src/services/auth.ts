@@ -33,6 +33,9 @@ export class AuthService {
     this.jwtService = jwtService;
   }
 
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
   private sanitizeUser(user: User): User {
     const { password_hash, ...sanitizedUser } = user;
     return sanitizedUser as User;
@@ -59,7 +62,7 @@ export class AuthService {
       );
 
       return { ...user, roles: roles.filter((r): r is Role => r !== null) };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Return user with empty roles on error
       return { ...user, roles: [] };
     }
@@ -69,7 +72,7 @@ export class AuthService {
     try {
       const result = await this.roleController.findFirst({ name: roleName });
       return result.data || null;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Return null on error
       return null;
     }
@@ -141,11 +144,11 @@ export class AuthService {
         user: this.sanitizeUser(userWithRoles),
         token,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Verificar si es un error de constraint de SQLite para email duplicado
-      if (error.message && (
-        error.message.includes('UNIQUE constraint failed') ||
-        error.message.includes('constraint failed')
+      if (this.getErrorMessage(error) && (
+        this.getErrorMessage(error).includes('UNIQUE constraint failed') ||
+        this.getErrorMessage(error).includes('constraint failed')
       )) {
         return {
           success: false,
@@ -157,7 +160,7 @@ export class AuthService {
       }
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
+        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
       };
     }
   }
@@ -234,11 +237,11 @@ export class AuthService {
         user: this.sanitizeUser(userWithRoles),
         token,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Preserve original error message for better error handling
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
+        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
       };
     }
   }
@@ -259,7 +262,7 @@ export class AuthService {
       }
 
       return this.sanitizeUser(user);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Return null on error
       return null;
     }
@@ -281,7 +284,7 @@ export class AuthService {
       }
 
       return this.sanitizeUser(user);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Return null on error
       return null;
     }
@@ -379,11 +382,11 @@ export class AuthService {
         };
       }
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Preserve original error message for better error handling
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
+        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
       };
     }
   }
@@ -438,11 +441,11 @@ export class AuthService {
         };
       }
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Preserve original error message for better error handling
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
+        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
       };
     }
   }
@@ -487,11 +490,11 @@ export class AuthService {
         };
       }
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Preserve original error message for better error handling
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: error.message },
+        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
       };
     }
   }
@@ -517,7 +520,7 @@ export class AuthService {
       }
 
       return { users: users.map(this.sanitizeUser), total };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Return empty result with error information
       return { users: [], total: 0 };
     }
@@ -532,7 +535,7 @@ export class AuthService {
 
       const userWithRoles = await this.attachRolesToUser(user.data);
       return userWithRoles.roles || [];
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Return empty array on error
       return [];
     }

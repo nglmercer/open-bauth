@@ -6,13 +6,13 @@ import { Database } from "bun:sqlite";
 /**
  * Generic API response wrapper
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: {
     code: string;
     message: string;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
   };
   meta?: {
     timestamp: string;
@@ -71,7 +71,7 @@ export interface QueryOptions {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   search?: string;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }
 
 /**
@@ -122,7 +122,7 @@ export interface ValidationError {
   field: string;
   message: string;
   code: string;
-  value?: any;
+  value?: unknown;
 }
 
 /**
@@ -132,7 +132,7 @@ export interface ValidationWarning {
   field: string;
   message: string;
   code: string;
-  value?: any;
+  value?: unknown;
 }
 
 /**
@@ -207,7 +207,7 @@ export interface SecurityConfig {
   };
   helmet: {
     enabled: boolean;
-    options: Record<string, any>;
+    options: Record<string, unknown>;
   };
 }
 
@@ -267,7 +267,7 @@ export type DeepRequired<T> = {
  */
 export type AsyncFunction<T = void> = () => Promise<T>;
 export type Callback<T = void> = (error?: Error, result?: T) => void;
-export type EventHandler<T = any> = (event: T) => void | Promise<void>;
+export type EventHandler<T = unknown> = (event: T) => void | Promise<void>;
 
 /**
  * Date utility types
@@ -314,8 +314,8 @@ export interface DomainEvent {
   aggregateType: string;
   version: number;
   timestamp: string;
-  data: Record<string, any>;
-  metadata?: Record<string, any>;
+  data: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -326,8 +326,8 @@ export interface Command {
   type: string;
   timestamp: string;
   userId?: string;
-  data: Record<string, any>;
-  metadata?: Record<string, any>;
+  data: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -338,6 +338,6 @@ export interface Query {
   type: string;
   timestamp: string;
   userId?: string;
-  parameters: Record<string, any>;
-  metadata?: Record<string, any>;
+  parameters: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }

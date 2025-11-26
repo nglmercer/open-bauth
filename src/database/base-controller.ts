@@ -28,7 +28,7 @@ export type WhereConditions<T> = {
   [P in keyof T]?: T[P] | T[P][] | null | AdvancedFilter<T[P]>;
 };
 
-export interface QueryOptions<T = any> {
+export interface QueryOptions<T = unknown> {
   limit?: number;
   offset?: number;
   orderBy?: string;
@@ -49,7 +49,7 @@ export interface JoinOptions {
   select?: string[];
 }
 
-export interface RelationOptions<T = any> extends QueryOptions<T> {
+export interface RelationOptions<T = unknown> extends QueryOptions<T> {
   joins?: JoinOptions[];
   select?: string[];
 }
@@ -61,7 +61,7 @@ export interface SimpleSearchOptions {
   orderDirection?: "ASC" | "DESC";
 }
 
-export interface ControllerResponse<T = any> {
+export interface ControllerResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -71,7 +71,7 @@ export interface ControllerResponse<T = any> {
 }
 
 export interface ValidationSchema {
-  parse(data: any): any;
+  parse(data: unknown): unknown;
 }
 
 export interface SchemaCollection {
@@ -210,7 +210,7 @@ export class DatabaseAdapter implements DatabaseConnection {
   }
 }
 
-export class BaseController<T = Record<string, any>> {
+export class BaseController<T = Record<string, unknown>> {
   protected adapter: IDatabaseAdapter;
   protected tableName: string;
   protected schemas?: SchemaCollection;

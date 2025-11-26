@@ -1,5 +1,6 @@
 // src/types/oauth.ts
 
+import type { User } from "../types/auth";
 import type { BaseEntity, EntityId, UserId } from "./common";
 
 /**
@@ -359,7 +360,7 @@ export enum OAuthErrorType {
  */
 export interface OAuthContext {
   client?: OAuthClient;
-  user?: any; // User type from auth.ts
+  user?: User;
   scopes: string[];
   grant_type?: OAuthGrantType;
   response_type?: OAuthResponseType;
@@ -500,5 +501,5 @@ export interface OAuthJWTPayload {
   email_verified?: boolean;
   picture?: string;
   // Additional claims
-  [key: string]: any;
+  [key: string]: unknown;
 }

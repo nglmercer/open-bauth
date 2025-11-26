@@ -23,7 +23,7 @@ export interface DatabaseError {
   timestamp?: string;
 }
 
-export interface ControllerError<T = any> {
+export interface ControllerError<T = unknown> {
   success: false;
   error: string;
   errorType: DatabaseErrorType;
@@ -31,7 +31,7 @@ export interface ControllerError<T = any> {
   originalError?: unknown;
 }
 
-export interface ControllerResponse<T = any> {
+export interface ControllerResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -133,7 +133,7 @@ export function categorizeError(error: unknown): DatabaseError {
 /**
  * Crea una respuesta de error estandarizada para el controlador
  */
-export function createErrorResponse<T = any>(
+export function createErrorResponse<T = unknown>(
   error: unknown,
   additionalDetails?: Record<string, unknown>
 ): ControllerError<T> {

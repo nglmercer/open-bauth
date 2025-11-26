@@ -535,7 +535,7 @@ export class DatabaseInitializer {
   /**
    * Create a controller instance for a specific table
    */
-  createController<T = Record<string, any>>(
+  createController<T = Record<string, unknown>>(
     tableName: string,
   ): BaseController<T> {
     return new BaseController<T>(tableName, {
@@ -547,7 +547,7 @@ export class DatabaseInitializer {
   /**
    * Create controller with custom table name from configuration
    */
-  createControllerByKey<T = Record<string, any>>(
+  createControllerByKey<T = Record<string, unknown>>(
     tableKey: keyof import("./config").DatabaseTableConfig,
   ): BaseController<T> {
     // Import config dynamically to avoid circular dependencies

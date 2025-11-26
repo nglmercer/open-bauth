@@ -65,7 +65,7 @@ export class ServiceFactory {
   /**
    * Create a controller with a configured table name
    */
-  createControllerWithCustomName<T = Record<string, any>>(
+  createControllerWithCustomName<T = Record<string, unknown>>(
     tableKey: keyof ReturnType<typeof getAllTableNames>
   ) {
     const tableName = getTableName(tableKey);

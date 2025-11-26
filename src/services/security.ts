@@ -183,8 +183,8 @@ export class SecurityService {
       }
 
       return { valid: true, payload };
-    } catch (error: any) {
-      return { valid: false, error: error.message };
+    } catch (error: unknown) {
+      return { valid: false, error: (error as Error).message };
     }
   }
 
@@ -247,8 +247,8 @@ export class SecurityService {
         default:
           return { valid: false, error: "Unknown challenge type" };
       }
-    } catch (error: any) {
-      return { valid: false, error: error.message };
+    } catch (error: unknown) {
+      return { valid: false, error: (error as Error).message };
     }
   }
 
@@ -366,7 +366,7 @@ export class SecurityService {
   /**
    * Convert CryptoKey to JWK format
    */
-  private async cryptoKeyToJWK(privateKey: CryptoKey): Promise<any> {
+  private async cryptoKeyToJWK(privateKey: CryptoKey): Promise<unknown> {
     return await crypto.subtle.exportKey("jwk", privateKey);
   }
 
