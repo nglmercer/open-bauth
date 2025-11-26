@@ -1,18 +1,23 @@
-import { Schema } from "./schema"; // Importamos tu nueva clase
+import { Schema } from "./schema";
 import type { TableSchema } from "../base-controller";
 import { setDatabaseConfig, createSchemaExtension } from "../config";
 
-// Helper para reutilizar columnas comunes en la sintaxis de Schema
-const CommonFields = {
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+// Constants
+
+const StandardFields = {
+  UUID: { type: String, primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  Timestamps: {
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
+  },
+  CreatedAt: { type: Date, default: Date.now },
+  Active: { type: Boolean, default: true },
 };
 
-/**
- * OAuth 2.0 Client Schema
- */
+// Schemas 
+
 export const oauthClientsSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   client_id: { type: String, required: true, unique: true },
   client_secret: String,
   client_secret_salt: String,
@@ -28,9 +33,8 @@ export const oauthClientsSchema = new Schema({
   jwks_uri: String,
   token_endpoint_auth_method: { type: String, default: "client_secret_basic" },
   is_public: { type: Boolean, default: false },
-  is_active: { type: Boolean, default: true },
-  created_at: CommonFields.createdAt,
-  updated_at: CommonFields.updatedAt
+  is_active: StandardFields.Active,
+  ...StandardFields.Timestamps
 }, {
   indexes: [
     { name: "idx_oauth_clients_client_id", columns: ["client_id"], unique: true },
@@ -38,11 +42,8 @@ export const oauthClientsSchema = new Schema({
   ]
 });
 
-/**
- * Authorization Codes Schema
- */
 export const authorizationCodesSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   code: { type: String, required: true, unique: true },
   client_id: { type: String, required: true },
   user_id: { type: String, required: true },
@@ -55,7 +56,7 @@ export const authorizationCodesSchema = new Schema({
   expires_at: { type: Date, required: true },
   is_used: { type: Boolean, default: false },
   used_at: Date,
-  created_at: CommonFields.createdAt
+  created_at: StandardFields.CreatedAt
 }, {
   indexes: [
     { name: "idx_auth_codes_code", columns: ["code"], unique: true },
@@ -66,11 +67,8 @@ export const authorizationCodesSchema = new Schema({
   ]
 });
 
-/**
- * Refresh Tokens Schema
- */
 export const refreshTokensSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   token: { type: String, required: true, unique: true },
   client_id: { type: String, required: true },
   user_id: { type: String, required: true },
@@ -79,7 +77,7 @@ export const refreshTokensSchema = new Schema({
   is_revoked: { type: Boolean, default: false },
   revoked_at: Date,
   rotation_count: { type: Number, default: 0 },
-  created_at: CommonFields.createdAt
+  created_at: StandardFields.CreatedAt
 }, {
   indexes: [
     { name: "idx_refresh_tokens_token", columns: ["token"], unique: true },
@@ -90,11 +88,8 @@ export const refreshTokensSchema = new Schema({
   ]
 });
 
-/**
- * Device Secrets Schema (for SSO)
- */
 export const deviceSecretsSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   user_id: { type: String, required: true },
   device_id: { type: String, required: true, unique: true },
   device_name: { type: String, required: true },
@@ -104,7 +99,7 @@ export const deviceSecretsSchema = new Schema({
   is_trusted: { type: Boolean, default: false },
   last_used_at: Date,
   expires_at: Date,
-  created_at: CommonFields.createdAt
+  created_at: StandardFields.CreatedAt
 }, {
   indexes: [
     { name: "idx_device_secrets_user_id", columns: ["user_id"] },
@@ -114,17 +109,14 @@ export const deviceSecretsSchema = new Schema({
   ]
 });
 
-/**
- * Biometric Credentials Schema
- */
 export const biometricCredentialsSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   user_id: { type: String, required: true },
   biometric_type: { type: String, required: true },
-  credential_data: { type: String, required: true }, // Encrypted
+  credential_data: { type: String, required: true }, 
   device_id: String,
-  is_active: { type: Boolean, default: true },
-  created_at: CommonFields.createdAt,
+  is_active: StandardFields.Active,
+  created_at: StandardFields.CreatedAt,
   expires_at: Date
 }, {
   indexes: [
@@ -136,14 +128,11 @@ export const biometricCredentialsSchema = new Schema({
   ]
 });
 
-/**
- * Anonymous Users Schema
- */
 export const anonymousUsersSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   anonymous_id: { type: String, required: true, unique: true },
   session_data: { type: String, required: true }, // JSON
-  created_at: CommonFields.createdAt,
+  created_at: StandardFields.CreatedAt,
   promoted_to_user_id: String,
   promoted_at: Date,
   expires_at: { type: Date, required: true }
@@ -155,11 +144,8 @@ export const anonymousUsersSchema = new Schema({
   ]
 });
 
-/**
- * User Devices Schema
- */
 export const userDevicesSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   user_id: { type: String, required: true },
   device_id: { type: String, required: true, unique: true },
   device_name: { type: String, required: true },
@@ -168,7 +154,7 @@ export const userDevicesSchema = new Schema({
   user_agent: String,
   is_trusted: { type: Boolean, default: false },
   last_seen_at: Date,
-  created_at: CommonFields.createdAt
+  created_at: StandardFields.CreatedAt
 }, {
   indexes: [
     { name: "idx_user_devices_user_id", columns: ["user_id"] },
@@ -178,11 +164,8 @@ export const userDevicesSchema = new Schema({
   ]
 });
 
-/**
- * MFA Configurations Schema
- */
 export const mfaConfigurationsSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   user_id: { type: String, required: true },
   mfa_type: { type: String, required: true },
   is_enabled: { type: Boolean, default: false },
@@ -192,8 +175,7 @@ export const mfaConfigurationsSchema = new Schema({
   email: String,
   backup_codes: String, // JSON array
   configuration_data: String, // JSON
-  created_at: CommonFields.createdAt,
-  updated_at: CommonFields.updatedAt
+  ...StandardFields.Timestamps
 }, {
   indexes: [
     { name: "idx_mfa_configs_user_id", columns: ["user_id"] },
@@ -203,18 +185,15 @@ export const mfaConfigurationsSchema = new Schema({
   ]
 });
 
-/**
- * Security Challenges Schema
- */
 export const securityChallengesSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   challenge_id: { type: String, required: true, unique: true },
   challenge_type: { type: String, required: true },
   challenge_data: { type: String, required: true },
   expires_at: { type: Date, required: true },
   is_solved: { type: Boolean, default: false },
   solved_at: Date,
-  created_at: CommonFields.createdAt
+  created_at: StandardFields.CreatedAt
 }, {
   indexes: [
     { name: "idx_security_challenges_challenge_id", columns: ["challenge_id"], unique: true },
@@ -224,19 +203,16 @@ export const securityChallengesSchema = new Schema({
   ]
 });
 
-/**
- * OAuth 2.0 Session Schema
- */
 export const oauthSessionsSchema = new Schema({
-  id: { type: "TEXT", primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  id: StandardFields.UUID,
   session_id: { type: String, required: true, unique: true },
   client_id: { type: String, required: true },
   user_id: String,
   auth_time: Date,
   expires_at: { type: Date, required: true },
-  is_active: { type: Boolean, default: true },
+  is_active: StandardFields.Active,
   session_data: String, // JSON
-  created_at: CommonFields.createdAt
+  created_at: StandardFields.CreatedAt
 }, {
   indexes: [
     { name: "idx_oauth_sessions_session_id", columns: ["session_id"], unique: true },
@@ -247,11 +223,9 @@ export const oauthSessionsSchema = new Schema({
   ]
 });
 
-// ==========================================
-// Adaptadores de Compatibilidad (Importante)
-// ==========================================
+// Adapters and exports 
 
-const schemasMap = {
+const schemasMap: Record<string, Schema> = {
   oauth_clients: oauthClientsSchema,
   authorization_codes: authorizationCodesSchema,
   refresh_tokens: refreshTokensSchema,
@@ -264,16 +238,10 @@ const schemasMap = {
   oauth_sessions: oauthSessionsSchema,
 };
 
-/**
- * Function to get all OAuth schema extensions in "Raw" TableSchema format
- * for compatibility with config
- */
 export function getOAuthSchemaExtensions(): Record<string, Omit<TableSchema, "tableName">> {
   const result: Record<string, Omit<TableSchema, "tableName">> = {};
   
-  // Convertimos las instancias de Schema a objetos planos que config.ts entiende
   Object.entries(schemasMap).forEach(([key, schemaInstance]) => {
-    // Usamos un nombre dummy porque aquí solo nos importan las columnas/índices
     const raw = schemaInstance.toTableSchema("dummy");
     result[key] = {
       columns: raw.columns,
@@ -284,35 +252,22 @@ export function getOAuthSchemaExtensions(): Record<string, Omit<TableSchema, "ta
   return result;
 }
 
-/**
- * Function to get OAuth schemas as complete TableSchema objects
- */
 export function getOAuthSchemas(): TableSchema[] {
   return Object.entries(schemasMap).map(([tableName, schemaInstance]) => 
     schemaInstance.toTableSchema(tableName)
   );
 }
 
-/**
- * Function to register OAuth schema extensions with the database configuration
- */
 export function registerOAuthSchemaExtensions(): void {
-  
   const schemaExtensions: Record<string, any> = {};
   
   Object.entries(schemasMap).forEach(([tableName, schemaInstance]) => {
-    // Extraemos las columnas SQL puras de la instancia de Schema
-    const columns = schemaInstance.getColumns();
-    
     schemaExtensions[tableName] = createSchemaExtension(
-      columns, // additionalColumns
-      [],      // modifiedColumns
-      [],      // removedColumns
+      schemaInstance.getColumns(), 
+      [], 
+      [], 
     );
   });
   
-  // Update the global database configuration
-  setDatabaseConfig({
-    schemaExtensions,
-  });
+  setDatabaseConfig({ schemaExtensions });
 }

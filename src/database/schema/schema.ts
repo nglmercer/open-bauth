@@ -1,9 +1,5 @@
 import type { ColumnDefinition, ColumnType, TableSchema } from "../base-controller";
 
-// ==========================================
-// 1. Definición de Tipos y Interfaces
-// ==========================================
-
 type ConstructorType = 
   | StringConstructor 
   | NumberConstructor 
@@ -24,9 +20,10 @@ export interface SchemaOptions {
 
 export interface SchemaTypeOptions {
   type: ConstructorType | ColumnType;
-  required?: boolean;           // Mapea a notNull
+  required?: boolean;
+  notNull?: boolean;
   unique?: boolean;
-  primaryKey?: boolean;         // <--- Agregado para soportar tus IDs
+  primaryKey?: boolean;
   default?: any;
   ref?: string;
   references?: {
@@ -34,7 +31,6 @@ export interface SchemaTypeOptions {
     column: string;
   };
   check?: string;
-  notNull?: boolean;            // Alias directo
 }
 
 type SchemaField = 
@@ -46,10 +42,6 @@ type SchemaField =
 export interface SchemaDefinition {
   [key: string]: SchemaField;
 }
-
-// ==========================================
-// 2. Clase Schema Principal
-// ==========================================
 
 export class Schema {
   private definition: SchemaDefinition;
@@ -76,15 +68,12 @@ export class Schema {
   }
 
   private parseColumns(): ColumnDefinition[] {
-    const columns: ColumnDefinition[] = [];
-    for (const [name, value] of Object.entries(this.definition)) {
-      columns.push(this.parseField(name, value));
-    }
-    return columns;
+    return Object.entries(this.definition).map(([name, value]) => 
+      this.parseField(name, value)
+    );
   }
 
   private parseField(name: string, value: any): ColumnDefinition {
-    // 1. Shorthand: name: String
     if (this.isConstructor(value)) {
       return {
         name,
@@ -92,24 +81,21 @@ export class Schema {
       };
     }
 
-    // 2. Array
     if (Array.isArray(value)) {
       return { name, type: "TEXT", defaultValue: "[]" };
     }
 
-    // 3. Objeto anidado sin 'type'
     if (typeof value === "object" && !value.type && !this.isConstructor(value)) {
        return { name, type: "TEXT", defaultValue: "{}" };
     }
 
-    // 4. Configuración completa
     if (typeof value === "object" && value.type) {
       const sqlColumn: ColumnDefinition = {
         name,
         type: this.mapConstructorToSQL(value.type),
       };
 
-      if (value.required || value.notNull) sqlColumn.notNull = true;
+      if (value.required ?? value.notNull) sqlColumn.notNull = true;
       if (value.unique) sqlColumn.unique = true;
       if (value.primaryKey) sqlColumn.primaryKey = true;
       if (value.check) sqlColumn.check = value.check;
@@ -124,9 +110,6 @@ export class Schema {
         if (value.default === Date.now) {
           sqlColumn.defaultValue = "CURRENT_TIMESTAMP";
         } else if (typeof value.default === 'function') {
-           // Nota: Si pasas una función generadora de IDs en JS, 
-           // aquí se ejecutará solo al crear el esquema, no en cada insert.
-           // Para SQL puro es mejor pasar el string SQL.
            sqlColumn.defaultValue = value.default(); 
         } else {
           sqlColumn.defaultValue = value.default;
@@ -144,12 +127,16 @@ export class Schema {
   }
 
   private mapConstructorToSQL(type: any): ColumnType {
-    if (type === String) return "TEXT";
-    if (type === Number) return "INTEGER"; 
-    if (type === Boolean) return "BOOLEAN";
-    if (type === Date) return "DATETIME";
-    if (type === Object || type === Array) return "TEXT";
     if (typeof type === "string") return type as ColumnType;
-    return "TEXT";
+
+    switch (type) {
+      case String: return "TEXT";
+      case Number: return "INTEGER";
+      case Boolean: return "BOOLEAN";
+      case Date: return "DATETIME";
+      case Object:
+      case Array: return "TEXT";
+      default: return "TEXT";
+    }
   }
 }

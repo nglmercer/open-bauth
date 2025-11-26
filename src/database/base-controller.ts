@@ -1227,3 +1227,5 @@ export class BaseController<T = Record<string, any>> {
 // Export configuration system for external use
 export * from "./config";
 export * from "./schema/schema-builder";
+export * from "./schema/oauth-schema-extensions";
+export * from "./schema/schema";
