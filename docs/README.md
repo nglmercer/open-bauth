@@ -379,9 +379,5 @@ We welcome contributions! Please see the [main README](../README.md) for contrib
 ### Community Resources
 
 - **GitHub Repository**: [https://github.com/nglmercer/open-bauth](https://github.com/nglmercer/open-bauth)
-- **Documentation Website**: [https://open-bauth.dev](https://open-bauth.dev) (if available)
+- **Documentation Website**: [https://nglmercer.github.io/Open_Bauth/](https://nglmercer.github.io/Open_Bauth/) 
 - **NPM Package**: [https://www.npmjs.com/package/open-bauth](https://www.npmjs.com/package/open-bauth)
-
----
-
-*Last updated: November 2024*

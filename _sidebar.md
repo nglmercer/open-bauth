@@ -14,16 +14,6 @@
   * [📝 Logger](docs/logger.md)
   * [🧪 Testing](docs/testing.md)
 
-* 💻 **Ejemplos**
-  * [📋 Uso Básico](docs/examples/usage-example.ts)
-  * [⚙️ Configuración](docs/examples/example-config.ts)
-  * [🚀 Ejemplos Completos](../examples/)
-
-* 📖 **Guías Rápidas**
-  * [⚡ Quick Start](../README.md#quick-start)
-  * [🔧 Instalación](../README.md#installation)
-  * [🏗️ Arquitectura](docs/README.md#architecture)
-
 * 📊 **Referencia**
   * [📋 API completa](docs/services.md)
   * [🔧 Configuración](docs/README.md#configuration)
