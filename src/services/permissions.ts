@@ -171,7 +171,7 @@ export class PermissionService {
           },
         };
       }
-      return { success: true, role: result.data };
+      return { success: true,data:result.data };
     } catch (error: any) {
       return {
         success: false,
@@ -191,7 +191,7 @@ export class PermissionService {
         },
       };
     }
-    return { success: true, role: result.data };
+    return { success: true, data: result.data };
   }
 
   async deleteRole(roleId: string): Promise<RoleResult> {

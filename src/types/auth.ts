@@ -459,10 +459,9 @@ export interface PermissionResult<T = unknown> {
 /**
  * Response for role operations
  */
-export interface RoleResult<T = unknown> {
+export interface RoleResult {
   success: boolean;
-  data?: T;
-  role?: Role;
+  data?: Role;
   error?: {
     type: AuthErrorType;
     message: string;

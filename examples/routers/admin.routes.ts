@@ -112,14 +112,17 @@ export function createAdminRoutes(
         name,
         description,
       });
-      const { role, data, success } = transaccion;
+      const { data, success } = transaccion;
+      if (!data?.id) {
+        return c.json({ error: "Error creating role", message: "" }, 400);
+      }
       const result = await assignPermissionsToRole(
-        role?.id || data.id,
+        data?.id,
         permissions,
         permissionService,
       );
 
-      return c.json({ role, data: role, success: success || false, result });
+      return c.json({ data, role: data, success: success || false, result });
     } catch (error: any) {
       return c.json(
         { error: "Error creating role", message: error?.message || "" },
@@ -135,13 +138,16 @@ export function createAdminRoutes(
         name,
         description,
       });
-      const { role, data, success } = transaccion;
+      const { data, success } = transaccion;
+      if (!data?.id) {
+        return c.json({ error: "Error updating role", message: "" }, 400);
+      }
       const result = await assignPermissionsToRole(
-        role?.id || data.id,
+        data?.id,
         permissions,
         permissionService,
       );
-      return c.json({ role, data: role, success: success || false, result });
+      return c.json({ data,role:data, success: success || false, result });
     } catch (error: any) {
       return c.json(
         { error: "Error updating role", message: error?.message || "" },
