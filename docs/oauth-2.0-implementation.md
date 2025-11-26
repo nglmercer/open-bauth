@@ -371,7 +371,7 @@ RATE_LIMIT_MAX=100
 ### Configuración de Base de Datos
 ```typescript
 // Registrar extensiones OAuth
-import { registerOAuthSchemaExtensions } from "./src/database/oauth-schema-extensions";
+import { registerOAuthSchemaExtensions } from "./src/database/schema/oauth-schema-extensions";
 
 // Aplicar a configuración existente
 registerOAuthSchemaExtensions();

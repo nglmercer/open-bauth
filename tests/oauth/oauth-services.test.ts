@@ -1,11 +1,11 @@
 import { test, expect, describe, beforeAll, afterAll } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { DatabaseInitializer } from '../src/database/database-initializer';
-import { JWTService } from '../src/services/jwt';
-import { AuthService } from '../src/services/auth';
-import { PermissionService } from '../src/services/permissions';
-import { SecurityService } from '../src/services/security';
-import { PKCEMethod } from '../src/types/oauth';
+import { DatabaseInitializer } from '../../src/database/database-initializer';
+import { JWTService } from '../../src/services/jwt';
+import { AuthService } from '../../src/services/auth';
+import { PermissionService } from '../../src/services/permissions';
+import { SecurityService } from '../../src/services/security';
+import { PKCEMethod } from '../../src/types/oauth';
 
 describe('OAuth 2.0 Services Tests', () => {
   let db: Database;

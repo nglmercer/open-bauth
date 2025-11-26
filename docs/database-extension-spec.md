@@ -34,6 +34,103 @@ The database extension system allows developers to:
 
 ## 🏗️ Core Concepts
 
+### Schema Class
+
+The `Schema` class is the core building block for defining database table structures with TypeScript type safety:
+
+```typescript
+import { Schema, SchemaDefinition, SchemaOptions } from "open-bauth/src/database/schema";
+
+// Define a schema using TypeScript constructors
+const userSchema = new Schema({
+  id: { type: String, primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  email: { type: String, required: true, unique: true },
+  age: { type: Number, check: "age >= 0" },
+  is_active: { type: Boolean, default: true },
+  created_at: { type: Date, default: Date.now }
+}, {
+  indexes: [
+    { name: "idx_users_email", columns: ["email"], unique: true },
+    { name: "idx_users_active", columns: ["is_active"] }
+  ]
+});
+
+// Convert to TableSchema for database initialization
+const tableSchema = userSchema.toTableSchema("users");
+```
+
+#### Schema Types and Interfaces
+
+```typescript
+// Field definition types
+interface SchemaTypeOptions {
+  type: ConstructorType | ColumnType;
+  required?: boolean;
+  notNull?: boolean;
+  unique?: boolean;
+  primaryKey?: boolean;
+  default?: any;
+  ref?: string;
+  references?: { table: string; column: string };
+  check?: string;
+}
+
+// Schema definition
+interface SchemaDefinition {
+  [key: string]: SchemaField;
+}
+
+// Index definition
+interface SchemaIndex {
+  name: string;
+  columns: string[];
+  unique?: boolean;
+}
+
+// Schema options
+interface SchemaOptions {
+  indexes?: SchemaIndex[];
+}
+```
+
+#### Advanced Schema Features
+
+```typescript
+// Using constructor shortcuts
+const quickSchema = new Schema({
+  id: String, // Simple type definition
+  name: { type: String, required: true },
+  metadata: { /* object */ }, // Automatically becomes TEXT with "{}" default
+  tags: [String], // Array becomes TEXT with "[]" default
+  profile: {
+    // Nested objects become TEXT with "{}" default
+    bio: String,
+    avatar: String
+  }
+});
+
+// Complex field definitions
+const advancedSchema = new Schema({
+  user_id: { 
+    type: String, 
+    ref: "users" // Shortcut for references
+  },
+  status: { 
+    type: String, 
+    default: "active",
+    check: "status IN ('active', 'inactive', 'suspended')"
+  },
+  expires_at: { 
+    type: Date, 
+    notNull: true 
+  },
+  is_premium: { 
+    type: Boolean, 
+    default: false 
+  }
+});
+```
+
 ### TableSchema
 
 Core interface for defining database tables:
