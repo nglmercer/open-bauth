@@ -434,9 +434,6 @@ const mfaResult = await enhancedUserService.setupMFA(
 **Purpose**: Dependency injection and centralized service management.
 
 **Key Methods**:
-- `createServices(config)` → `ServiceContainer`
-  - Creates all services with dependencies
-  - Ensures proper initialization order
 - `getService<T>(serviceName)` → `T`
   - Gets service instance by name
   - With type safety
@@ -449,18 +446,16 @@ const mfaResult = await enhancedUserService.setupMFA(
 
 **Usage Example**:
 ```typescript
-import { ServiceFactory, createServices } from './src/services/service-factory';
+import { Database } from 'bun:sqlite';
+import { DatabaseInitializer } from 'open-bauth';
+import { JWTService, AuthService, PermissionService } from 'open-bauth';
 
-// Create service container
-const services = createServices({
-  database: db,
-  jwtSecret: 'your-secret',
-  jwtExpiration: '24h'
-});
-
-// Get services
-const authService = services.getService<AuthService>('auth');
-const jwtService = services.getService<JWTService>('jwt');
+const db = new Database('auth.db');
+const dbInitializer = new DatabaseInitializer({ database: db });
+const jwtService = new JWTService(process.env.JWT_SECRET || 'dev-secret', '7d');
+const authService = new AuthService(dbInitializer, jwtService);
+const permissionService = new PermissionService(dbInitializer);
+//await dbInitializer.initialize();
 ```
 
 ## 📝 Type Definitions

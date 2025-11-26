@@ -61,7 +61,7 @@ See the main [README](../README.md) for basics and quick start.
 
 | Feature | Description |
 |---------|-------------|
-| **Version** | 1.3.2 |
+| **Version** | 1.3.5 |
 | **Runtime** | Bun |
 | **Database** | SQLite + adapters |
 | **Authentication** | JWT + RBAC + OAuth 2.0 |
@@ -114,13 +114,10 @@ await dbInitializer.seedDefaults();
 ### 3. Service Creation
 
 ```typescript
-import { createServices } from 'open-bauth/src/services/service-factory';
-
-const services = await createServices({
-  database: db,
-  jwtSecret: 'your-secret-key',
-  jwtExpiration: '24h'
-});
+import { JWTService, AuthService, PermissionService } from 'open-bauth';
+const jwtService = new JWTService('your-secret', '24h');
+const authService = new AuthService(dbInitializer, jwtService);
+const permissionService = new PermissionService(dbInitializer);
 ```
 
 ### 4. Middleware Setup
@@ -233,16 +230,16 @@ setDatabaseConfig({
 ### Service Configuration
 
 ```typescript
-import { createServices } from 'open-bauth/src/services/service-factory';
+import { Database } from 'bun:sqlite';
+import { DatabaseInitializer } from 'open-bauth';
+import { JWTService, AuthService, PermissionService } from 'open-bauth';
 
-const services = await createServices({
-  database: db,
-  jwtSecret: process.env.JWT_SECRET,
-  jwtExpiration: '24h',
-  bcryptRounds: 12,
-  enableRateLimiting: true,
-  enableAuditLogging: true
-});
+const db = new Database('auth.db');
+const dbInitializer = new DatabaseInitializer({ database: db });
+const jwtService = new JWTService(process.env.JWT_SECRET || 'dev-secret', '7d');
+const authService = new AuthService(dbInitializer, jwtService);
+const permissionService = new PermissionService(dbInitializer);
+//await dbInitializer.initialize();
 ```
 
 ## 🚀 Advanced Usage Examples
