@@ -1,5 +1,5 @@
 import type { DatabaseInitializer } from "../database/database-initializer";
-import type { BaseController } from "../database/base-controller";
+import type { BaseController,ControllerResponse } from "../database/base-controller";
 import type { JWTService } from "./jwt";
 import {
   AuthResult,
@@ -11,7 +11,6 @@ import {
   UserQueryOptions,
   AuthErrorType,
 } from "../types/auth";
-
 /**
  * Main service for authentication, registration, and user management.
  */
@@ -317,7 +316,7 @@ export class AuthService {
   async updatePassword(
     userId: string,
     newPassword: string,
-  ): Promise<{ success: boolean; error?: any }> {
+  ) {
     if (typeof newPassword !== "string" || !newPassword) {
       return {
         success: false,
@@ -335,12 +334,50 @@ export class AuthService {
         error: { type: AuthErrorType.DATABASE_ERROR, message: result.error },
       };
     }
-    return { success: true };
+    return result;
   }
+  async changePassword(
+    filter: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    let userResult: ControllerResponse<User | null>;
+    userResult = await this.userController.findById(filter);
+    if (!userResult.success || !userResult.data) {
+      userResult = await this.userController.findFirst({ email: filter });
+    }
 
+    if (!userResult.success || !userResult.data) {
+      return {
+        success: false,
+        error: {
+          type: AuthErrorType.DATABASE_ERROR,
+          message: "Failed to find user",
+        },
+      };
+    }
+
+    const user = userResult.data;
+    const isPasswordValid = await Bun.password.verify(
+      currentPassword,
+      user.password_hash!
+    );
+
+    if (!isPasswordValid) {
+      return {
+        success: false,
+        error: {
+          type: AuthErrorType.INVALID_CREDENTIALS,
+          message: "Invalid credentials",
+        },
+      };
+    }
+
+    return await this.updatePassword(user.id!, newPassword);
+  }
   async deactivateUser(
     userId: string,
-  ): Promise<{ success: boolean; error?: any }> {
+  ) {
     const result = await this.userController.update(userId, {
       is_active: false,
     });
@@ -350,12 +387,12 @@ export class AuthService {
         error: { type: AuthErrorType.DATABASE_ERROR, message: result.error },
       };
     }
-    return { success: true };
+    return result;
   }
 
   async activateUser(
     userId: string,
-  ): Promise<{ success: boolean; error?: any }> {
+  ) {
     const result = await this.userController.update(userId, {
       is_active: true,
     });
@@ -365,7 +402,7 @@ export class AuthService {
         error: { type: AuthErrorType.DATABASE_ERROR, message: result.error },
       };
     }
-    return { success: true };
+    return result;
   }
 
   async deleteUser(
@@ -408,7 +445,7 @@ export class AuthService {
   async assignRole(
     userId: string | number,
     roleName: string,
-  ): Promise<{ success: boolean; error?: any }> {
+  ) {
     try {
       const roleResult = await this.roleController.findFirst({
         name: roleName,
@@ -452,7 +489,7 @@ export class AuthService {
           error: { type: AuthErrorType.DATABASE_ERROR, message: result.error },
         };
       }
-      return { success: true };
+      return result;
     } catch (error: unknown) {
       // Preserve original error message for better error handling
       return {

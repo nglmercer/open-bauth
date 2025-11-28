@@ -113,4 +113,49 @@ describe("AuthService", () => {
       message: "A user with this email already exists",
     });
   });
+  test("should change password successfully", async () => {
+    const userData = {
+      email: "change@example.com",
+      password: "correctpassword",
+      username: "changeuser",
+    };
+    const registerData = await authService.register(userData);
+    const newpassword = "newpassword";
+    const resultbyid   = await authService.changePassword(
+      registerData.user?.id!,
+      userData.password,
+      newpassword,
+    );
+    expect(resultbyid.success).toBe(true);
+    expect(resultbyid.error).toBeUndefined();
+    // revert password
+    const resultbyemail = await authService.changePassword(
+      registerData.user?.email!,
+      newpassword,
+      userData.password,
+    );
+    expect(resultbyemail.success).toBe(true);
+    expect(resultbyemail.error).toBeUndefined();
+    // change password without password
+    const password2 = "password2"
+    const result_direct = await authService.updatePassword(registerData.user?.id!, password2)
+    expect(result_direct.success).toBe(true);
+    expect(resultbyemail.error).toBeUndefined();
+  });
+  test("update user successfully", async () => {
+    const userData = {
+      email: "update@example.com",
+      password: "correctpassword",
+      username: "updateuser",
+    };
+    const newUserData = {
+      username: "newusername",
+    };
+    const RegisterData = await authService.register(userData);
+    const result = await authService.updateUser(RegisterData.user?.id!, newUserData);
+    console.log("result", result);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(result.user?.username).toBe(newUserData.username);
+  });
 });
