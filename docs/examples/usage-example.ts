@@ -216,8 +216,8 @@ async function completeCustomExample() {
     description: "Custom administrator with extended fields",
   });
 
-  if (roleResult.success && roleResult.role) {
-    console.log("Custom role created:", roleResult.role.name);
+  if (roleResult.success && roleResult.data) {
+    console.log("Custom role created:", roleResult.data.name);
   }
 
   // Create user with extended fields
