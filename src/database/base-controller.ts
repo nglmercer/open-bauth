@@ -9,6 +9,8 @@ import type { Database } from "bun:sqlite";
 import type { IDatabaseAdapter, DatabaseAdapterConfig, IDatabaseConnection } from "./adapter";
 import { AdapterFactory } from "./adapter";
 import { createErrorResponse, DatabaseErrorType, type ControllerError } from "../types/errors";
+import { z } from "zod";
+import { SQLiteSchemaExtractor, type GeneratedZodSchema } from "./schema/schema-extractor";
 
 export type TruthyFilter = { isTruthy: true };
 export type FalsyFilter = { isFalsy: true };
@@ -438,14 +440,14 @@ export class BaseController<T = Record<string, unknown>> {
 
       switch (operation) {
         case "create":
-          schema = tableSchemas.create;
+          schema = tableSchemas?.create;
           break;
         case "update":
-          schema = tableSchemas.update;
+          schema = tableSchemas?.update;
           break;
         case "read":
         default:
-          schema = tableSchemas.read;
+          schema = tableSchemas?.read;
           break;
       }
 
@@ -1041,7 +1043,7 @@ export class BaseController<T = Record<string, unknown>> {
                 }
                 if (/\s+as\s+/i.test(col)) {
                   const [originalCol, alias] = col.split(/\s+as\s+/i);
-                  return `"${join.table}"."${originalCol.trim()}" AS "${alias.trim()}"`;
+                  return `"${join.table}"."${(originalCol || '').trim()}" AS "${(alias || '').trim()}"`;
                 }
                 return `"${join.table}"."${col}" AS "${join.table}_${col}"`;
               })
@@ -1135,7 +1137,7 @@ export class BaseController<T = Record<string, unknown>> {
                 }
                 if (/\s+as\s+/i.test(col)) {
                   const [originalCol, alias] = col.split(/\s+as\s+/i);
-                  return `"${join.table}"."${originalCol.trim()}" AS "${alias.trim()}"`;
+                  return `"${join.table}"."${(originalCol || '').trim()}" AS "${(alias || '').trim()}"`;
                 }
                 return `"${join.table}"."${col}" AS "${join.table}_${col}"`;
               })
@@ -1233,10 +1235,113 @@ export class BaseController<T = Record<string, unknown>> {
       select,
     };
   }
-}
 
-// Export configuration system for external use
+  /**
+   * Extrae y genera schemas Zod para la tabla actual
+   */
+  async extractSchema(): Promise<ControllerResponse<GeneratedZodSchema>> {
+    try {
+      const config = this.adapter.getConfig();
+      const extractor = new SQLiteSchemaExtractor(config);
+      const schema = await extractor.extractTableSchema(this.tableName);
+      
+      if (!schema) {
+        return {
+          success: false,
+          error: `Failed to extract schema for table '${this.tableName}'`,
+          errorType: DatabaseErrorType.QUERY_ERROR
+        };
+      }
+
+      return {
+        success: true,
+        data: schema
+      };
+    } catch (error: unknown) {
+      return createErrorResponse<GeneratedZodSchema>(error, {
+        operation: "extractSchema",
+        table: this.tableName
+      });
+    }
+  }
+
+
+  /**
+   * Obtiene todos los schemas de la base de datos
+   */
+  async getAllDatabaseSchemas(): Promise<ControllerResponse<GeneratedZodSchema[]>> {
+    try {
+      const config = this.adapter.getConfig();
+      const extractor = new SQLiteSchemaExtractor(config);
+      const schemas = await extractor.extractAllSchemas();
+      await extractor.close();
+
+      return {
+        success: true,
+        data: schemas,
+        message: `Extracted schemas for ${schemas.length} tables`
+      };
+    } catch (error: unknown) {
+      return createErrorResponse<GeneratedZodSchema[]>(error, {
+        operation: "getAllDatabaseSchemas"
+      });
+    }
+  }
+
+  /**
+   * Static method to create a BaseController with auto-extracted schema
+   */
+  static async createWithAutoSchema<T = Record<string, unknown>>(
+    tableName: string,
+    database: SQL | Database,
+    options: BaseControllerOptions = {}
+  ): Promise<BaseController<T>> {
+    // Create extractor to get table information
+    const extractor = new SQLiteSchemaExtractor(database);
+    
+    try {
+      // Extract schema for the specific table
+      const extractedSchema = await extractor.extractTableSchema(tableName);
+      
+      if (!extractedSchema) {
+        throw new Error(`Could not extract schema for table: ${tableName}`);
+      }
+
+      // Create validation schemas from extracted information
+      // For create, we need to exclude auto-increment primary keys
+      const schemaDef = extractedSchema.schema._def as any;
+      const createFields = { ...schemaDef.shape };
+      
+      // Remove auto-increment primary key from create validation
+      for (const column of extractedSchema.tableSchema.columns) {
+        if (column.primaryKey && column.autoIncrement) {
+          delete createFields[column.name];
+        }
+      }
+      
+      const createSchema = z.object(createFields);
+      
+      const schemas: SchemaCollection = {
+        [tableName]: {
+          create: createSchema,
+          update: extractedSchema.schema,
+          read: extractedSchema.schema
+        }
+      };
+
+      // Create controller with auto-extracted schemas
+      return new BaseController<T>(tableName, {
+        ...options,
+        database,
+        schemas
+      });
+    } finally {
+      await extractor.close();
+    }
+  }
+}
 export * from "./config";
 export * from "./schema/schema-builder";
 export * from "./schema/oauth-schema-extensions";
 export * from "./schema/schema";
+export * from "./schema/schema-extractor";

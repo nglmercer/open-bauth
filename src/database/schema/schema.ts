@@ -1,4 +1,4 @@
-import type { ColumnDefinition, ColumnType, TableSchema } from "../base-controller";
+import type { ColumnDefinition, ColumnType, TableSchema } from "../base-controller.ts";
 
 type ConstructorType = 
   | StringConstructor 
@@ -6,7 +6,8 @@ type ConstructorType =
   | BooleanConstructor 
   | DateConstructor 
   | ObjectConstructor 
-  | ArrayConstructor;
+  | ArrayConstructor
+  | BufferConstructor;
 
 export interface SchemaIndex {
   name: string;
@@ -67,6 +68,10 @@ export class Schema {
     return this.parseColumns();
   }
 
+  public getDefinition(): SchemaDefinition {
+    return this.definition;
+  }
+
   private parseColumns(): ColumnDefinition[] {
     return Object.entries(this.definition).map(([name, value]) => 
       this.parseField(name, value)
@@ -95,9 +100,13 @@ export class Schema {
         type: this.mapConstructorToSQL(value.type),
       };
 
-      if (value.required ?? value.notNull) sqlColumn.notNull = true;
+      if (value.primaryKey) {
+        sqlColumn.primaryKey = true;
+        sqlColumn.notNull = true; // Las columnas primaryKey siempre deben ser notNull
+      } else if (value.required ?? value.notNull) {
+        sqlColumn.notNull = true;
+      }
       if (value.unique) sqlColumn.unique = true;
-      if (value.primaryKey) sqlColumn.primaryKey = true;
       if (value.check) sqlColumn.check = value.check;
 
       if (value.references) {
@@ -123,7 +132,7 @@ export class Schema {
   }
 
   private isConstructor(value: any): boolean {
-    return [String, Number, Boolean, Date, Object, Array].includes(value);
+    return [String, Number, Boolean, Date, Object, Array, Buffer].includes(value);
   }
 
   private mapConstructorToSQL(type: any): ColumnType {
@@ -136,6 +145,7 @@ export class Schema {
       case Date: return "DATETIME";
       case Object:
       case Array: return "TEXT";
+      case Buffer: return "BLOB";
       default: return "TEXT";
     }
   }

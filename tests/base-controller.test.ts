@@ -234,8 +234,8 @@ describe("BaseController", () => {
     );
 
     expect(result.success).toBe(true);
-    expect(result.data?.length).toBe(1);
-    expect(result.data?.[0].name).toBe("Query Test");
+    expect((result.data as any[]).length).toBe(1);
+    expect((result.data as any[])[0].name).toBe("Query Test");
   });
 
   test("should get schema information", async () => {
@@ -282,7 +282,7 @@ describe("BaseController", () => {
     expect(randomResult.success).toBe(true);
     expect(randomResult.data?.length).toBe(1);
     expect(testRecords.map((r) => r.name)).toContain(
-      randomResult.data?.[0].name
+      (randomResult.data as any[])[0].name
     );
 
     const activeRandomResult = await controller.random({ is_active: true });
