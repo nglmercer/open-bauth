@@ -97,9 +97,9 @@ export function createPublicRoutes(deps: { authService: AuthService }) {
         return c.json(
           {
             success: false,
-            error: {
+            error:roleAssignmentResult.error || {
               message: "User registered, but role assignment failed.",
-              type: roleAssignmentResult.error?.type || "ROLE_ASSIGNMENT_ERROR",
+              type:  "ROLE_ASSIGNMENT_ERROR",
               timestamp: new Date().toISOString(),
             },
           },
