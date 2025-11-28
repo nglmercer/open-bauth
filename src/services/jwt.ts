@@ -1,6 +1,6 @@
 // src/services/jwt.ts
-import type { JWTPayload, User } from '../types/auth';
-import type { OAuthJWTPayload } from '../types/oauth';
+import type { JWTPayload, User } from "../types/auth";
+import type { OAuthJWTPayload } from "../types/oauth";
 
 /**
  * Servicio para manejar operaciones JWT
@@ -14,9 +14,14 @@ export class JWTService {
   private audience: string;
   private dpopNonceCache: Map<string, number> = new Map();
 
-  constructor(secret: string, expiresIn: string = '24h', issuer: string = 'https://your-auth-server.com', audience: string = 'your-api') {
+  constructor(
+    secret: string,
+    expiresIn: string = "24h",
+    issuer: string = "https://your-auth-server.com",
+    audience: string = "your-api",
+  ) {
     if (!secret) {
-      throw new Error('JWT secret is required');
+      throw new Error("JWT secret is required");
     }
     this.secret = secret;
     this.expiresIn = expiresIn;
@@ -32,37 +37,41 @@ export class JWTService {
   async generateToken(user: User): Promise<string> {
     // FIX: Añadir validación de entrada para el objeto de usuario.
     if (!user || !user.id || !user.email) {
-      throw new Error('Invalid user object provided. User must have an id and an email.');
+      throw new Error(
+        "Invalid user object provided. User must have an id and an email.",
+      );
     }
 
     try {
       const now = Math.floor(Date.now() / 1000);
       const expirationTime = this.parseExpirationTime(this.expiresIn);
-      
+
       const payload: JWTPayload = {
         id: user.id,
         userId: user.id,
         email: user.email,
-        roles: user.roles?.map(role => role.name) || [],
+        roles: user.roles?.map((role) => role.name) || [],
         iat: now,
-        exp: now + expirationTime
+        exp: now + expirationTime,
       };
 
       // Implementar JWT usando Web Crypto API nativo
       const header = {
-        alg: 'HS256',
-        typ: 'JWT'
+        alg: "HS256",
+        typ: "JWT",
       };
 
       const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
       const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
-      
-      const signature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
-      
+
+      const signature = await this.createSignature(
+        `${encodedHeader}.${encodedPayload}`,
+      );
+
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error:any) {
-      console.error('Error generating JWT token:', error);
-      throw new Error('Failed to generate token');
+    } catch (error: any) {
+      console.error("Error generating JWT token:", error);
+      throw new Error("Failed to generate token");
     }
   }
 
@@ -75,30 +84,32 @@ export class JWTService {
     try {
       const now = Math.floor(Date.now() / 1000);
       const expirationTime = this.parseExpirationTime(this.expiresIn);
-      
+
       const fullPayload = {
         ...payload,
         iat: now,
-        exp: payload.exp || (now + expirationTime),
+        exp: payload.exp || now + expirationTime,
         iss: payload.iss || this.issuer,
         aud: payload.aud || this.audience,
       };
 
       // Implementar JWT usando Web Crypto API nativo
       const header = {
-        alg: 'HS256',
-        typ: 'JWT'
+        alg: "HS256",
+        typ: "JWT",
       };
 
       const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
       const encodedPayload = this.base64UrlEncode(JSON.stringify(fullPayload));
-      
-      const signature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
-      
+
+      const signature = await this.createSignature(
+        `${encodedHeader}.${encodedPayload}`,
+      );
+
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error:any) {
-      console.error('Error generating JWT token:', error);
-      throw new Error('Failed to generate token');
+    } catch (error: any) {
+      console.error("Error generating JWT token:", error);
+      throw new Error("Failed to generate token");
     }
   }
 
@@ -109,11 +120,15 @@ export class JWTService {
    * @param clientId Client ID
    * @returns ID token JWT
    */
-  async generateIdToken(user: User, nonce?: string, clientId?: string): Promise<string> {
+  async generateIdToken(
+    user: User,
+    nonce?: string,
+    clientId?: string,
+  ): Promise<string> {
     try {
       const now = Math.floor(Date.now() / 1000);
       const expirationTime = this.parseExpirationTime(this.expiresIn);
-      
+
       const payload = {
         iss: this.issuer,
         sub: user.id,
@@ -122,7 +137,7 @@ export class JWTService {
         iat: now,
         auth_time: now,
         nonce: nonce,
-        name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+        name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
         email: user.email,
         email_verified: true, // In a real implementation, check if email is verified
         picture: (user as any).avatar_url || undefined,
@@ -130,19 +145,21 @@ export class JWTService {
 
       // Implementar JWT usando Web Crypto API nativo
       const header = {
-        alg: 'HS256',
-        typ: 'JWT'
+        alg: "HS256",
+        typ: "JWT",
       };
 
       const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
       const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
-      
-      const signature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
-      
+
+      const signature = await this.createSignature(
+        `${encodedHeader}.${encodedPayload}`,
+      );
+
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error:any) {
-      console.error('Error generating ID token:', error);
-      throw new Error('Failed to generate ID token');
+    } catch (error: any) {
+      console.error("Error generating ID token:", error);
+      throw new Error("Failed to generate ID token");
     }
   }
 
@@ -153,16 +170,20 @@ export class JWTService {
    * @param httpUri HTTP URI
    * @returns Verification result
    */
-  async verifyDPoPProof(dpopProof: string, httpMethod: string, httpUri: string): Promise<{
+  async verifyDPoPProof(
+    dpopProof: string,
+    httpMethod: string,
+    httpUri: string,
+  ): Promise<{
     valid: boolean;
     payload?: any;
     error?: string;
     jti?: string;
   }> {
     try {
-      const parts = dpopProof.split('.');
+      const parts = dpopProof.split(".");
       if (parts.length !== 3) {
-        return { valid: false, error: 'Invalid DPoP proof format' };
+        return { valid: false, error: "Invalid DPoP proof format" };
       }
 
       const [encodedHeader, encodedPayload, signature] = parts;
@@ -171,30 +192,30 @@ export class JWTService {
 
       // Verify required fields
       if (!payload.htu || !payload.htm || !payload.iat || !payload.jti) {
-        return { valid: false, error: 'Missing required DPoP fields' };
+        return { valid: false, error: "Missing required DPoP fields" };
       }
 
       // Verify HTTP method and URI match
       if (payload.htm !== httpMethod.toUpperCase()) {
-        return { valid: false, error: 'HTTP method mismatch' };
+        return { valid: false, error: "HTTP method mismatch" };
       }
 
       if (payload.htu !== httpUri) {
-        return { valid: false, error: 'HTTP URI mismatch' };
+        return { valid: false, error: "HTTP URI mismatch" };
       }
 
       // Verify timestamp (should be recent, within 5 minutes)
       const now = Math.floor(Date.now() / 1000);
       const maxAge = 300; // 5 minutes
       if (payload.iat < now - maxAge || payload.iat > now + maxAge) {
-        return { valid: false, error: 'DPoP proof timestamp out of range' };
+        return { valid: false, error: "DPoP proof timestamp out of range" };
       }
 
       // Check for replay attacks using JTI (JWT ID)
       if (this.dpopNonceCache.has(payload.jti)) {
         const cachedTime = this.dpopNonceCache.get(payload.jti)!;
         if (now - cachedTime < maxAge) {
-          return { valid: false, error: 'DPoP proof replay detected' };
+          return { valid: false, error: "DPoP proof replay detected" };
         }
       }
 
@@ -209,9 +230,11 @@ export class JWTService {
       }
 
       // Verify signature
-      const expectedSignature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
+      const expectedSignature = await this.createSignature(
+        `${encodedHeader}.${encodedPayload}`,
+      );
       if (signature !== expectedSignature) {
-        return { valid: false, error: 'Invalid DPoP signature' };
+        return { valid: false, error: "Invalid DPoP signature" };
       }
 
       return { valid: true, payload, jti: payload.jti };
@@ -227,49 +250,53 @@ export class JWTService {
    * @throws Error si el token es inválido
    */
   async verifyToken(token: string): Promise<JWTPayload> {
-    return Promise.resolve().then(async () => {
-      if (!token) {
-        throw new Error('Token is required');
-      }
+    return Promise.resolve()
+      .then(async () => {
+        if (!token) {
+          throw new Error("Token is required");
+        }
 
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        throw new Error('Invalid token format');
-      }
+        const parts = token.split(".");
+        if (parts.length !== 3) {
+          throw new Error("Invalid token format");
+        }
 
-      const [encodedHeader, encodedPayload, signature] = parts;
-      
-      // Verificar la firma
-      const expectedSignature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
-      if (signature !== expectedSignature) {
-        throw new Error('Invalid token signature');
-      }
+        const [encodedHeader, encodedPayload, signature] = parts;
 
-      // Decodificar el payload con manejo de errores mejorado
-      let payload: JWTPayload;
-      try {
-        const decodedPayload = this.base64UrlDecode(encodedPayload);
-        payload = JSON.parse(decodedPayload);
-      } catch (parseError) {
-        throw new Error('Invalid token: malformed payload');
-      }
-      
-      // Verificar expiración
-      const now = Math.floor(Date.now() / 1000);
-      if (payload.exp && payload.exp < now) {
-        console.log('Token expired check:', {
-          now,
-          payloadExp: payload.exp,
-          timeDiff: now - payload.exp,
-          isExpired: payload.exp < now
-        });
-        throw new Error('Token has expired');
-      }
+        // Verificar la firma
+        const expectedSignature = await this.createSignature(
+          `${encodedHeader}.${encodedPayload}`,
+        );
+        if (signature !== expectedSignature) {
+          throw new Error("Invalid token signature");
+        }
 
-      return payload;
-    }).catch((error: any) => {
-      throw new Error(`Invalid token: ${error.message}`);
-    });
+        // Decodificar el payload con manejo de errores mejorado
+        let payload: JWTPayload;
+        try {
+          const decodedPayload = this.base64UrlDecode(encodedPayload);
+          payload = JSON.parse(decodedPayload);
+        } catch (parseError) {
+          throw new Error("Invalid token: malformed payload");
+        }
+
+        // Verificar expiración
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp && payload.exp < now) {
+          console.log("Token expired check:", {
+            now,
+            payloadExp: payload.exp,
+            timeDiff: now - payload.exp,
+            isExpired: payload.exp < now,
+          });
+          throw new Error("Token has expired");
+        }
+
+        return payload;
+      })
+      .catch((error: any) => {
+        throw new Error(`Invalid token: ${error.message}`);
+      });
   }
 
   /**
@@ -282,8 +309,8 @@ export class JWTService {
       return null;
     }
 
-    const parts = authHeader.trim().split(' ');
-    if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
+    const parts = authHeader.trim().split(" ");
+    if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") {
       return null;
     }
 
@@ -297,7 +324,7 @@ export class JWTService {
    */
   isTokenExpired(token: string): boolean {
     try {
-      const parts = token.split('.');
+      const parts = token.split(".");
       if (parts.length !== 3) {
         return true;
       }
@@ -305,9 +332,9 @@ export class JWTService {
       const decodedPayload = this.base64UrlDecode(parts[1]);
       const payload: JWTPayload = JSON.parse(decodedPayload);
       const now = Math.floor(Date.now() / 1000);
-      
+
       return payload.exp ? payload.exp < now : false;
-    } catch (error:any) {
+    } catch (error: any) {
       // Si hay cualquier error de decodificación o parsing, consideramos el token como expirado
       return true;
     }
@@ -320,21 +347,21 @@ export class JWTService {
    */
   getTokenRemainingTime(token: string): number {
     try {
-      const parts = token.split('.');
+      const parts = token.split(".");
       if (parts.length !== 3) {
         return 0;
       }
 
       const payload: JWTPayload = JSON.parse(this.base64UrlDecode(parts[1]));
       const now = Math.floor(Date.now() / 1000);
-      
+
       if (!payload.exp) {
         return Infinity;
       }
 
       const remaining = payload.exp - now;
       return Math.max(0, remaining);
-    } catch (error:any) {
+    } catch (error: any) {
       return 0;
     }
   }
@@ -347,16 +374,16 @@ export class JWTService {
    * @returns Nuevo token o el mismo si no necesita refresh
    */
   async refreshTokenIfNeeded(
-    token: string, 
-    user: User, 
-    refreshThreshold: number = 3600
+    token: string,
+    user: User,
+    refreshThreshold: number = 3600,
   ): Promise<string> {
     const remainingTime = this.getTokenRemainingTime(token);
-    
+
     if (remainingTime <= refreshThreshold) {
       return await this.generateToken(user);
     }
-    
+
     return token;
   }
 
@@ -366,18 +393,24 @@ export class JWTService {
    * @param user User associated with the token
    * @returns New refresh token
    */
-  async rotateRefreshToken(oldRefreshToken: string, user: User): Promise<string> {
+  async rotateRefreshToken(
+    oldRefreshToken: string,
+    user: User,
+  ): Promise<string> {
     try {
       // Verify old refresh token
       const oldPayload = await this.verifyRefreshToken(oldRefreshToken);
-      
+
       // Generate new refresh token with shorter lifetime for security
       const now = Math.floor(Date.now() / 1000);
-      const newExpirationTime = Math.min(this.parseExpirationTime('7d'), (oldPayload as any).exp - now);
-      
+      const newExpirationTime = Math.min(
+        this.parseExpirationTime("7d"),
+        (oldPayload as any).exp - now,
+      );
+
       const newPayload = {
         userId: user.id,
-        type: 'refresh',
+        type: "refresh",
         iat: now,
         exp: now + newExpirationTime,
         rotatedFrom: oldRefreshToken, // Track rotation for security
@@ -385,19 +418,21 @@ export class JWTService {
 
       // Usar la misma estructura JWT estándar (header.payload.signature)
       const header = {
-        alg: 'HS256',
-        typ: 'JWT'
+        alg: "HS256",
+        typ: "JWT",
       };
 
       const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
       const encodedPayload = this.base64UrlEncode(JSON.stringify(newPayload));
-      
-      const signature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
-      
+
+      const signature = await this.createSignature(
+        `${encodedHeader}.${encodedPayload}`,
+      );
+
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     } catch (error: any) {
-      console.error('Error rotating refresh token:', error);
-      throw new Error('Failed to rotate refresh token');
+      console.error("Error rotating refresh token:", error);
+      throw new Error("Failed to rotate refresh token");
     }
   }
 
@@ -409,20 +444,22 @@ export class JWTService {
   async verifyRefreshTokenWithSecurity(refreshToken: string): Promise<any> {
     try {
       if (!refreshToken) {
-        throw new Error('Refresh token is required');
+        throw new Error("Refresh token is required");
       }
 
-      const parts = refreshToken.split('.');
+      const parts = refreshToken.split(".");
       if (parts.length !== 3) {
-        throw new Error('Invalid refresh token format');
+        throw new Error("Invalid refresh token format");
       }
 
       const [encodedHeader, encodedPayload, signature] = parts;
-      
+
       // Verificar la firma usando la misma lógica que el JWT normal
-      const expectedSignature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
+      const expectedSignature = await this.createSignature(
+        `${encodedHeader}.${encodedPayload}`,
+      );
       if (signature !== expectedSignature) {
-        throw new Error('Invalid refresh token signature');
+        throw new Error("Invalid refresh token signature");
       }
 
       // Decodificar y validar el payload con manejo de errores mejorado
@@ -431,23 +468,23 @@ export class JWTService {
         const decodedPayload = this.base64UrlDecode(encodedPayload);
         payload = JSON.parse(decodedPayload);
       } catch (parseError) {
-        throw new Error('Invalid refresh token: malformed payload');
+        throw new Error("Invalid refresh token: malformed payload");
       }
-      
+
       // Verificar que sea un token de refresh
-      if (payload.type !== 'refresh') {
-        throw new Error('Invalid token type');
+      if (payload.type !== "refresh") {
+        throw new Error("Invalid token type");
       }
 
       // Verificar expiración
       const now = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < now) {
-        throw new Error('Refresh token has expired');
+        throw new Error("Refresh token has expired");
       }
 
       // Verificar que tenga userId
       if (!payload.userId) {
-        throw new Error('Invalid refresh token: missing userId');
+        throw new Error("Invalid refresh token: missing userId");
       }
 
       return payload;
@@ -462,11 +499,8 @@ export class JWTService {
    * @returns String codificado
    */
   private base64UrlEncode(str: string): string {
-    const base64 = Buffer.from(str).toString('base64');
-    return base64
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+    const base64 = Buffer.from(str).toString("base64");
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
   }
 
   /**
@@ -478,14 +512,12 @@ export class JWTService {
     // Agregar padding si es necesario
     let padded = str;
     while (padded.length % 4) {
-      padded += '=';
+      padded += "=";
     }
-    
-    const base64 = padded
-      .replace(/-/g, '+')
-      .replace(/_/g, '/');
-    
-    return Buffer.from(base64, 'base64').toString('utf-8');
+
+    const base64 = padded.replace(/-/g, "+").replace(/_/g, "/");
+
+    return Buffer.from(base64, "base64").toString("utf-8");
   }
 
   /**
@@ -497,26 +529,23 @@ export class JWTService {
     const encoder = new TextEncoder();
     const keyData = encoder.encode(this.secret);
     const messageData = encoder.encode(data);
-    
+
     // Importar la clave
     const key = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       keyData,
-      { name: 'HMAC', hash: 'SHA-256' },
+      { name: "HMAC", hash: "SHA-256" },
       false,
-      ['sign']
+      ["sign"],
     );
-    
+
     // Crear la firma
-    const signature = await crypto.subtle.sign('HMAC', key, messageData);
+    const signature = await crypto.subtle.sign("HMAC", key, messageData);
     const signatureArray = new Uint8Array(signature);
-    
+
     // Convertir a base64 URL-safe
-    const base64 = Buffer.from(signatureArray).toString('base64');
-    return base64
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+    const base64 = Buffer.from(signatureArray).toString("base64");
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
   }
 
   /**
@@ -526,12 +555,12 @@ export class JWTService {
    */
   private parseExpirationTime(expiresIn: string): number {
     const units: Record<string, number> = {
-      's': 1,
-      'm': 60,
-      'h': 3600,
-      'd': 86400,
-      'w': 604800,
-      'ms': 0.001 // Add milliseconds support
+      s: 1,
+      m: 60,
+      h: 3600,
+      d: 86400,
+      w: 604800,
+      ms: 0.001, // Add milliseconds support
     };
 
     const match = expiresIn.match(/^(-?\d+)([smhdw]|ms)$/);
@@ -541,7 +570,7 @@ export class JWTService {
 
     const [, value, unit] = match;
     const multiplier = units[unit];
-    
+
     if (!multiplier) {
       throw new Error(`Invalid time unit: ${unit}`);
     }
@@ -557,35 +586,37 @@ export class JWTService {
   async generateRefreshToken(userId: string | number): Promise<string> {
     try {
       const now = Math.floor(Date.now() / 1000);
-      
+
       const payload = {
         userId,
-        type: 'refresh',
+        type: "refresh",
         iat: now,
-        exp: now + (30 * 24 * 60 * 60) // 30 días
+        exp: now + 30 * 24 * 60 * 60, // 30 días
       };
-      
-      console.log('Generating refresh token with payload:', {
+
+      console.log("Generating refresh token with payload:", {
         now,
         exp: payload.exp,
-        userId
+        userId,
       });
 
       // Usar la misma estructura JWT estándar (header.payload.signature)
       const header = {
-        alg: 'HS256',
-        typ: 'JWT'
+        alg: "HS256",
+        typ: "JWT",
       };
 
       const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
       const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
-      
-      const signature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
-      
+
+      const signature = await this.createSignature(
+        `${encodedHeader}.${encodedPayload}`,
+      );
+
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     } catch (error: any) {
-      console.error('Error generating refresh token:', error);
-      throw new Error('Failed to generate refresh token');
+      console.error("Error generating refresh token:", error);
+      throw new Error("Failed to generate refresh token");
     }
   }
 
@@ -597,20 +628,22 @@ export class JWTService {
   async verifyRefreshToken(refreshToken: string): Promise<string | number> {
     try {
       if (!refreshToken) {
-        throw new Error('Refresh token is required');
+        throw new Error("Refresh token is required");
       }
 
-      const parts = refreshToken.split('.');
+      const parts = refreshToken.split(".");
       if (parts.length !== 3) {
-        throw new Error('Invalid refresh token format');
+        throw new Error("Invalid refresh token format");
       }
 
       const [encodedHeader, encodedPayload, signature] = parts;
-      
+
       // Verificar la firma usando la misma lógica que el JWT normal
-      const expectedSignature = await this.createSignature(`${encodedHeader}.${encodedPayload}`);
+      const expectedSignature = await this.createSignature(
+        `${encodedHeader}.${encodedPayload}`,
+      );
       if (signature !== expectedSignature) {
-        throw new Error('Invalid refresh token signature');
+        throw new Error("Invalid refresh token signature");
       }
 
       // Decodificar y validar el payload con manejo de errores mejorado
@@ -619,29 +652,29 @@ export class JWTService {
         const decodedPayload = this.base64UrlDecode(encodedPayload);
         payload = JSON.parse(decodedPayload);
       } catch (parseError) {
-        throw new Error('Invalid refresh token: malformed payload');
+        throw new Error("Invalid refresh token: malformed payload");
       }
-      
+
       // Verificar que sea un token de refresh
-      if (payload.type !== 'refresh') {
-        throw new Error('Invalid token type');
+      if (payload.type !== "refresh") {
+        throw new Error("Invalid token type");
       }
 
       // Verificar expiración
       const now = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < now) {
-        console.log('Refresh token expired:', {
+        console.log("Refresh token expired:", {
           now,
           payloadExp: payload.exp,
           timeDiff: now - payload.exp,
-          isExpired: payload.exp < now
+          isExpired: payload.exp < now,
         });
-        throw new Error('Refresh token has expired');
+        throw new Error("Refresh token has expired");
       }
 
       // Verificar que tenga userId
       if (!payload.userId) {
-        throw new Error('Invalid refresh token: missing userId');
+        throw new Error("Invalid refresh token: missing userId");
       }
 
       return payload.userId;
@@ -674,7 +707,9 @@ export function initJWTService(secret: string, expiresIn?: string): JWTService {
  */
 export function getJWTService(): JWTService {
   if (!jwtServiceInstance) {
-    throw new Error('JWT Service not initialized. Call initJWTService() first.');
+    throw new Error(
+      "JWT Service not initialized. Call initJWTService() first.",
+    );
   }
   return jwtServiceInstance;
 }

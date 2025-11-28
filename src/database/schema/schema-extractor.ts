@@ -1,7 +1,11 @@
 import { Database } from "bun:sqlite";
 import { SQL } from "bun";
 import { z } from "zod";
-import type { TableSchema, ColumnDefinition, ColumnType } from "../base-controller";
+import type {
+  TableSchema,
+  ColumnDefinition,
+  ColumnType,
+} from "../base-controller";
 import type { IDatabaseAdapter, DatabaseAdapterConfig } from "../adapter";
 import { AdapterFactory } from "../adapter";
 import { Schema } from "./schema";
@@ -65,7 +69,7 @@ export class SQLiteSchemaExtractor {
    * Checks if parameter is a DatabaseAdapterConfig
    */
   private isAdapterConfig(db: any): db is DatabaseAdapterConfig {
-    return typeof db === 'object' && 'database' in db;
+    return typeof db === "object" && "database" in db;
   }
 
   /**
@@ -85,15 +89,17 @@ export class SQLiteSchemaExtractor {
       }
 
       const connection = this.adapter.getConnection();
-      const result = await connection.query(`
-        SELECT name FROM sqlite_master 
+      const result = await connection
+        .query(
+          `
+        SELECT name FROM sqlite_master
         WHERE type='table' AND name NOT LIKE 'sqlite_%'
         ORDER BY name
-      `).all();
+      `,
+        )
+        .all();
 
-      return Array.isArray(result)
-        ? result.map((row: any) => row.name)
-        : [];
+      return Array.isArray(result) ? result.map((row: any) => row.name) : [];
     } catch (error) {
       console.error("Error getting table names:", error);
       return [];
@@ -125,23 +131,31 @@ export class SQLiteSchemaExtractor {
       const connection = this.adapter.getConnection();
 
       // Get column info with PRAGMA
-      const pragmaResult = await connection.query(`PRAGMA table_info("${tableName}")`).all();
+      const pragmaResult = await connection
+        .query(`PRAGMA table_info("${tableName}")`)
+        .all();
       //console.log(`PRAGMA table_info("${tableName}") result length: ${Array.isArray(pragmaResult) ? pragmaResult.length : 'not array'}`);
-      let columns = Array.isArray(pragmaResult) ? pragmaResult as SQLiteColumnInfo[] : [];
+      let columns = Array.isArray(pragmaResult)
+        ? (pragmaResult as SQLiteColumnInfo[])
+        : [];
 
       // Shim: SQLite often reports PKs as nullable in PRAGMA, but tests expect them to be notnull.
-      columns = columns.map(col => ({
+      columns = columns.map((col) => ({
         ...col,
-        notnull: col.pk > 0 ? 1 : col.notnull
+        notnull: col.pk > 0 ? 1 : col.notnull,
       }));
       if (!columns || columns.length === 0) {
         return null;
       }
       // Get Create Table SQL
-      const sqlResult = await connection.query(`
-        SELECT sql FROM sqlite_master 
+      const sqlResult = await connection
+        .query(
+          `
+        SELECT sql FROM sqlite_master
         WHERE type='table' AND name=?
-      `).get(tableName);
+      `,
+        )
+        .get(tableName);
 
       const sql = (sqlResult as any)?.sql || "";
 
@@ -151,17 +165,28 @@ export class SQLiteSchemaExtractor {
       // Inspect columns that are TEXT/VARCHAR/etc but not PKs
       const inspectionPromises = columns.map(async (col) => {
         const type = col.type.toUpperCase();
-        const baseType = type.split('(')[0]?.trim() || type.trim();
+        const baseType = type.split("(")[0]?.trim() || type.trim();
         // Only inspect text-like columns that aren't explicitly declared as DATE/DATETIME
         // and aren't primary keys (PKs are usually IDs)
-        if (['TEXT', 'VARCHAR', 'CHAR', 'CLOB', 'NVARCHAR', 'NCHAR', ''].includes(baseType) && !col.pk) {
+        if (
+          ["TEXT", "VARCHAR", "CHAR", "CLOB", "NVARCHAR", "NCHAR", ""].includes(
+            baseType,
+          ) &&
+          !col.pk
+        ) {
           try {
-            const detectedType = await this.inspectColumnData(tableName, col.name);
+            const detectedType = await this.inspectColumnData(
+              tableName,
+              col.name,
+            );
             if (detectedType) {
               inspectedTypes[col.name] = detectedType;
             }
           } catch (e) {
-            console.error(`Error in inspection loop for ${tableName}.${col.name}:`, e);
+            console.error(
+              `Error in inspection loop for ${tableName}.${col.name}:`,
+              e,
+            );
           }
         }
       });
@@ -180,7 +205,7 @@ export class SQLiteSchemaExtractor {
         sql,
         inspectedTypes,
         indexes,
-        foreignKeys
+        foreignKeys,
       };
     } catch (error) {
       console.error(`Error getting table info for ${tableName}:`, error);
@@ -188,20 +213,27 @@ export class SQLiteSchemaExtractor {
     }
   }
 
-  private columnOverrides: Record<string, Record<string, Partial<ColumnDefinition>>> = {};
+  private columnOverrides: Record<
+    string,
+    Record<string, Partial<ColumnDefinition>>
+  > = {};
   private tableOverrides: Record<string, Partial<TableSchema>> = {};
 
   /**
    * Registers a manual override for a specific column
    * This allows correcting types, default values, foreign keys, etc. that might be missed by automatic extraction
    */
-  public registerOverride(tableName: string, columnName: string, override: Partial<ColumnDefinition>) {
+  public registerOverride(
+    tableName: string,
+    columnName: string,
+    override: Partial<ColumnDefinition>,
+  ) {
     if (!this.columnOverrides[tableName]) {
       this.columnOverrides[tableName] = {};
     }
     this.columnOverrides[tableName][columnName] = {
       ...this.columnOverrides[tableName][columnName],
-      ...override
+      ...override,
     };
   }
 
@@ -209,32 +241,42 @@ export class SQLiteSchemaExtractor {
    * Registers a manual override for a table schema
    * Useful for defining indexes that cannot be extracted from CREATE TABLE SQL
    */
-  public registerTableOverride(tableName: string, override: Partial<TableSchema>) {
+  public registerTableOverride(
+    tableName: string,
+    override: Partial<TableSchema>,
+  ) {
     this.tableOverrides[tableName] = {
       ...this.tableOverrides[tableName],
-      ...override
+      ...override,
     };
   }
 
   /**
    * Gets indexes for a table using PRAGMA index_list and index_info
    */
-  private async getIndexes(tableName: string): Promise<{ name: string; columns: string[]; unique?: boolean }[]> {
+  private async getIndexes(
+    tableName: string,
+  ): Promise<{ name: string; columns: string[]; unique?: boolean }[]> {
     try {
       const connection = this.adapter.getConnection();
-      const indexList = await connection.query(`PRAGMA index_list("${tableName}")`).all();
+      const indexList = await connection
+        .query(`PRAGMA index_list("${tableName}")`)
+        .all();
 
       if (!Array.isArray(indexList)) return [];
 
-      const indexes: { name: string; columns: string[]; unique?: boolean }[] = [];
+      const indexes: { name: string; columns: string[]; unique?: boolean }[] =
+        [];
 
       for (const idx of indexList) {
         // Skip auto-indexes (primary keys, unique constraints created by CREATE TABLE)
         // actually we WANT unique constraints, but maybe not PKs if they are implicit
         // origin 'pk' means primary key. 'u' means unique constraint. 'c' means create index.
-        if ((idx as any).origin === 'pk') continue;
+        if ((idx as any).origin === "pk") continue;
 
-        const indexInfo = await connection.query(`PRAGMA index_info("${(idx as any).name}")`).all();
+        const indexInfo = await connection
+          .query(`PRAGMA index_info("${(idx as any).name}")`)
+          .all();
         if (Array.isArray(indexInfo)) {
           const columns = indexInfo
             .sort((a: any, b: any) => a.seqno - b.seqno)
@@ -243,7 +285,7 @@ export class SQLiteSchemaExtractor {
           indexes.push({
             name: (idx as any).name,
             columns,
-            unique: (idx as any).unique === 1
+            unique: (idx as any).unique === 1,
           });
         }
       }
@@ -257,17 +299,21 @@ export class SQLiteSchemaExtractor {
   /**
    * Gets foreign keys for a table using PRAGMA foreign_key_list
    */
-  private async getForeignKeys(tableName: string): Promise<{ table: string; from: string; to: string }[]> {
+  private async getForeignKeys(
+    tableName: string,
+  ): Promise<{ table: string; from: string; to: string }[]> {
     try {
       const connection = this.adapter.getConnection();
-      const fkList = await connection.query(`PRAGMA foreign_key_list("${tableName}")`).all();
+      const fkList = await connection
+        .query(`PRAGMA foreign_key_list("${tableName}")`)
+        .all();
 
       if (!Array.isArray(fkList)) return [];
 
       return fkList.map((fk: any) => ({
         table: fk.table,
         from: fk.from,
-        to: fk.to
+        to: fk.to,
       }));
     } catch (error) {
       console.error(`Error getting foreign keys for ${tableName}:`, error);
@@ -278,16 +324,23 @@ export class SQLiteSchemaExtractor {
   /**
    * Inspects column data to detect types that SQLite stores as generic types (like dates in TEXT)
    */
-  private async inspectColumnData(tableName: string, columnName: string): Promise<string | null> {
+  private async inspectColumnData(
+    tableName: string,
+    columnName: string,
+  ): Promise<string | null> {
     try {
       const connection = this.adapter.getConnection();
       // Sample up to 10 non-null values
-      const result = await connection.query(`
-        SELECT "${columnName}" as val 
-        FROM "${tableName}" 
-        WHERE "${columnName}" IS NOT NULL 
+      const result = await connection
+        .query(
+          `
+        SELECT "${columnName}" as val
+        FROM "${tableName}"
+        WHERE "${columnName}" IS NOT NULL
         LIMIT 10
-      `).all();
+      `,
+        )
+        .all();
 
       if (!Array.isArray(result) || result.length === 0) {
         return null;
@@ -297,14 +350,19 @@ export class SQLiteSchemaExtractor {
 
       for (const row of result) {
         const val = (row as any).val;
-        if (typeof val === 'string') {
+        if (typeof val === "string") {
           // Use Date.parse to check if it's a valid date string
           const timestamp = Date.parse(val);
           if (!isNaN(timestamp)) {
             // Filter out simple numbers that might be parsed as dates (e.g. "1")
             // but allow ISO strings, SQL dates, etc.
             // A simple heuristic: if it parses as date, check if it looks like a date string (has separators)
-            if (val.includes('-') || val.includes('/') || val.includes(':') || val.includes('T')) {
+            if (
+              val.includes("-") ||
+              val.includes("/") ||
+              val.includes(":") ||
+              val.includes("T")
+            ) {
               dateCount++;
             }
           }
@@ -313,7 +371,7 @@ export class SQLiteSchemaExtractor {
 
       // If more than 50% of samples are dates, consider it a date column
       if (dateCount > 0 && dateCount >= result.length * 0.5) {
-        return 'DATETIME';
+        return "DATETIME";
       }
 
       return null;
@@ -327,74 +385,92 @@ export class SQLiteSchemaExtractor {
    * Maps SQLite type to System ColumnType
    */
 
-  private mapSQLiteTypeToColumnType(sqliteType: string, columnName?: string, defaultValue?: any, inspectedType?: string | null): ColumnType {
+  private mapSQLiteTypeToColumnType(
+    sqliteType: string,
+    columnName?: string,
+    defaultValue?: any,
+    inspectedType?: string | null,
+  ): ColumnType {
     const type = sqliteType.toUpperCase();
-    const baseType = type.split('(')[0]?.trim() || type.trim();
+    const baseType = type.split("(")[0]?.trim() || type.trim();
 
     // Use inspected type if available
-    if (inspectedType === 'DATETIME') {
-      return 'DATETIME';
+    if (inspectedType === "DATETIME") {
+      return "DATETIME";
     }
 
     // Removed heuristic checks for default values as requested by user.
     // We rely on explicit types or data inspection.
 
     switch (baseType) {
-      case 'INTEGER':
-      case 'INT':
-      case 'BIGINT':
-      case 'SMALLINT':
-      case 'TINYINT':
-        return 'INTEGER';
+      case "INTEGER":
+      case "INT":
+      case "BIGINT":
+      case "SMALLINT":
+      case "TINYINT":
+        return "INTEGER";
 
-      case 'TEXT':
-      case 'VARCHAR':
-      case 'CHAR':
-      case 'CLOB':
-      case 'NVARCHAR':
-      case 'NCHAR':
-        return 'TEXT';
+      case "TEXT":
+      case "VARCHAR":
+      case "CHAR":
+      case "CLOB":
+      case "NVARCHAR":
+      case "NCHAR":
+        return "TEXT";
 
-      case 'REAL':
-      case 'FLOAT':
-      case 'DOUBLE':
-      case 'NUMERIC':
-      case 'DECIMAL':
-        return 'REAL';
+      case "REAL":
+      case "FLOAT":
+      case "DOUBLE":
+      case "NUMERIC":
+      case "DECIMAL":
+        return "REAL";
 
-      case 'BLOB':
-      case 'BINARY':
-        return 'BLOB';
+      case "BLOB":
+      case "BINARY":
+        return "BLOB";
 
-      case 'BOOLEAN':
-      case 'BIT':
-        return 'BOOLEAN';
+      case "BOOLEAN":
+      case "BIT":
+        return "BOOLEAN";
 
-      case 'DATE':
-      case 'DATETIME':
-      case 'TIMESTAMP':
-        return 'DATETIME';
+      case "DATE":
+      case "DATETIME":
+      case "TIMESTAMP":
+        return "DATETIME";
 
-      case 'SERIAL':
-        return 'SERIAL';
+      case "SERIAL":
+        return "SERIAL";
 
       default:
-        return 'TEXT';
+        return "TEXT";
     }
   }
 
   /**
    * Converts SQLiteColumnInfo to ColumnDefinition
    */
-  private convertColumnDefinition(tableName: string, column: SQLiteColumnInfo, sql?: string, inspectedType?: string | null, foreignKeys?: { table: string; from: string; to: string }[]): ColumnDefinition {
+  private convertColumnDefinition(
+    tableName: string,
+    column: SQLiteColumnInfo,
+    sql?: string,
+    inspectedType?: string | null,
+    foreignKeys?: { table: string; from: string; to: string }[],
+  ): ColumnDefinition {
     // Check for manual override
     const override = this.columnOverrides[tableName]?.[column.name] || {};
 
     const definition: ColumnDefinition = {
       name: column.name,
-      type: override.type || this.mapSQLiteTypeToColumnType(column.type, column.name, column.dflt_value, inspectedType),
+      type:
+        override.type ||
+        this.mapSQLiteTypeToColumnType(
+          column.type,
+          column.name,
+          column.dflt_value,
+          inspectedType,
+        ),
       // Primary keys must always be notNull
-      notNull: (column.pk > 0) ? true : (column.notnull === 1),
+      notNull: column.pk > 0 ? true : column.notnull === 1,
       // Explicitly set primaryKey to true or false
       primaryKey: column.pk > 0,
     };
@@ -415,41 +491,50 @@ export class SQLiteSchemaExtractor {
     if (!definition.primaryKey && sql) {
       const patterns = [
         // `"email" TEXT UNIQUE NOT NULL` - inline UNIQUE with quotes support
-        new RegExp(`"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+UNIQUE`, 'i'),
+        new RegExp(
+          `"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+UNIQUE`,
+          "i",
+        ),
         // Line containing UNIQUE and column name at the beginning
-        new RegExp(`^\\s*"?${column.name}"?\\s+.*UNIQUE`, 'mi')
+        new RegExp(`^\\s*"?${column.name}"?\\s+.*UNIQUE`, "mi"),
       ];
 
-      definition.unique = patterns.some(pattern => pattern.test(sql));
+      definition.unique = patterns.some((pattern) => pattern.test(sql));
     }
 
     // Extract foreign key references from SQL - improved regex
     // Extract foreign key references from PRAGMA first, then SQL
     if (foreignKeys) {
-      const fk = foreignKeys.find(f => f.from === column.name);
+      const fk = foreignKeys.find((f) => f.from === column.name);
       if (fk) {
         definition.references = {
           table: fk.table,
-          column: fk.to
+          column: fk.to,
         };
       }
     }
 
     // Fallback to SQL regex if not found (though PRAGMA should cover it)
     if (!definition.references && sql) {
-      const fkPattern = new RegExp(`"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+REFERENCES\\s+"?([^"]+)"?\\s*\\("?([^"]+)"?\\)`, 'i');
+      const fkPattern = new RegExp(
+        `"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+REFERENCES\\s+"?([^"]+)"?\\s*\\("?([^"]+)"?\\)`,
+        "i",
+      );
       const fkMatch = sql.match(fkPattern);
       if (fkMatch) {
         definition.references = {
           table: fkMatch[1]!,
-          column: fkMatch[2] || 'id'
+          column: fkMatch[2] || "id",
         };
       }
     }
 
     // Extract check constraints from SQL - improved regex
     if (sql) {
-      const checkPattern = new RegExp(`"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+CHECK\\s*\\(\\s*([^)]+)\\s*\\)`, 'i');
+      const checkPattern = new RegExp(
+        `"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+CHECK\\s*\\(\\s*([^)]+)\\s*\\)`,
+        "i",
+      );
       const checkMatch = sql.match(checkPattern);
       if (checkMatch) {
         definition.check = checkMatch[1]!.trim();
@@ -457,13 +542,17 @@ export class SQLiteSchemaExtractor {
     }
 
     // Apply remaining overrides (defaultValue, unique, references, check, etc.)
-    if (override.defaultValue !== undefined) definition.defaultValue = override.defaultValue;
+    if (override.defaultValue !== undefined)
+      definition.defaultValue = override.defaultValue;
     if (override.unique !== undefined) definition.unique = override.unique;
-    if (override.references !== undefined) definition.references = override.references;
+    if (override.references !== undefined)
+      definition.references = override.references;
     if (override.check !== undefined) definition.check = override.check;
     if (override.notNull !== undefined) definition.notNull = override.notNull;
-    if (override.primaryKey !== undefined) definition.primaryKey = override.primaryKey;
-    if (override.autoIncrement !== undefined) definition.autoIncrement = override.autoIncrement;
+    if (override.primaryKey !== undefined)
+      definition.primaryKey = override.primaryKey;
+    if (override.autoIncrement !== undefined)
+      definition.autoIncrement = override.autoIncrement;
 
     return definition;
   }
@@ -471,12 +560,21 @@ export class SQLiteSchemaExtractor {
    * Converts TableInfo to System TableSchema
    */
   convertToTableSchema(tableInfo: TableInfo): TableSchema {
-    const columns = tableInfo.columns.map(col => this.convertColumnDefinition(tableInfo.tableName, col, tableInfo.sql, tableInfo.inspectedTypes?.[col.name], tableInfo.foreignKeys));
+    const columns = tableInfo.columns.map((col) =>
+      this.convertColumnDefinition(
+        tableInfo.tableName,
+        col,
+        tableInfo.sql,
+        tableInfo.inspectedTypes?.[col.name],
+        tableInfo.foreignKeys,
+      ),
+    );
 
     // Use PRAGMA indexes if available, otherwise fallback to SQL extraction
-    const extractedIndexes = (tableInfo.indexes && tableInfo.indexes.length > 0)
-      ? tableInfo.indexes
-      : this.extractIndexesFromSQL(tableInfo.sql, tableInfo.tableName);
+    const extractedIndexes =
+      tableInfo.indexes && tableInfo.indexes.length > 0
+        ? tableInfo.indexes
+        : this.extractIndexesFromSQL(tableInfo.sql, tableInfo.tableName);
 
     // Apply table overrides
     const tableOverride = this.tableOverrides[tableInfo.tableName] || {};
@@ -485,35 +583,42 @@ export class SQLiteSchemaExtractor {
     return {
       tableName: tableInfo.tableName,
       columns,
-      indexes
+      indexes,
     };
   }
 
   /**
    * Extracts index information from Table Creation SQL
    */
-  private extractIndexesFromSQL(sql: string, tableName: string): { name: string; columns: string[]; unique?: boolean }[] {
+  private extractIndexesFromSQL(
+    sql: string,
+    tableName: string,
+  ): { name: string; columns: string[]; unique?: boolean }[] {
     const indexes: { name: string; columns: string[]; unique?: boolean }[] = [];
 
     try {
       // 1. Capture explicit CONSTRAINT ... UNIQUE (...)
       // 2. Capture anonymous UNIQUE (...)
       // The regex handles both: (?:CONSTRAINT\s+(\w+)\s+)?UNIQUE\s*\(\s*([^)]+)\s*\)
-      const uniqueRegex = /(?:CONSTRAINT\s+(\w+)\s+)?UNIQUE\s*\(\s*([^)]+)\s*\)/gi;
+      const uniqueRegex =
+        /(?:CONSTRAINT\s+(\w+)\s+)?UNIQUE\s*\(\s*([^)]+)\s*\)/gi;
       let match;
 
       while ((match = uniqueRegex.exec(sql)) !== null) {
         // match[1] is constraint name (optional), match[2] is columns
-        const constraintName = match[1] || `uniq_${Math.random().toString(36).substr(2, 5)}`;
+        const constraintName =
+          match[1] || `uniq_${Math.random().toString(36).substr(2, 5)}`;
         const columnsStr = match[2];
 
         if (columnsStr) {
-          const columns = columnsStr.split(',').map(col => col.trim().replace(/['"`]/g, ''));
+          const columns = columnsStr
+            .split(",")
+            .map((col) => col.trim().replace(/['"`]/g, ""));
 
           indexes.push({
             name: `idx_${tableName}_${constraintName.toLowerCase()}`,
             columns,
-            unique: true
+            unique: true,
           });
         }
       }
@@ -521,7 +626,6 @@ export class SQLiteSchemaExtractor {
       // Note: We no longer create separate index entries for inline UNIQUE constraints
       // (e.g., `email TEXT UNIQUE`) because these are already handled by the column.unique property
       // Only multi-column constraints defined with UNIQUE(...) need separate index entries
-
     } catch (error) {
       console.warn("Error extracting indexes from SQL:", error);
     }
@@ -538,29 +642,29 @@ export class SQLiteSchemaExtractor {
     let zodType: z.ZodTypeAny;
 
     switch (type) {
-      case 'INTEGER':
-      case 'SERIAL': // Added SERIAL case to match INTEGER
+      case "INTEGER":
+      case "SERIAL": // Added SERIAL case to match INTEGER
         zodType = z.number().int();
         break;
 
-      case 'REAL':
+      case "REAL":
         zodType = z.number();
         break;
 
-      case 'TEXT':
+      case "TEXT":
         zodType = z.string();
         break;
 
-      case 'BOOLEAN':
+      case "BOOLEAN":
         zodType = z.boolean();
         break;
 
-      case 'DATE':
-      case 'DATETIME':
+      case "DATE":
+      case "DATETIME":
         zodType = z.date();
         break;
 
-      case 'BLOB':
+      case "BLOB":
         zodType = z.instanceof(Uint8Array).or(z.string());
         break;
 
@@ -604,7 +708,7 @@ export class SQLiteSchemaExtractor {
       schemas.push({
         tableName: tableInfo.tableName,
         schema: zodSchema,
-        tableSchema
+        tableSchema,
       });
     }
 
@@ -614,7 +718,9 @@ export class SQLiteSchemaExtractor {
   /**
    * Extracts and generates Zod schema for a specific table
    */
-  async extractTableSchema(tableName: string): Promise<GeneratedZodSchema | null> {
+  async extractTableSchema(
+    tableName: string,
+  ): Promise<GeneratedZodSchema | null> {
     const tableInfo = await this.getTableInfo(tableName);
     if (!tableInfo || tableInfo.columns.length === 0) {
       return null;
@@ -626,7 +732,7 @@ export class SQLiteSchemaExtractor {
     return {
       tableName,
       schema: zodSchema,
-      tableSchema
+      tableSchema,
     };
   }
 
@@ -643,13 +749,15 @@ export class SQLiteSchemaExtractor {
    */
   async extractAsTableSchemas(): Promise<TableSchema[]> {
     const schemas = await this.extractAllSchemas();
-    return schemas.map(schema => schema.tableSchema);
+    return schemas.map((schema) => schema.tableSchema);
   }
 
   /**
    * Extracts a specific table and converts to schema-builder compatible format
    */
-  async extractTableSchemaAsTableSchema(tableName: string): Promise<TableSchema | null> {
+  async extractTableSchemaAsTableSchema(
+    tableName: string,
+  ): Promise<TableSchema | null> {
     const schema = await this.extractTableSchema(tableName);
     return schema ? schema.tableSchema : null;
   }
@@ -662,9 +770,10 @@ export class SQLiteSchemaExtractor {
     const result: { [tableName: string]: Schema } = {};
 
     for (const tableSchema of tableSchemas) {
-      const schemaDefinition = this.convertTableSchemaToSchemaDefinition(tableSchema);
+      const schemaDefinition =
+        this.convertTableSchemaToSchemaDefinition(tableSchema);
       result[tableSchema.tableName] = new Schema(schemaDefinition, {
-        indexes: tableSchema.indexes
+        indexes: tableSchema.indexes,
       });
     }
 
@@ -678,7 +787,8 @@ export class SQLiteSchemaExtractor {
     const definition: any = {};
 
     for (const column of tableSchema.columns) {
-      definition[column.name] = this.convertColumnDefinitionToSchemaField(column);
+      definition[column.name] =
+        this.convertColumnDefinitionToSchemaField(column);
     }
 
     return definition;
@@ -726,11 +836,15 @@ export class SQLiteSchemaExtractor {
 /**
  * Helper function to create an extractor quickly
  */
-export function createSchemaExtractor(databasePath?: string): SQLiteSchemaExtractor {
+export function createSchemaExtractor(
+  databasePath?: string,
+): SQLiteSchemaExtractor {
   if (databasePath) {
     const db = new Database(databasePath);
     return new SQLiteSchemaExtractor(db);
   }
 
-  throw new Error('Database path is required when not providing a database instance');
+  throw new Error(
+    "Database path is required when not providing a database instance",
+  );
 }

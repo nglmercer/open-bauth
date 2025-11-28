@@ -1,10 +1,18 @@
 // tests/database/schema/schema-extractor.test.ts
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
-import { SQLiteSchemaExtractor, createSchemaExtractor } from "../../../src/database/schema/schema-extractor";
+import {
+  SQLiteSchemaExtractor,
+  createSchemaExtractor,
+} from "../../../src/database/schema/schema-extractor";
 import { DatabaseInitializer } from "../../../src/database/database-initializer";
 import { buildDatabaseSchemas } from "../../../src/database/schema/schema-builder";
-import { Schema, SchemaDefinition, SchemaOptions, SchemaIndex } from "../../../src/database/schema/schema";
+import {
+  Schema,
+  SchemaDefinition,
+  SchemaOptions,
+  SchemaIndex,
+} from "../../../src/database/schema/schema";
 
 let db: Database;
 let extractor: SQLiteSchemaExtractor;
@@ -60,7 +68,7 @@ describe("sqlite Schema Extractor", () => {
         notNull: true,
         primaryKey: true,
         autoIncrement: true,
-      })
+      }),
     );
 
     expect(columns).toContainEqual(
@@ -69,7 +77,7 @@ describe("sqlite Schema Extractor", () => {
         type: "TEXT",
         notNull: true,
         primaryKey: false,
-      })
+      }),
     );
 
     expect(columns).toContainEqual(
@@ -79,7 +87,7 @@ describe("sqlite Schema Extractor", () => {
         notNull: false,
         primaryKey: false,
         unique: true,
-      })
+      }),
     );
 
     expect(columns).toContainEqual(
@@ -87,7 +95,7 @@ describe("sqlite Schema Extractor", () => {
         name: "balance",
         type: "REAL",
         defaultValue: "0.0",
-      })
+      }),
     );
 
     expect(columns).toContainEqual(
@@ -95,7 +103,7 @@ describe("sqlite Schema Extractor", () => {
         name: "is_active",
         type: "BOOLEAN",
         defaultValue: "true", // ← SQLite devuelve string
-      })
+      }),
     );
 
     expect(columns).toContainEqual(
@@ -103,7 +111,7 @@ describe("sqlite Schema Extractor", () => {
         name: "created_at",
         type: "DATETIME",
         defaultValue: "CURRENT_TIMESTAMP",
-      })
+      }),
     );
   });
 
@@ -148,7 +156,9 @@ describe("sqlite Schema Extractor", () => {
     expect(index).toBeDefined();
     expect(index!.columns).toEqual(["sku", "vendor_id"]);
     expect(index!.unique).toBe(true);
-    expect(index!.name).toMatch(/^(uniq_sku_vendor|sqlite_autoindex_products_)/);
+    expect(index!.name).toMatch(
+      /^(uniq_sku_vendor|sqlite_autoindex_products_)/,
+    );
   });
 
   it("should detect inline UNIQUE on column", async () => {
@@ -160,7 +170,7 @@ describe("sqlite Schema Extractor", () => {
     `);
 
     const schema = await extractor.extractTableSchema("categories");
-    const slugCol = schema!.tableSchema.columns.find(c => c.name === "slug");
+    const slugCol = schema!.tableSchema.columns.find((c) => c.name === "slug");
 
     expect(slugCol?.unique).toBe(true);
     expect(slugCol?.notNull).toBe(true);
@@ -182,7 +192,9 @@ describe("sqlite Schema Extractor", () => {
 
     // Campos requeridos y opcionales
     expect(zodSchema.parse({ id: 1 })).toBeTruthy();
-    expect(zodSchema.parse({ id: 1, bio: "hello", rating: 4.5, active: true })).toBeTruthy();
+    expect(
+      zodSchema.parse({ id: 1, bio: "hello", rating: 4.5, active: true }),
+    ).toBeTruthy();
 
     // Tipos correctos
     expect(() => zodSchema.parse({ id: "string" })).toThrow();
@@ -206,7 +218,7 @@ describe("sqlite Schema Extractor", () => {
         primaryKey: true,
         autoIncrement: true,
         notNull: true,
-      })
+      }),
     );
   });
 
@@ -216,7 +228,7 @@ describe("sqlite Schema Extractor", () => {
 
     const allSchemas = await extractor.extractAllSchemas();
     expect(allSchemas.length).toBe(2);
-    expect(allSchemas.map(s => s.tableName).sort()).toEqual(["t1", "t2"]);
+    expect(allSchemas.map((s) => s.tableName).sort()).toEqual(["t1", "t2"]);
   });
 
   it("should return null for non-existent table", async () => {
@@ -231,9 +243,11 @@ describe("sqlite Schema Extractor", () => {
     const extracted = await extractor.extractAsTableSchemas();
     expect(extracted.length).toBeGreaterThan(0);
 
-    const usersTable = extracted.find(t => t.tableName === "users");
+    const usersTable = extracted.find((t) => t.tableName === "users");
     expect(usersTable).toBeDefined();
-    expect(usersTable!.columns.some(c => c.name === "id" && c.primaryKey)).toBe(true);
+    expect(
+      usersTable!.columns.some((c) => c.name === "id" && c.primaryKey),
+    ).toBe(true);
   });
 
   it("createSchemaExtractor helper should work", () => {
@@ -254,10 +268,10 @@ describe("sqlite Schema Extractor", () => {
     const schema = await extractor.extractTableSchema("settings");
     const cols = schema!.tableSchema.columns;
 
-    const maintenance = cols.find(c => c.name === "maintenance");
-    const maxUsers = cols.find(c => c.name === "max_users");
-    const apiKey = cols.find(c => c.name === "api_key");
-    const isEnabled = cols.find(c => c.name === "is_enabled");
+    const maintenance = cols.find((c) => c.name === "maintenance");
+    const maxUsers = cols.find((c) => c.name === "max_users");
+    const apiKey = cols.find((c) => c.name === "api_key");
+    const isEnabled = cols.find((c) => c.name === "is_enabled");
 
     // SQLite devuelve booleanos como strings "true"/"false"
     expect(maintenance?.defaultValue).toBe("false");
@@ -274,7 +288,7 @@ describe("sqlite Schema Extractor", () => {
         name: { type: String, required: true },
         email: { type: String, unique: true },
         age: { type: Number },
-        active: { type: Boolean, default: true }
+        active: { type: Boolean, default: true },
       });
 
       // 2. Convertir a TableSchema e inicializar la DB
@@ -298,7 +312,7 @@ describe("sqlite Schema Extractor", () => {
       // 4. COMPARACIONES (Round-trip check)
 
       // ID: String + PK
-      const idCol = extractedColumns.find(c => c.name === "id");
+      const idCol = extractedColumns.find((c) => c.name === "id");
       expect(idCol).toBeDefined();
       expect(idCol!.type).toBe("TEXT"); // String se convierte a TEXT en SQLite
       expect(idCol!.primaryKey).toBe(true);
@@ -306,7 +320,7 @@ describe("sqlite Schema Extractor", () => {
       expect(idCol!.autoIncrement).toBe(true); // Las PK de tipo String no deberían tener autoIncrement
 
       // Name: String + Required
-      const nameCol = extractedColumns.find(c => c.name === "name");
+      const nameCol = extractedColumns.find((c) => c.name === "name");
       expect(nameCol).toBeDefined();
       expect(nameCol!.type).toBe("TEXT");
       expect(nameCol!.notNull).toBe(true);
@@ -314,7 +328,7 @@ describe("sqlite Schema Extractor", () => {
       expect(nameCol!.unique).toBe(false);
 
       // Email: String + Unique
-      const emailCol = extractedColumns.find(c => c.name === "email");
+      const emailCol = extractedColumns.find((c) => c.name === "email");
       expect(emailCol).toBeDefined();
       expect(emailCol!.type).toBe("TEXT");
       expect(emailCol!.notNull).toBe(false);
@@ -322,13 +336,14 @@ describe("sqlite Schema Extractor", () => {
       expect(emailCol!.unique).toBe(true);
 
       // Verificar unique ya sea en la columna o en los índices
-      const hasUniqueIndex = extractedResult!.tableSchema.indexes?.some(
-        idx => idx.unique && idx.columns.includes("email")
-      ) || emailCol!.unique;
+      const hasUniqueIndex =
+        extractedResult!.tableSchema.indexes?.some(
+          (idx) => idx.unique && idx.columns.includes("email"),
+        ) || emailCol!.unique;
       expect(hasUniqueIndex).toBeTruthy();
 
       // Age: Number (SQLite usa REAL o INTEGER para number)
-      const ageCol = extractedColumns.find(c => c.name === "age");
+      const ageCol = extractedColumns.find((c) => c.name === "age");
       expect(ageCol).toBeDefined();
       expect(ageCol!.type).toBe("INTEGER"); // Number se convierte a INTEGER en Schema class
       expect(ageCol!.notNull).toBe(false); // No era requerido
@@ -337,21 +352,23 @@ describe("sqlite Schema Extractor", () => {
       expect(ageCol!.defaultValue).toBeUndefined();
 
       // Active: Boolean + Default
-      const activeCol = extractedColumns.find(c => c.name === "active");
+      const activeCol = extractedColumns.find((c) => c.name === "active");
       expect(activeCol).toBeDefined();
       expect(activeCol!.type).toBe("INTEGER");
       expect(activeCol!.notNull).toBe(false); // No era required
       expect(activeCol!.primaryKey).toBe(false);
       expect(activeCol!.unique).toBeFalsy();
       // SQLite devuelve los defaults como strings
-      expect(["true", "1"]).toContain(activeCol!.defaultValue?.toString().toLowerCase() || "");
+      expect(["true", "1"]).toContain(
+        activeCol!.defaultValue?.toString().toLowerCase() || "",
+      );
     });
 
     it("should maintain structural equality between original and extracted table schema", async () => {
       // Este test compara la estructura de objetos directamente
       const productSchema = new Schema({
         sku: { type: String, primaryKey: true },
-        price: { type: Number, required: true }
+        price: { type: Number, required: true },
       });
 
       const originalTable = productSchema.toTableSchema("products");
@@ -360,42 +377,59 @@ describe("sqlite Schema Extractor", () => {
       const extracted = await extractor.extractTableSchema("products");
 
       // Verificamos longitudes
-      expect(extracted!.tableSchema.columns).toHaveLength(originalTable.columns.length);
+      expect(extracted!.tableSchema.columns).toHaveLength(
+        originalTable.columns.length,
+      );
 
       // Verificamos mapeo de tipos
-      const skuOriginal = originalTable.columns.find(c => c.name === "sku");
-      const skuExtracted = extracted!.tableSchema.columns.find(c => c.name === "sku");
+      const skuOriginal = originalTable.columns.find((c) => c.name === "sku");
+      const skuExtracted = extracted!.tableSchema.columns.find(
+        (c) => c.name === "sku",
+      );
 
       expect(skuExtracted!.primaryKey).toBe(skuOriginal!.primaryKey);
       expect(skuExtracted!.notNull).toBe(skuOriginal!.notNull);
       expect(skuExtracted!.type).toBe("TEXT"); // String -> TEXT
 
-      const priceOriginal = originalTable.columns.find(c => c.name === "price");
-      const priceExtracted = extracted!.tableSchema.columns.find(c => c.name === "price");
+      const priceOriginal = originalTable.columns.find(
+        (c) => c.name === "price",
+      );
+      const priceExtracted = extracted!.tableSchema.columns.find(
+        (c) => c.name === "price",
+      );
 
-      expect(priceExtracted!.primaryKey).toBe(priceOriginal!.primaryKey || false);
+      expect(priceExtracted!.primaryKey).toBe(
+        priceOriginal!.primaryKey || false,
+      );
       expect(priceExtracted!.notNull).toBe(priceOriginal!.notNull);
       expect(priceExtracted!.type).toBe("INTEGER"); // Number -> INTEGER
     });
 
     it("should validate complex schema with all field types and constraints", async () => {
-      const complexSchema = new Schema({
-        id: { type: String, primaryKey: true },
-        title: { type: String, required: true, unique: true },
-        description: { type: String },
-        price: { type: Number, required: true },
-        quantity: { type: Number, default: 0 },
-        is_active: { type: Boolean, default: true, required: true },
-        created_at: { type: Date, default: Date.now },
-        category_id: { type: Number, ref: "categories" },
-        metadata: { type: Object },
-        tags: { type: Array }
-      }, {
-        indexes: [
-          { name: "idx_price_quantity", columns: ["price", "quantity"], unique: false },
-          { name: "uniq_title", columns: ["title"], unique: true }
-        ]
-      });
+      const complexSchema = new Schema(
+        {
+          id: { type: String, primaryKey: true },
+          title: { type: String, required: true, unique: true },
+          description: { type: String },
+          price: { type: Number, required: true },
+          quantity: { type: Number, default: 0 },
+          is_active: { type: Boolean, default: true, required: true },
+          created_at: { type: Date, default: Date.now },
+          category_id: { type: Number, ref: "categories" },
+          metadata: { type: Object },
+          tags: { type: Array },
+        },
+        {
+          indexes: [
+            {
+              name: "idx_price_quantity",
+              columns: ["price", "quantity"],
+              unique: false,
+            },
+            { name: "uniq_title", columns: ["title"], unique: true },
+          ],
+        },
+      );
 
       const originalTable = complexSchema.toTableSchema("products");
       await initializer.initialize([originalTable]);
@@ -403,12 +437,16 @@ describe("sqlite Schema Extractor", () => {
       // Register overrides for complex schema
       extractor.registerOverride("products", "title", { unique: true });
       extractor.registerOverride("products", "quantity", { defaultValue: "0" });
-      extractor.registerOverride("products", "is_active", { defaultValue: "true" });
-      extractor.registerOverride("products", "created_at", { defaultValue: "CURRENT_TIMESTAMP" });
-      extractor.registerOverride("products", "metadata", { defaultValue: "'{}'" });
+      extractor.registerOverride("products", "is_active", {
+        defaultValue: "true",
+      });
+      extractor.registerOverride("products", "created_at", {
+        defaultValue: "CURRENT_TIMESTAMP",
+      });
+      extractor.registerOverride("products", "metadata", {
+        defaultValue: "'{}'",
+      });
       extractor.registerOverride("products", "tags", { defaultValue: "'[]'" });
-
-
 
       const extracted = await extractor.extractTableSchema("products");
       expect(extracted).not.toBeNull();
@@ -418,20 +456,81 @@ describe("sqlite Schema Extractor", () => {
 
       // Validar columnas
       const validations = [
-        { name: "id", type: "TEXT", primaryKey: true, notNull: true, hasDefault: false },
-        { name: "title", type: "TEXT", primaryKey: false, notNull: true, hasDefault: false, unique: true },
-        { name: "description", type: "TEXT", primaryKey: false, notNull: false, hasDefault: false },
-        { name: "price", type: "INTEGER", primaryKey: false, notNull: true, hasDefault: false },
-        { name: "quantity", type: "INTEGER", primaryKey: false, notNull: false, hasDefault: true },
-        { name: "is_active", type: "BOOLEAN", primaryKey: false, notNull: true, hasDefault: true },
-        { name: "created_at", type: "DATETIME", primaryKey: false, notNull: false, hasDefault: true },
-        { name: "category_id", type: "INTEGER", primaryKey: false, notNull: false, hasDefault: false },
-        { name: "metadata", type: "TEXT", primaryKey: false, notNull: false, hasDefault: true },
-        { name: "tags", type: "TEXT", primaryKey: false, notNull: false, hasDefault: true }
+        {
+          name: "id",
+          type: "TEXT",
+          primaryKey: true,
+          notNull: true,
+          hasDefault: false,
+        },
+        {
+          name: "title",
+          type: "TEXT",
+          primaryKey: false,
+          notNull: true,
+          hasDefault: false,
+          unique: true,
+        },
+        {
+          name: "description",
+          type: "TEXT",
+          primaryKey: false,
+          notNull: false,
+          hasDefault: false,
+        },
+        {
+          name: "price",
+          type: "INTEGER",
+          primaryKey: false,
+          notNull: true,
+          hasDefault: false,
+        },
+        {
+          name: "quantity",
+          type: "INTEGER",
+          primaryKey: false,
+          notNull: false,
+          hasDefault: true,
+        },
+        {
+          name: "is_active",
+          type: "BOOLEAN",
+          primaryKey: false,
+          notNull: true,
+          hasDefault: true,
+        },
+        {
+          name: "created_at",
+          type: "DATETIME",
+          primaryKey: false,
+          notNull: false,
+          hasDefault: true,
+        },
+        {
+          name: "category_id",
+          type: "INTEGER",
+          primaryKey: false,
+          notNull: false,
+          hasDefault: false,
+        },
+        {
+          name: "metadata",
+          type: "TEXT",
+          primaryKey: false,
+          notNull: false,
+          hasDefault: true,
+        },
+        {
+          name: "tags",
+          type: "TEXT",
+          primaryKey: false,
+          notNull: false,
+          hasDefault: true,
+        },
       ];
 
-      validations.forEach(validation => {
-        const col = extractedColumns.find(c => c.name === validation.name);
+      validations.forEach((validation) => {
+        const col = extractedColumns.find((c) => c.name === validation.name);
         expect(col).toBeDefined();
         expect(col!.type).toBe(validation.type as any);
         expect(col!.primaryKey).toBe(validation.primaryKey);
@@ -444,9 +543,11 @@ describe("sqlite Schema Extractor", () => {
         }
 
         if (validation.unique) {
-          const hasUnique = col!.unique || extractedIndexes.some(idx =>
-            idx.unique && idx.columns.includes(validation.name)
-          );
+          const hasUnique =
+            col!.unique ||
+            extractedIndexes.some(
+              (idx) => idx.unique && idx.columns.includes(validation.name),
+            );
           expect(hasUnique).toBeTruthy();
         }
       });
@@ -455,8 +556,9 @@ describe("sqlite Schema Extractor", () => {
       expect(extractedIndexes.length).toBeGreaterThanOrEqual(1);
 
       // Debe existir un índice compuesto o individual para price/quantity
-      const hasPriceQuantityIndex = extractedIndexes.some(idx =>
-        idx.columns.includes("price") || idx.columns.includes("quantity")
+      const hasPriceQuantityIndex = extractedIndexes.some(
+        (idx) =>
+          idx.columns.includes("price") || idx.columns.includes("quantity"),
       );
       expect(hasPriceQuantityIndex).toBeTruthy();
     });
@@ -471,7 +573,7 @@ describe("sqlite Schema Extractor", () => {
         date_field: { type: Date },
         object_field: { type: Object, default: {} },
         array_field: { type: Array, default: [] },
-        blob_field: { type: Buffer }
+        blob_field: { type: Buffer },
       });
 
       const originalTable = dataTypesSchema.toTableSchema("data_types_test");
@@ -491,46 +593,54 @@ describe("sqlite Schema Extractor", () => {
         { field: "date_field", expectedType: "DATETIME" },
         { field: "object_field", expectedType: "TEXT" },
         { field: "array_field", expectedType: "TEXT" },
-        { field: "blob_field", expectedType: "BLOB" }
+        { field: "blob_field", expectedType: "BLOB" },
       ];
 
       typeMappings.forEach(({ field, expectedType }) => {
-        const col = extractedColumns.find(c => c.name === field);
+        const col = extractedColumns.find((c) => c.name === field);
         expect(col).toBeDefined();
         expect(col!.type).toBe(expectedType as any);
       });
 
       // Validar constraints específicas
-      const textCol = extractedColumns.find(c => c.name === "text_field");
+      const textCol = extractedColumns.find((c) => c.name === "text_field");
       expect(textCol!.notNull).toBe(true);
 
-      const booleanCol = extractedColumns.find(c => c.name === "boolean_field");
+      const booleanCol = extractedColumns.find(
+        (c) => c.name === "boolean_field",
+      );
       expect(booleanCol!.defaultValue).toBeDefined();
-      expect(["false", "0"]).toContain(booleanCol!.defaultValue?.toString().toLowerCase() || "");
+      expect(["false", "0"]).toContain(
+        booleanCol!.defaultValue?.toString().toLowerCase() || "",
+      );
 
-      const objectCol = extractedColumns.find(c => c.name === "object_field");
+      const objectCol = extractedColumns.find((c) => c.name === "object_field");
       expect(objectCol!.defaultValue).toBe("'{}'");
 
-      const arrayCol = extractedColumns.find(c => c.name === "array_field");
+      const arrayCol = extractedColumns.find((c) => c.name === "array_field");
       expect(arrayCol!.defaultValue).toBe("'[]'");
     });
 
     it("should validate foreign key relationships are preserved", async () => {
       const userSchema = new Schema({
         id: { type: String, primaryKey: true },
-        name: { type: String, required: true }
+        name: { type: String, required: true },
       });
 
       const postSchema = new Schema({
         id: { type: String, primaryKey: true },
         title: { type: String, required: true },
-        user_id: { type: String, required: true, references: { table: "users", column: "id" } },
-        category_id: { type: String, ref: "categories" }
+        user_id: {
+          type: String,
+          required: true,
+          references: { table: "users", column: "id" },
+        },
+        category_id: { type: String, ref: "categories" },
       });
 
       await initializer.initialize([
         userSchema.toTableSchema("users"),
-        postSchema.toTableSchema("posts")
+        postSchema.toTableSchema("posts"),
       ]);
 
       const extracted = await extractor.extractTableSchema("posts");
@@ -539,22 +649,26 @@ describe("sqlite Schema Extractor", () => {
       // Note: SQLite PRAGMA foreign_key_list is not used by the current extractor implementation
       // so we need to override these manually for the test to pass
 
-
-
       // Re-extract with overrides
-      const extractedWithOverrides = await extractor.extractTableSchema("posts");
+      const extractedWithOverrides =
+        await extractor.extractTableSchema("posts");
       expect(extractedWithOverrides).not.toBeNull();
 
       const extractedColumns = extractedWithOverrides!.tableSchema.columns;
-      const userIdCol = extractedColumns.find(c => c.name === "user_id");
-      const categoryIdCol = extractedColumns.find(c => c.name === "category_id");
+      const userIdCol = extractedColumns.find((c) => c.name === "user_id");
+      const categoryIdCol = extractedColumns.find(
+        (c) => c.name === "category_id",
+      );
 
       // Validar foreign keys (si el extractor las soporta)
       expect(userIdCol).toBeDefined();
       expect(userIdCol!.references).toEqual({ table: "users", column: "id" });
 
       expect(categoryIdCol).toBeDefined();
-      expect(categoryIdCol!.references).toEqual({ table: "categories", column: "id" });
+      expect(categoryIdCol!.references).toEqual({
+        table: "categories",
+        column: "id",
+      });
     });
 
     it("should validate check constraints are preserved", async () => {
@@ -562,7 +676,7 @@ describe("sqlite Schema Extractor", () => {
         id: { type: String, primaryKey: true },
         age: { type: Number, required: true, check: "age >= 18" },
         email: { type: String, check: "email LIKE '%@%'" },
-        price: { type: Number, required: true, check: "price > 0" }
+        price: { type: Number, required: true, check: "price > 0" },
       });
 
       const originalTable = checkSchema.toTableSchema("check_constraints");
@@ -571,12 +685,19 @@ describe("sqlite Schema Extractor", () => {
       const extracted = await extractor.extractTableSchema("check_constraints");
 
       // Register overrides for check constraints
-      extractor.registerOverride("check_constraints", "age", { check: "age >= 18" });
-      extractor.registerOverride("check_constraints", "email", { check: "email LIKE '%@%'" });
-      extractor.registerOverride("check_constraints", "price", { check: "price > 0" });
+      extractor.registerOverride("check_constraints", "age", {
+        check: "age >= 18",
+      });
+      extractor.registerOverride("check_constraints", "email", {
+        check: "email LIKE '%@%'",
+      });
+      extractor.registerOverride("check_constraints", "price", {
+        check: "price > 0",
+      });
 
       // Re-extract with overrides
-      const extractedWithOverrides = await extractor.extractTableSchema("check_constraints");
+      const extractedWithOverrides =
+        await extractor.extractTableSchema("check_constraints");
       expect(extractedWithOverrides).not.toBeNull();
 
       const extractedColumns = extractedWithOverrides!.tableSchema.columns;
@@ -584,11 +705,11 @@ describe("sqlite Schema Extractor", () => {
       const checkValidations = [
         { field: "age", expectedCheck: "age >= 18" },
         { field: "email", expectedCheck: "email LIKE '%@%'" },
-        { field: "price", expectedCheck: "price > 0" }
+        { field: "price", expectedCheck: "price > 0" },
       ];
 
       checkValidations.forEach(({ field, expectedCheck }) => {
-        const col = extractedColumns.find(c => c.name === field);
+        const col = extractedColumns.find((c) => c.name === field);
         expect(col).toBeDefined();
         expect(col!.check).toBe(expectedCheck);
       });
@@ -596,21 +717,24 @@ describe("sqlite Schema Extractor", () => {
 
     it("should validate complete schema equivalence through round-trip conversion", async () => {
       // Test completo: Schema -> TableSchema -> DB -> Extraer -> Schema y comparar
-      const originalSchema = new Schema({
-        uuid: { type: String, primaryKey: true },
-        name: { type: String, required: true, unique: true },
-        email: { type: String, unique: true },
-        age: { type: Number, check: "age >= 0" },
-        balance: { type: Number, default: 0.0 },
-        is_verified: { type: Boolean, default: false },
-        created_at: { type: Date, default: Date.now },
-        metadata: { type: Object, default: {} }
-      }, {
-        indexes: [
-          { name: "idx_name_age", columns: ["name", "age"] },
-          { name: "idx_balance", columns: ["balance"] }
-        ]
-      });
+      const originalSchema = new Schema(
+        {
+          uuid: { type: String, primaryKey: true },
+          name: { type: String, required: true, unique: true },
+          email: { type: String, unique: true },
+          age: { type: Number, check: "age >= 0" },
+          balance: { type: Number, default: 0.0 },
+          is_verified: { type: Boolean, default: false },
+          created_at: { type: Date, default: Date.now },
+          metadata: { type: Object, default: {} },
+        },
+        {
+          indexes: [
+            { name: "idx_name_age", columns: ["name", "age"] },
+            { name: "idx_balance", columns: ["balance"] },
+          ],
+        },
+      );
 
       // Convertir a TableSchema y crear en DB
       const originalTableSchema = originalSchema.toTableSchema("complete_test");
@@ -626,7 +750,8 @@ describe("sqlite Schema Extractor", () => {
       expect(extracted).not.toBeNull();
 
       // Convertir extraído de vuelta a Schema
-      const extractedSchemaInstances = await extractor.extractAsSchemaInstances();
+      const extractedSchemaInstances =
+        await extractor.extractAsSchemaInstances();
       const extractedSchema = extractedSchemaInstances["complete_test"];
       expect(extractedSchema).toBeDefined();
 
@@ -635,38 +760,49 @@ describe("sqlite Schema Extractor", () => {
       const extractedDef = extractedSchema!.getDefinition();
 
       // Validar que todos los campos originales existen en el extraído
-      Object.keys(originalDef).forEach(fieldName => {
+      Object.keys(originalDef).forEach((fieldName) => {
         expect(extractedDef[fieldName]).toBeDefined();
 
         const originalField = originalDef[fieldName] as any;
         const extractedField = extractedDef[fieldName] as any;
 
         // Validar tipo (considerando mapeos)
-        if (typeof originalField.type === 'function') {
-          const expectedType = originalField.type === String ? 'TEXT' :
-            originalField.type === Number ? 'INTEGER' :
-              originalField.type === Boolean ? 'BOOLEAN' :
-                originalField.type === Date ? 'DATETIME' : 'TEXT';
+        if (typeof originalField.type === "function") {
+          const expectedType =
+            originalField.type === String
+              ? "TEXT"
+              : originalField.type === Number
+                ? "INTEGER"
+                : originalField.type === Boolean
+                  ? "BOOLEAN"
+                  : originalField.type === Date
+                    ? "DATETIME"
+                    : "TEXT";
           expect(extractedField.type).toBe(expectedType);
         }
 
         // Validar constraints
-        if (originalField.primaryKey) expect(extractedField.primaryKey).toBe(true);
-        if (originalField.required || originalField.notNull) expect(extractedField.notNull).toBe(true);
+        if (originalField.primaryKey)
+          expect(extractedField.primaryKey).toBe(true);
+        if (originalField.required || originalField.notNull)
+          expect(extractedField.notNull).toBe(true);
         if (originalField.unique) {
           // Unique puede estar en el campo o en índices
-          const hasUnique = extractedField.unique ||
-            extracted!.tableSchema.indexes?.some(idx =>
-              idx.unique && idx.columns.includes(fieldName)
+          const hasUnique =
+            extractedField.unique ||
+            extracted!.tableSchema.indexes?.some(
+              (idx) => idx.unique && idx.columns.includes(fieldName),
             );
           expect(hasUnique).toBeTruthy();
         }
-        if (originalField.check) expect(extractedField.check).toBe(originalField.check);
+        if (originalField.check)
+          expect(extractedField.check).toBe(originalField.check);
       });
 
       // Validar número de columnas
-      expect(extracted!.tableSchema.columns.length).toBe(originalTableSchema.columns.length);
+      expect(extracted!.tableSchema.columns.length).toBe(
+        originalTableSchema.columns.length,
+      );
     });
   });
-
-})
+});

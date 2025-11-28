@@ -599,21 +599,28 @@ describe("Custom Table Names and Service-Specific Schemas", () => {
       };
 
       setDatabaseConfig(config);
-      
+
       // Register OAuth schemas first
       registerOAuthSchemaExtensions();
-      
+
       const schemas = buildDatabaseSchemas();
 
       // Should use all default names (now includes OAuth tables)
       const tableNames = schemas.map((s) => s.tableName);
-      
+
       // Check that basic table names are present (OAuth tables might not be included in basic build)
-      const basicTableNames = ["users", "roles", "permissions", "user_roles", "role_permissions", "sessions"];
-      basicTableNames.forEach(tableName => {
+      const basicTableNames = [
+        "users",
+        "roles",
+        "permissions",
+        "user_roles",
+        "role_permissions",
+        "sessions",
+      ];
+      basicTableNames.forEach((tableName) => {
         expect(tableNames).toContain(tableName);
       });
-      
+
       // Check that we have at least the basic tables
       expect(tableNames.length).toBeGreaterThanOrEqual(basicTableNames.length);
     });
@@ -624,21 +631,28 @@ describe("Custom Table Names and Service-Specific Schemas", () => {
       };
 
       setDatabaseConfig(config);
-      
+
       // Register OAuth schemas first
       registerOAuthSchemaExtensions();
-      
+
       const schemas = buildDatabaseSchemas();
 
       // Should use all default names (now includes OAuth tables)
       const tableNames = schemas.map((s) => s.tableName);
-      
+
       // Check that basic table names are present (OAuth tables might not be included in basic build)
-      const basicTableNames = ["users", "roles", "permissions", "user_roles", "role_permissions", "sessions"];
-      basicTableNames.forEach(tableName => {
+      const basicTableNames = [
+        "users",
+        "roles",
+        "permissions",
+        "user_roles",
+        "role_permissions",
+        "sessions",
+      ];
+      basicTableNames.forEach((tableName) => {
         expect(tableNames).toContain(tableName);
       });
-      
+
       // Check that we have at least the basic tables
       expect(tableNames.length).toBeGreaterThanOrEqual(basicTableNames.length);
     });

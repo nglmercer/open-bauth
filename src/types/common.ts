@@ -69,7 +69,7 @@ export interface QueryOptions {
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
   search?: string;
   filters?: Record<string, unknown>;
 }
@@ -87,11 +87,19 @@ export interface DatabaseTransaction {
 /**
  * Repository interface
  */
-export interface Repository<T extends BaseEntity, CreateData = Partial<T>, UpdateData = Partial<T>> {
+export interface Repository<
+  T extends BaseEntity,
+  CreateData = Partial<T>,
+  UpdateData = Partial<T>,
+> {
   findById(id: string, options?: QueryOptions): Promise<T | null>;
   findMany(options?: QueryOptions): Promise<PaginatedResponse<T>>;
   create(data: CreateData, transaction?: DatabaseTransaction): Promise<T>;
-  update(id: string, data: UpdateData, transaction?: DatabaseTransaction): Promise<T>;
+  update(
+    id: string,
+    data: UpdateData,
+    transaction?: DatabaseTransaction,
+  ): Promise<T>;
   delete(id: string, transaction?: DatabaseTransaction): Promise<boolean>;
   exists(id: string): Promise<boolean>;
 }
@@ -149,7 +157,7 @@ export interface Configuration {
  * Database configuration interface
  */
 export interface DatabaseConfig {
-  type: 'sqlite' | 'mysql' | 'postgresql';
+  type: "sqlite" | "mysql" | "postgresql";
   host?: string;
   port?: number;
   database: string;
@@ -215,9 +223,9 @@ export interface SecurityConfig {
  * Logging configuration interface
  */
 export interface LoggingConfig {
-  level: 'debug' | 'info' | 'warn' | 'error';
-  format: 'json' | 'text';
-  outputs: ('console' | 'file' | 'database')[];
+  level: "debug" | "info" | "warn" | "error";
+  format: "json" | "text";
+  outputs: ("console" | "file" | "database")[];
   audit: {
     enabled: boolean;
     logSuccessfulRequests: boolean;
@@ -240,13 +248,13 @@ export enum HttpStatusCode {
   UNPROCESSABLE_ENTITY = 422,
   TOO_MANY_REQUESTS = 429,
   INTERNAL_SERVER_ERROR = 500,
-  SERVICE_UNAVAILABLE = 503
+  SERVICE_UNAVAILABLE = 503,
 }
 
 /**
  * Environment types
  */
-export type Environment = 'development' | 'test' | 'staging' | 'production';
+export type Environment = "development" | "test" | "staging" | "production";
 
 /**
  * Utility types
@@ -287,15 +295,15 @@ export type PermissionId = string;
  * Brand types for better type safety
  */
 export type Brand<T, B> = T & { __brand: B };
-export type Email = Brand<string, 'Email'> | string;
-export type HashedPassword = Brand<string, 'HashedPassword'> | string;
-export type JWT = Brand<string, 'JWT'> | string;
-export type RefreshToken = Brand<string, 'RefreshToken'>;
+export type Email = Brand<string, "Email"> | string;
+export type HashedPassword = Brand<string, "HashedPassword"> | string;
+export type JWT = Brand<string, "JWT"> | string;
+export type RefreshToken = Brand<string, "RefreshToken">;
 
 /**
  * Result type for error handling
  */
-export type Result<T, E = Error> = 
+export type Result<T, E = Error> =
   | { success: true; data: T }
   | { success: false; error: E };
 

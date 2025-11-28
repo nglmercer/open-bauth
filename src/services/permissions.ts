@@ -171,7 +171,7 @@ export class PermissionService {
           },
         };
       }
-      return { success: true,data:result.data };
+      return { success: true, data: result.data };
     } catch (error: any) {
       return {
         success: false,

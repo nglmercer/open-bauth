@@ -29,14 +29,21 @@ export class EnhancedUserService {
 
   constructor(
     dbInitializer: DatabaseInitializer,
-    securityService: SecurityService
+    securityService: SecurityService,
   ) {
     this.userController = dbInitializer.createController<User>("users");
-    this.deviceSecretController = dbInitializer.createController<DeviceSecret>("device_secrets");
-    this.biometricController = dbInitializer.createController<BiometricCredential>("biometric_credentials");
-    this.anonymousUserController = dbInitializer.createController<AnonymousUser>("anonymous_users");
-    this.userDeviceController = dbInitializer.createController<UserDevice>("user_devices");
-    this.mfaController = dbInitializer.createController<MFAConfiguration>("mfa_configurations");
+    this.deviceSecretController =
+      dbInitializer.createController<DeviceSecret>("device_secrets");
+    this.biometricController =
+      dbInitializer.createController<BiometricCredential>(
+        "biometric_credentials",
+      );
+    this.anonymousUserController =
+      dbInitializer.createController<AnonymousUser>("anonymous_users");
+    this.userDeviceController =
+      dbInitializer.createController<UserDevice>("user_devices");
+    this.mfaController =
+      dbInitializer.createController<MFAConfiguration>("mfa_configurations");
     this.securityService = securityService;
   }
 
@@ -45,13 +52,15 @@ export class EnhancedUserService {
   /**
    * Create a new user with enhanced features
    */
-  async createUser(data: CreateUserData): Promise<{ success: boolean; user?: User; error?: any }> {
+  async createUser(
+    data: CreateUserData,
+  ): Promise<{ success: boolean; user?: User; error?: any }> {
     try {
       // Check if user already exists
       const existingUser = await this.userController.findFirst({
         email: data.email.toLowerCase(),
       });
-      
+
       if (existingUser.data) {
         return {
           success: false,
@@ -99,7 +108,7 @@ export class EnhancedUserService {
    */
   async updateUser(
     userId: string,
-    data: UpdateUserData
+    data: UpdateUserData,
   ): Promise<{ success: boolean; user?: User; error?: any }> {
     const result = await this.userController.update(userId, data);
     if (!result.success || !result.data) {
@@ -139,7 +148,7 @@ export class EnhancedUserService {
    */
   async createAnonymousUser(
     sessionData: any,
-    expiresAt?: Date
+    expiresAt?: Date,
   ): Promise<{ success: boolean; anonymousUser?: AnonymousUser; error?: any }> {
     try {
       const anonymousId = this.securityService.generateSecureToken(32);
@@ -173,7 +182,9 @@ export class EnhancedUserService {
   /**
    * Find anonymous user by ID
    */
-  async findAnonymousUserById(anonymousId: string): Promise<AnonymousUser | null> {
+  async findAnonymousUserById(
+    anonymousId: string,
+  ): Promise<AnonymousUser | null> {
     const result = await this.anonymousUserController.findFirst({
       anonymous_id: anonymousId,
     });
@@ -185,7 +196,7 @@ export class EnhancedUserService {
    */
   async promoteAnonymousUser(
     anonymousId: string,
-    userData: CreateUserData
+    userData: CreateUserData,
   ): Promise<{ success: boolean; user?: User; error?: any }> {
     try {
       // Find anonymous user
@@ -232,7 +243,7 @@ export class EnhancedUserService {
     deviceName: string,
     deviceType: DeviceType,
     platform?: string,
-    userAgent?: string
+    userAgent?: string,
   ): Promise<{ success: boolean; device?: UserDevice; error?: any }> {
     try {
       // Check if device already exists
@@ -242,13 +253,16 @@ export class EnhancedUserService {
 
       if (existingDevice.data) {
         // Update existing device
-        const result = await this.userDeviceController.update(existingDevice.data.id, {
-          device_name: deviceName,
-          device_type: deviceType,
-          platform,
-          user_agent: userAgent,
-          last_seen_at: new Date().toISOString(),
-        });
+        const result = await this.userDeviceController.update(
+          existingDevice.data.id,
+          {
+            device_name: deviceName,
+            device_type: deviceType,
+            platform,
+            user_agent: userAgent,
+            last_seen_at: new Date().toISOString(),
+          },
+        );
 
         if (!result.success || !result.data) {
           return {
@@ -299,7 +313,7 @@ export class EnhancedUserService {
    */
   async trustDevice(
     userId: string,
-    deviceId: string
+    deviceId: string,
   ): Promise<{ success: boolean; error?: any }> {
     try {
       const device = await this.userDeviceController.findFirst({
@@ -362,8 +376,13 @@ export class EnhancedUserService {
     userId: string,
     deviceId: string,
     deviceName: string,
-    deviceType: DeviceType = DeviceType.UNKNOWN
-  ): Promise<{ success: boolean; deviceSecret?: DeviceSecret; secret?: string; error?: any }> {
+    deviceType: DeviceType = DeviceType.UNKNOWN,
+  ): Promise<{
+    success: boolean;
+    deviceSecret?: DeviceSecret;
+    secret?: string;
+    error?: any;
+  }> {
     try {
       const secret = this.securityService.generateSecureToken(64);
       const { hash, salt } = await this.securityService.hashPassword(secret);
@@ -376,7 +395,9 @@ export class EnhancedUserService {
         secret_hash: hash,
         secret_salt: salt,
         is_trusted: true,
-        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
+        expires_at: new Date(
+          Date.now() + 365 * 24 * 60 * 60 * 1000,
+        ).toISOString(), // 1 year
       });
 
       if (!result.success || !result.data) {
@@ -404,7 +425,7 @@ export class EnhancedUserService {
    */
   async verifyDeviceSecret(
     deviceId: string,
-    secret: string
+    secret: string,
   ): Promise<{ success: boolean; deviceSecret?: DeviceSecret; error?: any }> {
     try {
       const deviceSecret = await this.deviceSecretController.findFirst({
@@ -422,7 +443,10 @@ export class EnhancedUserService {
       }
 
       // Check if expired
-      if (deviceSecret.data.expires_at && new Date() > new Date(deviceSecret.data.expires_at)) {
+      if (
+        deviceSecret.data.expires_at &&
+        new Date() > new Date(deviceSecret.data.expires_at)
+      ) {
         return {
           success: false,
           error: {
@@ -436,7 +460,7 @@ export class EnhancedUserService {
       const isValid = await this.securityService.verifyPassword(
         secret,
         deviceSecret.data.secret_hash || "",
-        (deviceSecret.data as any).secret_salt || ""
+        (deviceSecret.data as any).secret_salt || "",
       );
 
       if (!isValid) {
@@ -473,12 +497,20 @@ export class EnhancedUserService {
     biometricType: BiometricType,
     biometricData: string,
     deviceId?: string,
-    expiresAt?: Date
-  ): Promise<{ success: boolean; credential?: BiometricCredential; error?: any }> {
+    expiresAt?: Date,
+  ): Promise<{
+    success: boolean;
+    credential?: BiometricCredential;
+    error?: any;
+  }> {
     try {
       // Encrypt biometric data
-      const encryptionKey = process.env.BIOMETRIC_ENCRYPTION_KEY || "default-key";
-      const encryptedData = await this.securityService.encrypt(biometricData, encryptionKey);
+      const encryptionKey =
+        process.env.BIOMETRIC_ENCRYPTION_KEY || "default-key";
+      const encryptedData = await this.securityService.encrypt(
+        biometricData,
+        encryptionKey,
+      );
 
       const result = await this.biometricController.create({
         user_id: userId,
@@ -515,8 +547,12 @@ export class EnhancedUserService {
     userId: string,
     biometricType: BiometricType,
     biometricData: string,
-    deviceId?: string
-  ): Promise<{ success: boolean; credential?: BiometricCredential; error?: any }> {
+    deviceId?: string,
+  ): Promise<{
+    success: boolean;
+    credential?: BiometricCredential;
+    error?: any;
+  }> {
     try {
       // Find matching biometric credentials
       const credentials = await this.biometricController.search({
@@ -536,13 +572,14 @@ export class EnhancedUserService {
       }
 
       // Decrypt stored biometric data and compare
-      const encryptionKey = process.env.BIOMETRIC_ENCRYPTION_KEY || "default-key";
-      
+      const encryptionKey =
+        process.env.BIOMETRIC_ENCRYPTION_KEY || "default-key";
+
       for (const credential of credentials.data) {
         try {
           const storedData = await this.securityService.decrypt(
             credential.credential_data,
-            encryptionKey
+            encryptionKey,
           );
 
           // In a real implementation, you would use a proper biometric comparison algorithm
@@ -579,7 +616,9 @@ export class EnhancedUserService {
   /**
    * Get user biometric credentials
    */
-  async getUserBiometricCredentials(userId: string): Promise<BiometricCredential[]> {
+  async getUserBiometricCredentials(
+    userId: string,
+  ): Promise<BiometricCredential[]> {
     const result = await this.biometricController.search({
       user_id: userId,
       is_active: true,
@@ -590,7 +629,9 @@ export class EnhancedUserService {
   /**
    * Deactivate biometric credential
    */
-  async deactivateBiometricCredential(credentialId: string): Promise<{ success: boolean; error?: any }> {
+  async deactivateBiometricCredential(
+    credentialId: string,
+  ): Promise<{ success: boolean; error?: any }> {
     const result = await this.biometricController.update(credentialId, {
       is_active: false,
     });
@@ -616,7 +657,7 @@ export class EnhancedUserService {
   async setupMFA(
     userId: string,
     mfaType: MFAType,
-    configuration: any
+    configuration: any,
   ): Promise<{ success: boolean; mfaConfig?: MFAConfiguration; error?: any }> {
     try {
       // Check if MFA of this type already exists
@@ -665,7 +706,9 @@ export class EnhancedUserService {
   /**
    * Enable MFA for user
    */
-  async enableMFA(mfaConfigId: string): Promise<{ success: boolean; error?: any }> {
+  async enableMFA(
+    mfaConfigId: string,
+  ): Promise<{ success: boolean; error?: any }> {
     const result = await this.mfaController.update(mfaConfigId, {
       is_enabled: true,
     });
@@ -686,7 +729,9 @@ export class EnhancedUserService {
   /**
    * Disable MFA for user
    */
-  async disableMFA(mfaConfigId: string): Promise<{ success: boolean; error?: any }> {
+  async disableMFA(
+    mfaConfigId: string,
+  ): Promise<{ success: boolean; error?: any }> {
     const result = await this.mfaController.update(mfaConfigId, {
       is_enabled: false,
     });
@@ -707,7 +752,9 @@ export class EnhancedUserService {
   /**
    * Set MFA as primary
    */
-  async setPrimaryMFA(mfaConfigId: string): Promise<{ success: boolean; error?: any }> {
+  async setPrimaryMFA(
+    mfaConfigId: string,
+  ): Promise<{ success: boolean; error?: any }> {
     try {
       // Get the MFA configuration
       const mfaConfig = await this.mfaController.findById(mfaConfigId);
@@ -772,7 +819,9 @@ export class EnhancedUserService {
   /**
    * Get enabled MFA configurations for user
    */
-  async getEnabledMFAConfigurations(userId: string): Promise<MFAConfiguration[]> {
+  async getEnabledMFAConfigurations(
+    userId: string,
+  ): Promise<MFAConfiguration[]> {
     const result = await this.mfaController.search({
       user_id: userId,
       is_enabled: true,
@@ -783,7 +832,9 @@ export class EnhancedUserService {
   /**
    * Get primary MFA configuration for user
    */
-  async getPrimaryMFAConfiguration(userId: string): Promise<MFAConfiguration | null> {
+  async getPrimaryMFAConfiguration(
+    userId: string,
+  ): Promise<MFAConfiguration | null> {
     const result = await this.mfaController.findFirst({
       user_id: userId,
       is_primary: true,
@@ -797,7 +848,10 @@ export class EnhancedUserService {
    * Compare biometric data (simplified implementation)
    * In a real implementation, this would use sophisticated biometric comparison algorithms
    */
-  private compareBiometricData(storedData: string, providedData: string): boolean {
+  private compareBiometricData(
+    storedData: string,
+    providedData: string,
+  ): boolean {
     // This is a very simplified comparison for demonstration
     // Real biometric comparison would use specialized algorithms
     return storedData === providedData;

@@ -28,7 +28,7 @@ export type {
   AuthStats as AuthStatsType,
   AuthEvent as AuthEventType,
   AuthEventData as AuthEventDataType,
-} from './auth';
+} from "./auth";
 
 export type {
   // Re-export common types with explicit naming to avoid conflicts
@@ -45,7 +45,7 @@ export type {
   QueryOptions as QueryOptionsType,
   PaginatedResponse as PaginatedResponseType,
   ValidationResult as ValidationResultType,
-} from './common';
+} from "./common";
 
 // OAuth 2.0 and Enhanced Security Types
 export type {
@@ -83,4 +83,4 @@ export type {
   DeviceType as DeviceTypeEnum,
   OIDCUserInfo as OIDCUserInfoType,
   OIDCClaims as OIDCClaimsType,
-} from './oauth';
+} from "./oauth";

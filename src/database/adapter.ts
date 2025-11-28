@@ -10,7 +10,9 @@ import { SQL } from "bun";
 export interface IQueryResult {
   all(...params: unknown[]): Promise<unknown[]>;
   get(...params: unknown[]): Promise<unknown>;
-  run(...params: unknown[]): Promise<{ changes: number; lastInsertRowid?: number }>;
+  run(
+    ...params: unknown[]
+  ): Promise<{ changes: number; lastInsertRowid?: number }>;
 }
 
 export interface IDatabaseConnection {
@@ -40,27 +42,27 @@ export interface IDatabaseAdapter {
    * Get the underlying database connection
    */
   getConnection(): DatabaseConnection;
-  
+
   /**
    * Get the database configuration
    */
   getConfig(): DatabaseAdapterConfig;
-  
+
   /**
    * Initialize the database connection
    */
   initialize(): Promise<void>;
-  
+
   /**
    * Close the database connection
    */
   close(): Promise<void>;
-  
+
   /**
    * Check if the connection is active
    */
   isConnected(): boolean;
-  
+
   /**
    * Get database type information
    */
@@ -70,7 +72,7 @@ export interface IDatabaseAdapter {
     isPostgreSQL: boolean;
     isMySQL: boolean;
   };
-  
+
   /**
    * Get database-specific SQL syntax helpers
    */
@@ -103,7 +105,7 @@ export class BunSQLiteAdapter implements IDatabaseAdapter {
 
   private createConnection(): DatabaseConnection {
     const { database } = this.config;
-    
+
     // Type guard para SQLite
     if (this.isSQLiteDatabase(database)) {
       return {
@@ -116,29 +118,38 @@ export class BunSQLiteAdapter implements IDatabaseAdapter {
             const stmt = database.prepare(sql);
             return stmt.get(...(params as any[]));
           },
-          run: async (...params: unknown[]): Promise<{ changes: number; lastInsertRowid?: number }> => {
+          run: async (
+            ...params: unknown[]
+          ): Promise<{ changes: number; lastInsertRowid?: number }> => {
             const stmt = database.prepare(sql);
             const result = stmt.run(...(params as any[]));
             return {
               changes: result.changes,
-              lastInsertRowid: result.lastInsertRowid != null ? Number(result.lastInsertRowid) : undefined,
+              lastInsertRowid:
+                result.lastInsertRowid != null
+                  ? Number(result.lastInsertRowid)
+                  : undefined,
             };
           },
         }),
         prepare: (sql: string) => database.prepare(sql),
       };
     }
-    
+
     // Para SQL (PostgreSQL/MySQL), implementación genérica
     return {
       query: (sql: string) => ({
         all: async (...params: unknown[]): Promise<unknown[]> => {
           try {
             // Convertir unknown[] a tipos compatibles con SQL
-            const sqlParams = params.map(param => {
+            const sqlParams = params.map((param) => {
               if (param === null || param === undefined) return null;
-              if (typeof param === 'string' || typeof param === 'number' || 
-                  typeof param === 'boolean' || typeof param === 'bigint') {
+              if (
+                typeof param === "string" ||
+                typeof param === "number" ||
+                typeof param === "boolean" ||
+                typeof param === "bigint"
+              ) {
                 return param;
               }
               if (param instanceof Uint8Array || param instanceof Buffer) {
@@ -150,7 +161,10 @@ export class BunSQLiteAdapter implements IDatabaseAdapter {
               // Para otros tipos, convertir a string
               return String(param);
             });
-            const result = await (database as SQL).unsafe(sql, sqlParams as any[]);
+            const result = await (database as SQL).unsafe(
+              sql,
+              sqlParams as any[],
+            );
             return Array.isArray(result) ? result : [result];
           } catch (error: unknown) {
             console.error("SQL query.all error:", error);
@@ -160,10 +174,14 @@ export class BunSQLiteAdapter implements IDatabaseAdapter {
         get: async (...params: unknown[]): Promise<unknown> => {
           try {
             // Convertir unknown[] a tipos compatibles con SQL
-            const sqlParams = params.map(param => {
+            const sqlParams = params.map((param) => {
               if (param === null || param === undefined) return null;
-              if (typeof param === 'string' || typeof param === 'number' || 
-                  typeof param === 'boolean' || typeof param === 'bigint') {
+              if (
+                typeof param === "string" ||
+                typeof param === "number" ||
+                typeof param === "boolean" ||
+                typeof param === "bigint"
+              ) {
                 return param;
               }
               if (param instanceof Uint8Array || param instanceof Buffer) {
@@ -174,20 +192,29 @@ export class BunSQLiteAdapter implements IDatabaseAdapter {
               }
               return String(param);
             });
-            const result = await (database as SQL).unsafe(sql, sqlParams as any[]);
+            const result = await (database as SQL).unsafe(
+              sql,
+              sqlParams as any[],
+            );
             return Array.isArray(result) ? result[0] : result;
           } catch (error: unknown) {
             console.error("SQL query.get error:", error);
             throw error;
           }
         },
-        run: async (...params: unknown[]): Promise<{ changes: number; lastInsertRowid?: number }> => {
+        run: async (
+          ...params: unknown[]
+        ): Promise<{ changes: number; lastInsertRowid?: number }> => {
           try {
             // Convertir unknown[] a tipos compatibles con SQL
-            const sqlParams = params.map(param => {
+            const sqlParams = params.map((param) => {
               if (param === null || param === undefined) return null;
-              if (typeof param === 'string' || typeof param === 'number' || 
-                  typeof param === 'boolean' || typeof param === 'bigint') {
+              if (
+                typeof param === "string" ||
+                typeof param === "number" ||
+                typeof param === "boolean" ||
+                typeof param === "bigint"
+              ) {
                 return param;
               }
               if (param instanceof Uint8Array || param instanceof Buffer) {
@@ -207,7 +234,9 @@ export class BunSQLiteAdapter implements IDatabaseAdapter {
         },
       }),
       prepare: () => {
-        throw new Error("Prepared statements not supported for SQL databases in this adapter");
+        throw new Error(
+          "Prepared statements not supported for SQL databases in this adapter",
+        );
       },
     };
   }
@@ -270,29 +299,31 @@ export class BunSQLiteAdapter implements IDatabaseAdapter {
             return upperType;
         }
       },
-      
+
       formatDefaultValue: (value: any): string => {
         if (value === null) return "NULL";
         if (typeof value === "boolean") return value ? "1" : "0";
-        
+
         if (typeof value === "string") {
           const upperValue = value.toUpperCase();
-          const isFunctionOrKeyword = 
-            /^\(.*\)$/.test(value.trim()) || 
-            ["CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME"].includes(upperValue);
-          
+          const isFunctionOrKeyword =
+            /^\(.*\)$/.test(value.trim()) ||
+            ["CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME"].includes(
+              upperValue,
+            );
+
           return isFunctionOrKeyword ? value : `'${value.replace(/'/g, "''")}'`;
         }
-        
+
         return String(value);
       },
-      
+
       getRandomOrder: (): string => "ORDER BY RANDOM()",
-      
-      getPrimaryKeyQuery: (tableName: string): string => 
+
+      getPrimaryKeyQuery: (tableName: string): string =>
         `PRAGMA table_info("${tableName}")`,
-      
-      getTableInfoQuery: (tableName: string): string => 
+
+      getTableInfoQuery: (tableName: string): string =>
         `PRAGMA table_info("${tableName}")`,
     };
   }
@@ -307,32 +338,38 @@ export class AdapterFactory {
    */
   static createAdapter(config: DatabaseAdapterConfig): IDatabaseAdapter {
     // Default to Bun SQLite if no specific type is set
-    if (!config.isSQLite && !config.isSQLServer && !config.isPostgreSQL && !config.isMySQL) {
+    if (
+      !config.isSQLite &&
+      !config.isSQLServer &&
+      !config.isPostgreSQL &&
+      !config.isMySQL
+    ) {
       return new BunSQLiteAdapter({ ...config, isSQLite: true });
     }
-    
+
     // Create adapter based on database type
     if (config.isSQLite) {
       return new BunSQLiteAdapter(config);
     }
-    
+
     // For other database types, user should provide their own adapter
     throw new Error(
-      `Unsupported database type. Please provide a custom adapter for ${this.getDatabaseTypeName(config)}`
+      `Unsupported database type. Please provide a custom adapter for ${this.getDatabaseTypeName(config)}`,
     );
   }
-  
+
   /**
    * Register a custom adapter for a specific database type
    */
   static registerCustomAdapter(
     databaseType: string,
-    adapterClass: new (config: DatabaseAdapterConfig) => IDatabaseAdapter
+    adapterClass: new (config: DatabaseAdapterConfig) => IDatabaseAdapter,
   ): void {
-    (globalThis as any).__customAdapters = (globalThis as any).__customAdapters || {};
+    (globalThis as any).__customAdapters =
+      (globalThis as any).__customAdapters || {};
     (globalThis as any).__customAdapters[databaseType] = adapterClass;
   }
-  
+
   /**
    * Get a human-readable database type name
    */
@@ -403,9 +440,9 @@ export abstract class CustomDatabaseAdapter implements IDatabaseAdapter {
         return String(value);
       },
       getRandomOrder: (): string => "ORDER BY RANDOM()",
-      getPrimaryKeyQuery: (tableName: string): string => 
+      getPrimaryKeyQuery: (tableName: string): string =>
         `SELECT column_name FROM information_schema.key_column_usage WHERE table_name = '${tableName}'`,
-      getTableInfoQuery: (tableName: string): string => 
+      getTableInfoQuery: (tableName: string): string =>
         `SELECT * FROM information_schema.columns WHERE table_name = '${tableName}'`,
     };
   }

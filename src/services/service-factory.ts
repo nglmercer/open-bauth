@@ -1,8 +1,8 @@
-import type { DatabaseInitializer } from '../database/database-initializer';
-import { AuthService } from './auth';
-import { PermissionService } from './permissions';
-import { JWTService } from './jwt';
-import { getTableName, getAllTableNames } from '../database/config';
+import type { DatabaseInitializer } from "../database/database-initializer";
+import { AuthService } from "./auth";
+import { PermissionService } from "./permissions";
+import { JWTService } from "./jwt";
+import { getTableName, getAllTableNames } from "../database/config";
 
 /**
  * Factory class for creating service instances with configured table names
@@ -23,7 +23,9 @@ export class ServiceFactory {
    */
   getJWTService(secret?: string): JWTService {
     if (!this.jwtService) {
-      this.jwtService = new JWTService(secret || process.env.JWT_SECRET || 'dev-secret');
+      this.jwtService = new JWTService(
+        secret || process.env.JWT_SECRET || "dev-secret",
+      );
     }
     return this.jwtService;
   }
@@ -35,7 +37,7 @@ export class ServiceFactory {
     if (!this.authService) {
       this.authService = new AuthService(
         this.dbInitializer,
-        this.getJWTService()
+        this.getJWTService(),
       );
     }
     return this.authService;
@@ -58,7 +60,7 @@ export class ServiceFactory {
     return {
       jwtService: this.getJWTService(),
       authService: this.getAuthService(),
-      permissionService: this.getPermissionService()
+      permissionService: this.getPermissionService(),
     };
   }
 
@@ -66,7 +68,7 @@ export class ServiceFactory {
    * Create a controller with a configured table name
    */
   createControllerWithCustomName<T = Record<string, unknown>>(
-    tableKey: keyof ReturnType<typeof getAllTableNames>
+    tableKey: keyof ReturnType<typeof getAllTableNames>,
   ) {
     const tableName = getTableName(tableKey);
     return this.dbInitializer.createController<T>(tableName);
@@ -99,7 +101,9 @@ let globalServiceFactory: ServiceFactory | null = null;
  * Initialize the global service factory
  * Call this once during application startup
  */
-export function initializeServices(dbInitializer: DatabaseInitializer): ServiceFactory {
+export function initializeServices(
+  dbInitializer: DatabaseInitializer,
+): ServiceFactory {
   globalServiceFactory = new ServiceFactory(dbInitializer);
   return globalServiceFactory;
 }
@@ -110,7 +114,9 @@ export function initializeServices(dbInitializer: DatabaseInitializer): ServiceF
  */
 export function getServiceFactory(): ServiceFactory {
   if (!globalServiceFactory) {
-    throw new Error('Service factory not initialized. Call initializeServices() first.');
+    throw new Error(
+      "Service factory not initialized. Call initializeServices() first.",
+    );
   }
   return globalServiceFactory;
 }

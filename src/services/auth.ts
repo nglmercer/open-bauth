@@ -146,10 +146,11 @@ export class AuthService {
       };
     } catch (error: unknown) {
       // Verificar si es un error de constraint de SQLite para email duplicado
-      if (this.getErrorMessage(error) && (
-        this.getErrorMessage(error).includes('UNIQUE constraint failed') ||
-        this.getErrorMessage(error).includes('constraint failed')
-      )) {
+      if (
+        this.getErrorMessage(error) &&
+        (this.getErrorMessage(error).includes("UNIQUE constraint failed") ||
+          this.getErrorMessage(error).includes("constraint failed"))
+      ) {
         return {
           success: false,
           error: {
@@ -160,7 +161,10 @@ export class AuthService {
       }
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
+        error: {
+          type: AuthErrorType.DATABASE_ERROR,
+          message: (error as Error).message,
+        },
       };
     }
   }
@@ -241,7 +245,10 @@ export class AuthService {
       // Preserve original error message for better error handling
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
+        error: {
+          type: AuthErrorType.DATABASE_ERROR,
+          message: (error as Error).message,
+        },
       };
     }
   }
@@ -361,7 +368,9 @@ export class AuthService {
     return { success: true };
   }
 
-  async deleteUser(userId: string | number): Promise<{ success: boolean; error?: any }> {
+  async deleteUser(
+    userId: string | number,
+  ): Promise<{ success: boolean; error?: any }> {
     try {
       // Idealmente, esto debería estar en una transacción.
       const assignments = await this.userRoleController.search(
@@ -386,7 +395,10 @@ export class AuthService {
       // Preserve original error message for better error handling
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
+        error: {
+          type: AuthErrorType.DATABASE_ERROR,
+          message: (error as Error).message,
+        },
       };
     }
   }
@@ -445,7 +457,10 @@ export class AuthService {
       // Preserve original error message for better error handling
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
+        error: {
+          type: AuthErrorType.DATABASE_ERROR,
+          message: (error as Error).message,
+        },
       };
     }
   }
@@ -494,7 +509,10 @@ export class AuthService {
       // Preserve original error message for better error handling
       return {
         success: false,
-        error: { type: AuthErrorType.DATABASE_ERROR, message: (error as Error).message },
+        error: {
+          type: AuthErrorType.DATABASE_ERROR,
+          message: (error as Error).message,
+        },
       };
     }
   }

@@ -16,7 +16,7 @@ export class JsonFileAdapter implements IDatabaseAdapter {
   constructor(config: { filePath: string }) {
     this.config = config;
     this.filePath = config.filePath;
-    
+
     // Crear conexión que opera sobre archivo JSON
     this.connection = {
       query: (sql: string) => ({
@@ -33,14 +33,14 @@ export class JsonFileAdapter implements IDatabaseAdapter {
           console.log(`JSON Adapter - Query: ${sql}`, params);
           this.executeWrite(sql, params);
           return { changes: 1, lastInsertRowid: Date.now() };
-        }
-      })
+        },
+      }),
     };
   }
 
   async initialize(): Promise<void> {
     console.log(`JSON Adapter initialized with file: ${this.filePath}`);
-    
+
     // Crear archivo si no existe
     if (!existsSync(this.filePath)) {
       this.saveData({});
@@ -48,7 +48,7 @@ export class JsonFileAdapter implements IDatabaseAdapter {
   }
 
   async close(): Promise<void> {
-    console.log('JSON Adapter closed');
+    console.log("JSON Adapter closed");
   }
 
   isConnected(): boolean {
@@ -65,7 +65,7 @@ export class JsonFileAdapter implements IDatabaseAdapter {
       isSQLServer: false,
       isPostgreSQL: false,
       isMySQL: false,
-      isJsonFile: true // Tipo personalizado
+      isJsonFile: true, // Tipo personalizado
     };
   }
 
@@ -99,17 +99,16 @@ export class JsonFileAdapter implements IDatabaseAdapter {
         return String(value);
       },
       getRandomOrder: () => "ORDER BY RANDOM()",
-      getPrimaryKeyQuery: (tableName: string) => 
-        `SELECT 'id' as name, 1 as pk`,
-      getTableInfoQuery: (tableName: string) => 
-        `SELECT 'id' as name, 'string' as type, 1 as notnull, null as dflt_value, 1 as pk`
+      getPrimaryKeyQuery: (tableName: string) => `SELECT 'id' as name, 1 as pk`,
+      getTableInfoQuery: (tableName: string) =>
+        `SELECT 'id' as name, 'string' as type, 1 as notnull, null as dflt_value, 1 as pk`,
     };
   }
 
   // Métodos privados para manejo del archivo JSON
   private loadData(): any {
     try {
-      const content = readFileSync(this.filePath, 'utf-8');
+      const content = readFileSync(this.filePath, "utf-8");
       return JSON.parse(content);
     } catch (error) {
       return {};
@@ -123,7 +122,7 @@ export class JsonFileAdapter implements IDatabaseAdapter {
   private getTableName(sql: string): string {
     // Extraer nombre de tabla de SQL simple
     const match = sql.match(/FROM\s+(\w+)|INTO\s+(\w+)/i);
-    return match ? (match[1] || match[2]) : 'unknown';
+    return match ? match[1] || match[2] : "unknown";
   }
 
   private executeQuery(sql: string, params: any[]): any[] {
@@ -132,9 +131,9 @@ export class JsonFileAdapter implements IDatabaseAdapter {
     const tableData = data[tableName] || [];
 
     // SELECT simple
-    if (sql.toUpperCase().includes('SELECT')) {
+    if (sql.toUpperCase().includes("SELECT")) {
       // Manejar COUNT queries
-      if (sql.toUpperCase().includes('COUNT(')) {
+      if (sql.toUpperCase().includes("COUNT(")) {
         return [{ total: tableData.length }];
       }
       return tableData;
@@ -145,12 +144,12 @@ export class JsonFileAdapter implements IDatabaseAdapter {
 
   private executeWrite(sql: string, params: any[]): void {
     const data = this.loadData();
-    
+
     // INSERT simple
-    if (sql.toUpperCase().includes('INSERT')) {
+    if (sql.toUpperCase().includes("INSERT")) {
       const tableName = this.getTableName(sql);
       if (!data[tableName]) data[tableName] = [];
-      
+
       // Extraer datos del INSERT (simplificado)
       const newItem = { id: Date.now(), created_at: new Date().toISOString() };
       data[tableName].push(newItem);
@@ -159,14 +158,21 @@ export class JsonFileAdapter implements IDatabaseAdapter {
   }
 
   // Método REAL: Obtener valor actual del contador
-  async getCurrentCounter(): Promise<{ value: number; timestamp: string; lastUpdated: string }> {
+  async getCurrentCounter(): Promise<{
+    value: number;
+    timestamp: string;
+    lastUpdated: string;
+  }> {
     const data = this.loadData();
-    const counter = data.counter || { value: 0, created_at: new Date().toISOString() };
-    
+    const counter = data.counter || {
+      value: 0,
+      created_at: new Date().toISOString(),
+    };
+
     return {
       value: counter.value,
       timestamp: new Date().toISOString(),
-      lastUpdated: counter.created_at
+      lastUpdated: counter.created_at,
     };
   }
 
@@ -176,13 +182,13 @@ export class JsonFileAdapter implements IDatabaseAdapter {
     const counter = data.counter || { value: 0 };
     counter.value += 1;
     counter.created_at = new Date().toISOString();
-    
+
     data.counter = counter;
     this.saveData(data);
-    
+
     return {
       value: counter.value,
-      timestamp: counter.created_at
+      timestamp: counter.created_at,
     };
   }
 
@@ -201,7 +207,7 @@ export class MemoryAdapter implements IDatabaseAdapter {
 
   constructor(config: any = {}) {
     this.config = config;
-    
+
     this.connection = {
       query: (sql: string) => ({
         all: async (...params: any[]) => {
@@ -215,17 +221,17 @@ export class MemoryAdapter implements IDatabaseAdapter {
         },
         run: async (...params: any[]) => {
           return { changes: 1, lastInsertRowid: Date.now() };
-        }
-      })
+        },
+      }),
     };
   }
 
   async initialize(): Promise<void> {
-    console.log('Memory Adapter initialized');
+    console.log("Memory Adapter initialized");
   }
 
   async close(): Promise<void> {
-    console.log('Memory Adapter closed');
+    console.log("Memory Adapter closed");
     this.data.clear();
   }
 
@@ -243,7 +249,7 @@ export class MemoryAdapter implements IDatabaseAdapter {
       isSQLServer: false,
       isPostgreSQL: false,
       isMySQL: false,
-      isMemory: true
+      isMemory: true,
     };
   }
 
@@ -256,98 +262,97 @@ export class MemoryAdapter implements IDatabaseAdapter {
       mapDataType: (type: string) => type,
       formatDefaultValue: (value: any) => String(value),
       getRandomOrder: () => "ORDER BY RANDOM()",
-      getPrimaryKeyQuery: (tableName: string) => 
-        `SELECT 'id' as name, 1 as pk`,
-      getTableInfoQuery: (tableName: string) => 
-        `SELECT 'id' as name, 'string' as type, 1 as notnull, null as dflt_value, 1 as pk`
+      getPrimaryKeyQuery: (tableName: string) => `SELECT 'id' as name, 1 as pk`,
+      getTableInfoQuery: (tableName: string) =>
+        `SELECT 'id' as name, 'string' as type, 1 as notnull, null as dflt_value, 1 as pk`,
     };
   }
 
   private extractTableName(sql: string): string {
     const match = sql.match(/FROM\s+(\w+)|INTO\s+(\w+)/i);
-    return match ? (match[1] || match[2]) : 'default';
+    return match ? match[1] || match[2] : "default";
   }
 
   // Método REAL simple: Obtener estadísticas
-  async getStats(): Promise<{ tables: number; totalRecords: number; timestamp: string }> {
+  async getStats(): Promise<{
+    tables: number;
+    totalRecords: number;
+    timestamp: string;
+  }> {
     let totalRecords = 0;
-    this.data.forEach(records => {
+    this.data.forEach((records) => {
       totalRecords += records.length;
     });
 
     return {
       tables: this.data.size,
       totalRecords,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
 
 // Ejemplos de uso REALES
 async function jsonAdapterExample() {
-  console.log('\n=== JSON File Adapter Example ===');
-  
+  console.log("\n=== JSON File Adapter Example ===");
+
   // Crear adaptador JSON real
-  const jsonAdapter = new JsonFileAdapter({ filePath: './data.json' });
-  
+  const jsonAdapter = new JsonFileAdapter({ filePath: "./data.json" });
+
   // Inicializar
   await jsonAdapter.initialize();
-  
+
   // Obtener valor del contador
   const counter = await jsonAdapter.getCurrentCounter();
-  console.log('Current counter:', counter);
-  
+  console.log("Current counter:", counter);
+
   // Incrementar contador
   const incremented = await jsonAdapter.incrementCounter();
-  console.log('Incremented counter:', incremented);
-  
+  console.log("Incremented counter:", incremented);
+
   // Obtener usuarios
   const users = await jsonAdapter.getUsers();
-  console.log('Users:', users);
-  
+  console.log("Users:", users);
+
   return { counter, incremented, users };
 }
 
 async function memoryAdapterExample() {
-  console.log('\n=== Memory Adapter Example ===');
-  
+  console.log("\n=== Memory Adapter Example ===");
+
   // Crear adaptador de memoria
   const memoryAdapter = new MemoryAdapter();
-  
+
   // Inicializar
   await memoryAdapter.initialize();
-  
+
   // Obtener estadísticas
   const stats = await memoryAdapter.getStats();
-  console.log('Memory adapter stats:', stats);
-  
+  console.log("Memory adapter stats:", stats);
+
   return { stats };
 }
 
 async function realWorldExample() {
-  console.log('\n=== Real World Example ===');
-  
+  console.log("\n=== Real World Example ===");
+
   // Usar adaptador JSON con BaseController
-  const jsonAdapter = new JsonFileAdapter({ filePath: './app-data.json' });
+  const jsonAdapter = new JsonFileAdapter({ filePath: "./app-data.json" });
   await jsonAdapter.initialize();
-  
+
   // Crear controller
   const { BaseController } = await import("../src/database/base-controller");
   const userController = new BaseController("users", { adapter: jsonAdapter });
-  
+
   // Obtener usuarios (funciona igual que con base de datos real)
   const users = await userController.findAll();
-  console.log('Users from controller:', users);
-  
+  console.log("Users from controller:", users);
+
   return { users };
 }
 
 // Exportar ejemplos
-export { 
-  jsonAdapterExample, 
-  memoryAdapterExample, 
-  realWorldExample 
-};
+export { jsonAdapterExample, memoryAdapterExample, realWorldExample };
 
 // Ejecutar todos los ejemplos
 if (import.meta.main) {
@@ -356,11 +361,11 @@ if (import.meta.main) {
       await jsonAdapterExample();
       await memoryAdapterExample();
       await realWorldExample();
-      console.log('\n✅ All examples completed successfully!');
+      console.log("\n✅ All examples completed successfully!");
     } catch (error) {
-      console.error('❌ Example failed:', error);
+      console.error("❌ Example failed:", error);
     }
   }
-  
+
   runAllExamples();
 }

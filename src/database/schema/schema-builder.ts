@@ -4,13 +4,17 @@ import {
   getDatabaseConfig,
   getAllTableNames,
   getTableName,
-  type DatabaseTableConfig
+  type DatabaseTableConfig,
 } from "../config";
 
 // Utils
 
 const StandardFields = {
-  UUID: { type: String, primaryKey: true, default: "(lower(hex(randomblob(16))))" },
+  UUID: {
+    type: String,
+    primaryKey: true,
+    default: "(lower(hex(randomblob(16))))",
+  },
   Timestamps: {
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
@@ -18,103 +22,132 @@ const StandardFields = {
   Active: { type: Boolean, default: true },
 };
 
-// Schema base 
+// Schema base
 
 const BASE_SCHEMAS: Record<string, Schema> = {
-  users: new Schema({
-    id: StandardFields.UUID,
-    email: { type: String, required: true, unique: true },
-    username: String,
-    password_hash: { type: String, required: true },
-    first_name: String,
-    last_name: String,
-    ...StandardFields.Timestamps,
-    last_login_at: Date,
-    is_active: StandardFields.Active
-  }, {
-    indexes: [
-      { name: "idx_users_email", columns: ["email"], unique: true },
-      { name: "idx_users_username", columns: ["username"], unique: true },
-      { name: "idx_users_active", columns: ["is_active"] },
-    ]
-  }),
+  users: new Schema(
+    {
+      id: StandardFields.UUID,
+      email: { type: String, required: true, unique: true },
+      username: String,
+      password_hash: { type: String, required: true },
+      first_name: String,
+      last_name: String,
+      ...StandardFields.Timestamps,
+      last_login_at: Date,
+      is_active: StandardFields.Active,
+    },
+    {
+      indexes: [
+        { name: "idx_users_email", columns: ["email"], unique: true },
+        { name: "idx_users_username", columns: ["username"], unique: true },
+        { name: "idx_users_active", columns: ["is_active"] },
+      ],
+    },
+  ),
 
-  roles: new Schema({
-    id: StandardFields.UUID,
-    name: { type: String, required: true, unique: true },
-    description: String,
-    ...StandardFields.Timestamps,
-    is_active: StandardFields.Active
-  }, {
-    indexes: [{ name: "idx_roles_name", columns: ["name"], unique: true }]
-  }),
+  roles: new Schema(
+    {
+      id: StandardFields.UUID,
+      name: { type: String, required: true, unique: true },
+      description: String,
+      ...StandardFields.Timestamps,
+      is_active: StandardFields.Active,
+    },
+    {
+      indexes: [{ name: "idx_roles_name", columns: ["name"], unique: true }],
+    },
+  ),
 
-  permissions: new Schema({
-    id: StandardFields.UUID,
-    name: { type: String, required: true, unique: true },
-    resource: { type: String, required: true },
-    action: { type: String, required: true },
-    description: String,
-    created_at: { type: Date, default: Date.now },
-  }, {
-    indexes: [
-      { name: "idx_permissions_name", columns: ["name"], unique: true },
-      { name: "idx_permissions_resource", columns: ["resource"] },
-      { name: "idx_permissions_action", columns: ["action"] },
-    ]
-  }),
+  permissions: new Schema(
+    {
+      id: StandardFields.UUID,
+      name: { type: String, required: true, unique: true },
+      resource: { type: String, required: true },
+      action: { type: String, required: true },
+      description: String,
+      created_at: { type: Date, default: Date.now },
+    },
+    {
+      indexes: [
+        { name: "idx_permissions_name", columns: ["name"], unique: true },
+        { name: "idx_permissions_resource", columns: ["resource"] },
+        { name: "idx_permissions_action", columns: ["action"] },
+      ],
+    },
+  ),
 
-  userRoles: new Schema({
-    id: StandardFields.UUID,
-    user_id: { type: "TEXT", required: true, ref: "users" },
-    role_id: { type: "TEXT", required: true, ref: "roles" },
-    ...StandardFields.Timestamps,
-  }, {
-    indexes: [
-      { name: "idx_user_roles_user_id", columns: ["user_id"] },
-      { name: "idx_user_roles_role_id", columns: ["role_id"] },
-      { name: "idx_user_roles_unique", columns: ["user_id", "role_id"], unique: true },
-    ]
-  }),
+  userRoles: new Schema(
+    {
+      id: StandardFields.UUID,
+      user_id: { type: "TEXT", required: true, ref: "users" },
+      role_id: { type: "TEXT", required: true, ref: "roles" },
+      ...StandardFields.Timestamps,
+    },
+    {
+      indexes: [
+        { name: "idx_user_roles_user_id", columns: ["user_id"] },
+        { name: "idx_user_roles_role_id", columns: ["role_id"] },
+        {
+          name: "idx_user_roles_unique",
+          columns: ["user_id", "role_id"],
+          unique: true,
+        },
+      ],
+    },
+  ),
 
-  rolePermissions: new Schema({
-    id: StandardFields.UUID,
-    role_id: { type: "TEXT", required: true, ref: "roles" },
-    permission_id: { type: "TEXT", required: true, ref: "permissions" },
-    ...StandardFields.Timestamps,
-  }, {
-    indexes: [
-      { name: "idx_role_permissions_role_id", columns: ["role_id"] },
-      { name: "idx_role_permissions_permission_id", columns: ["permission_id"] },
-      { name: "idx_role_permissions_unique", columns: ["role_id", "permission_id"], unique: true },
-    ]
-  }),
+  rolePermissions: new Schema(
+    {
+      id: StandardFields.UUID,
+      role_id: { type: "TEXT", required: true, ref: "roles" },
+      permission_id: { type: "TEXT", required: true, ref: "permissions" },
+      ...StandardFields.Timestamps,
+    },
+    {
+      indexes: [
+        { name: "idx_role_permissions_role_id", columns: ["role_id"] },
+        {
+          name: "idx_role_permissions_permission_id",
+          columns: ["permission_id"],
+        },
+        {
+          name: "idx_role_permissions_unique",
+          columns: ["role_id", "permission_id"],
+          unique: true,
+        },
+      ],
+    },
+  ),
 
-  sessions: new Schema({
-    id: StandardFields.UUID,
-    user_id: { type: "TEXT", required: true, ref: "users" },
-    token: { type: String, required: true, unique: true },
-    created_at: { type: Date, default: Date.now },
-    expires_at: { type: Date, required: true },
-    last_activity: { type: Date, default: Date.now },
-    ip_address: String,
-    user_agent: String,
-    is_active: StandardFields.Active
-  }, {
-    indexes: [
-      { name: "idx_sessions_user_id", columns: ["user_id"] },
-      { name: "idx_sessions_token", columns: ["token"], unique: true },
-      { name: "idx_sessions_expires_at", columns: ["expires_at"] },
-      { name: "idx_sessions_active", columns: ["is_active"] },
-    ]
-  })
+  sessions: new Schema(
+    {
+      id: StandardFields.UUID,
+      user_id: { type: "TEXT", required: true, ref: "users" },
+      token: { type: String, required: true, unique: true },
+      created_at: { type: Date, default: Date.now },
+      expires_at: { type: Date, required: true },
+      last_activity: { type: Date, default: Date.now },
+      ip_address: String,
+      user_agent: String,
+      is_active: StandardFields.Active,
+    },
+    {
+      indexes: [
+        { name: "idx_sessions_user_id", columns: ["user_id"] },
+        { name: "idx_sessions_token", columns: ["token"], unique: true },
+        { name: "idx_sessions_expires_at", columns: ["expires_at"] },
+        { name: "idx_sessions_active", columns: ["is_active"] },
+      ],
+    },
+  ),
 };
 
 // constructor functions
 
 function applySchemaExtensions(
   baseSchema: TableSchema,
-  extension?: import("../config").SchemaExtension
+  extension?: import("../config").SchemaExtension,
 ): TableSchema {
   if (!extension) return baseSchema;
 
@@ -122,12 +155,14 @@ function applySchemaExtensions(
 
   if (extension.removedColumns) {
     const toRemove = new Set(extension.removedColumns);
-    columns = columns.filter(col => !toRemove.has(col.name));
+    columns = columns.filter((col) => !toRemove.has(col.name));
   }
 
   if (extension.modifiedColumns) {
-    const modifications = new Map(extension.modifiedColumns.map(c => [c.name, c]));
-    columns = columns.map(col => modifications.get(col.name) || col);
+    const modifications = new Map(
+      extension.modifiedColumns.map((c) => [c.name, c]),
+    );
+    columns = columns.map((col) => modifications.get(col.name) || col);
   }
 
   if (extension.additionalColumns) {
@@ -148,7 +183,7 @@ function updateTableReferences(
     permissions: tableNames.permissions,
     user_roles: tableNames.userRoles,
     role_permissions: tableNames.rolePermissions,
-    sessions: tableNames.sessions
+    sessions: tableNames.sessions,
   };
 
   const updatedColumns = schema.columns.map((column) => {
@@ -187,7 +222,7 @@ export function buildDatabaseSchemas(): TableSchema[] {
   const tableNames = getAllTableNames();
   const schemaExtensions = config.schemaExtensions || {};
   const schemas: TableSchema[] = [];
-  
+
   // 1. Procesar Esquemas Base
   const baseKeys = Object.keys(BASE_SCHEMAS) as (keyof typeof BASE_SCHEMAS)[];
 
@@ -195,7 +230,7 @@ export function buildDatabaseSchemas(): TableSchema[] {
     const definition = BASE_SCHEMAS[key];
     // key mapping BASE_SCHEMAS  -> config.tableNames
     //  (users -> users, roles -> roles, etc.)
-    const configKey = key as keyof DatabaseTableConfig; 
+    const configKey = key as keyof DatabaseTableConfig;
     const customTableName = tableNames[configKey];
     const extension = schemaExtensions[configKey];
 
@@ -209,20 +244,27 @@ export function buildDatabaseSchemas(): TableSchema[] {
 
   // Oauth Schemes
   const oauthKeys: (keyof DatabaseTableConfig)[] = [
-    "oauthClients", "authorizationCodes", "refreshTokens", 
-    "deviceSecrets", "biometricCredentials", "anonymousUsers", 
-    "userDevices", "mfaConfigurations", "securityChallenges", "oauthSessions",
+    "oauthClients",
+    "authorizationCodes",
+    "refreshTokens",
+    "deviceSecrets",
+    "biometricCredentials",
+    "anonymousUsers",
+    "userDevices",
+    "mfaConfigurations",
+    "securityChallenges",
+    "oauthSessions",
   ];
 
   for (const key of oauthKeys) {
     const extension = schemaExtensions[key];
     const tableName = tableNames[key];
-    
+
     if (extension?.additionalColumns?.length) {
       schemas.push({
-        tableName: tableName || key, 
+        tableName: tableName || key,
         columns: extension.additionalColumns,
-        indexes: [], 
+        indexes: [],
       });
     }
   }

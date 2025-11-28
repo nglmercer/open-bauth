@@ -34,12 +34,10 @@ beforeEach(async () => {
   // Initialize OAuth services for tests
   // Use dynamic import to avoid type compatibility issues
   const { JWTService: JWTServiceType } = await import("../src/services/jwt");
-  const { SecurityService: SecurityServiceType } = await import(
-    "../src/services/security"
-  );
-  const { OAuthService: OAuthServiceType } = await import(
-    "../src/services/oauth"
-  );
+  const { SecurityService: SecurityServiceType } =
+    await import("../src/services/security");
+  const { OAuthService: OAuthServiceType } =
+    await import("../src/services/oauth");
 
   const jwtService = new JWTServiceType(
     process.env.JWT_SECRET || "test-secret-key",

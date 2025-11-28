@@ -3,9 +3,13 @@
  * Provides transaction support across different database adapters
  */
 
-import type { IDatabaseAdapter } from './adapter';
-import type { ControllerError, DatabaseErrorType,ControllerResponse } from '../types/errors';
-import { createErrorResponse } from '../types/errors';
+import type { IDatabaseAdapter } from "./adapter";
+import type {
+  ControllerError,
+  DatabaseErrorType,
+  ControllerResponse,
+} from "../types/errors";
+import { createErrorResponse } from "../types/errors";
 
 export interface Transaction {
   id: string;
@@ -16,7 +20,11 @@ export interface Transaction {
 
 export interface TransactionOptions {
   timeout?: number; // Timeout in milliseconds
-  isolationLevel?: 'READ_UNCOMMITTED' | 'READ_COMMITTED' | 'REPEATABLE_READ' | 'SERIALIZABLE';
+  isolationLevel?:
+    | "READ_UNCOMMITTED"
+    | "READ_COMMITTED"
+    | "REPEATABLE_READ"
+    | "SERIALIZABLE";
 }
 
 export class TransactionManager {
@@ -26,7 +34,7 @@ export class TransactionManager {
 
   constructor(
     private adapter: IDatabaseAdapter,
-    private options: TransactionOptions = {}
+    private options: TransactionOptions = {},
   ) {
     // Setup periodic cleanup of abandoned transactions
     this.cleanupInterval = setInterval(() => {
@@ -41,23 +49,23 @@ export class TransactionManager {
     try {
       const connection = this.adapter.getConnection();
       const transactionId = this.generateTransactionId();
-      
+
       // Begin transaction based on database type
       await this.beginTransaction(connection);
-      
+
       const transaction: Transaction = {
         id: transactionId,
         connection,
         isActive: true,
-        createdAt: new Date()
+        createdAt: new Date(),
       };
-      
+
       this.activeTransactions.set(transactionId, transaction);
       return transaction;
     } catch (error: unknown) {
       throw createErrorResponse(error, {
-        operation: 'beginTransaction',
-        table: 'transaction'
+        operation: "beginTransaction",
+        table: "transaction",
       });
     }
   }
@@ -67,7 +75,7 @@ export class TransactionManager {
    */
   async commit(transaction: Transaction): Promise<void> {
     if (!transaction.isActive) {
-      throw new Error('Transaction is not active');
+      throw new Error("Transaction is not active");
     }
 
     try {
@@ -87,7 +95,7 @@ export class TransactionManager {
    */
   async rollback(transaction: Transaction): Promise<void> {
     if (!transaction.isActive) {
-      throw new Error('Transaction is not active');
+      throw new Error("Transaction is not active");
     }
 
     try {
@@ -106,29 +114,29 @@ export class TransactionManager {
    * Execute operations within a transaction
    */
   async transaction<T>(
-    operations: (trx: Transaction) => Promise<T>
+    operations: (trx: Transaction) => Promise<T>,
   ): Promise<ControllerResponse<T>> {
     const trx = await this.begin();
-    
+
     try {
       const result = await operations(trx);
       await this.commit(trx);
-      
+
       return {
         success: true,
-        data: result
+        data: result,
       };
     } catch (error: unknown) {
       await this.rollback(trx);
       const errorResponse = createErrorResponse(error, {
-        operation: 'transaction',
-        table: 'unknown'
+        operation: "transaction",
+        table: "unknown",
       });
-      
+
       return {
         success: false,
         error: errorResponse.error,
-        errorType: errorResponse.errorType as DatabaseErrorType
+        errorType: errorResponse.errorType as DatabaseErrorType,
       };
     }
   }
@@ -153,7 +161,7 @@ export class TransactionManager {
   cleanup(): void {
     const now = Date.now();
     const timeout = this.options.timeout || this.DEFAULT_TIMEOUT;
-    
+
     for (const [id, transaction] of this.activeTransactions) {
       if (now - transaction.createdAt.getTime() > timeout) {
         console.warn(`Cleaning up abandoned transaction: ${id}`);
@@ -169,12 +177,12 @@ export class TransactionManager {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
-    
+
     // Rollback all active transactions
     for (const transaction of this.activeTransactions.values()) {
       this.rollback(transaction).catch(console.error);
     }
-    
+
     this.activeTransactions.clear();
   }
 
@@ -190,15 +198,15 @@ export class TransactionManager {
    */
   private async beginTransaction(connection: any): Promise<void> {
     const dbType = this.adapter.getDatabaseType();
-    
+
     if (dbType.isSQLite) {
-      await connection.query('BEGIN TRANSACTION').run();
+      await connection.query("BEGIN TRANSACTION").run();
     } else if (dbType.isSQLServer) {
       // SQL Server specific transaction begin
-      await connection.query('BEGIN TRANSACTION').run();
+      await connection.query("BEGIN TRANSACTION").run();
     } else {
       // PostgreSQL and others
-      await connection.query('BEGIN').run();
+      await connection.query("BEGIN").run();
     }
   }
 
@@ -206,14 +214,14 @@ export class TransactionManager {
    * Commit transaction based on database type
    */
   private async commitTransaction(connection: any): Promise<void> {
-    await connection.query('COMMIT').run();
+    await connection.query("COMMIT").run();
   }
 
   /**
    * Rollback transaction based on database type
    */
   private async rollbackTransaction(connection: any): Promise<void> {
-    await connection.query('ROLLBACK').run();
+    await connection.query("ROLLBACK").run();
   }
 }
 
@@ -225,16 +233,19 @@ export abstract class TransactionalController {
 
   constructor(
     protected adapter: IDatabaseAdapter,
-    transactionOptions?: TransactionOptions
+    transactionOptions?: TransactionOptions,
   ) {
-    this.transactionManager = new TransactionManager(adapter, transactionOptions);
+    this.transactionManager = new TransactionManager(
+      adapter,
+      transactionOptions,
+    );
   }
 
   /**
    * Execute operations within a transaction
    */
   protected async executeInTransaction<T>(
-    operations: (trx: Transaction) => Promise<T>
+    operations: (trx: Transaction) => Promise<T>,
   ): Promise<ControllerResponse<T>> {
     return this.transactionManager.transaction(operations);
   }

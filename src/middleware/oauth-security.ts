@@ -27,7 +27,7 @@ export class OAuthSecurityMiddleware {
   constructor(
     oauthService: OAuthService,
     securityService: SecurityService,
-    jwtService: JWTService
+    jwtService: JWTService,
   ) {
     this.oauthService = oauthService;
     this.securityService = securityService;
@@ -39,7 +39,7 @@ export class OAuthSecurityMiddleware {
    */
   async validateAuthorizationRequest(
     request: AuthorizationRequest,
-    client?: OAuthClient
+    client?: OAuthClient,
   ): Promise<{
     valid: boolean;
     error?: OAuthErrorType;
@@ -68,11 +68,12 @@ export class OAuthSecurityMiddleware {
       if (client) {
         // Validate redirect URI
         if (request.redirect_uri) {
-          const isValidRedirectUri = await this.oauthService.validateRedirectUri(
-            request.client_id,
-            request.redirect_uri
-          );
-          
+          const isValidRedirectUri =
+            await this.oauthService.validateRedirectUri(
+              request.client_id,
+              request.redirect_uri,
+            );
+
           if (!isValidRedirectUri) {
             return {
               valid: false,
@@ -83,7 +84,9 @@ export class OAuthSecurityMiddleware {
         }
 
         // Validate response type
-        const responseTypes = JSON.parse((client as any).response_types || "[]");
+        const responseTypes = JSON.parse(
+          (client as any).response_types || "[]",
+        );
         if (!responseTypes.includes(request.response_type)) {
           return {
             valid: false,
@@ -96,7 +99,7 @@ export class OAuthSecurityMiddleware {
         if (request.scope) {
           const clientScopes = client.scope ? client.scope.split(" ") : [];
           const requestedScopes = request.scope.split(" ");
-          
+
           for (const scope of requestedScopes) {
             if (!clientScopes.includes(scope)) {
               return {
@@ -155,7 +158,7 @@ export class OAuthSecurityMiddleware {
    */
   async validateTokenRequest(
     request: TokenRequest,
-    client?: OAuthClient
+    client?: OAuthClient,
   ): Promise<{
     valid: boolean;
     error?: OAuthErrorType;
@@ -182,7 +185,9 @@ export class OAuthSecurityMiddleware {
       }
 
       // Validate grant type
-      const supportedGrantTypes = JSON.parse((client as any).grant_types || "[]");
+      const supportedGrantTypes = JSON.parse(
+        (client as any).grant_types || "[]",
+      );
       if (!supportedGrantTypes.includes(request.grant_type)) {
         return {
           valid: false,
@@ -218,7 +223,7 @@ export class OAuthSecurityMiddleware {
           break;
 
         case "password":
-          if (!((request as any).username) || !((request as any).password)) {
+          if (!(request as any).username || !(request as any).password) {
             return {
               valid: false,
               error: OAuthErrorType.INVALID_REQUEST,
@@ -258,7 +263,7 @@ export class OAuthSecurityMiddleware {
    */
   async verifyState(
     state: string,
-    storedState?: string
+    storedState?: string,
   ): Promise<{
     valid: boolean;
     error?: string;
@@ -289,7 +294,7 @@ export class OAuthSecurityMiddleware {
    */
   async verifyNonce(
     nonce: string,
-    usedNonces: Set<string>
+    usedNonces: Set<string>,
   ): Promise<{
     valid: boolean;
     error?: string;
@@ -313,7 +318,7 @@ export class OAuthSecurityMiddleware {
       const noncesArray = Array.from(usedNonces);
       usedNonces.clear();
       // Keep only the most recent 500 nonces
-      noncesArray.slice(-500).forEach(n => usedNonces.add(n));
+      noncesArray.slice(-500).forEach((n) => usedNonces.add(n));
     }
 
     return { valid: true };
@@ -324,7 +329,7 @@ export class OAuthSecurityMiddleware {
    */
   async verifyDPoP(
     request: AuthRequest,
-    accessToken?: string
+    accessToken?: string,
   ): Promise<{
     valid: boolean;
     error?: string;
@@ -332,7 +337,7 @@ export class OAuthSecurityMiddleware {
   }> {
     try {
       const dpopHeader = request.headers["dpop"];
-      
+
       if (!dpopHeader) {
         return { valid: true }; // DPoP is optional
       }
@@ -352,7 +357,7 @@ export class OAuthSecurityMiddleware {
       const dpopResult = await this.jwtService.verifyDPoPProof(
         dpopHeader,
         httpMethod,
-        httpUri
+        httpUri,
       );
 
       if (!dpopResult.valid) {
@@ -386,7 +391,7 @@ export class OAuthSecurityMiddleware {
   async createChallenge(
     type: ChallengeType,
     data: any,
-    expiresInMinutes: number = 10
+    expiresInMinutes: number = 10,
   ): Promise<{
     success: boolean;
     challenge?: SecurityChallenge;
@@ -396,7 +401,7 @@ export class OAuthSecurityMiddleware {
       const challengeData = this.securityService.createChallenge(
         type,
         data,
-        expiresInMinutes
+        expiresInMinutes,
       );
 
       // In a real implementation, you would store this in the database
@@ -423,7 +428,7 @@ export class OAuthSecurityMiddleware {
    */
   async verifyChallenge(
     challengeId: string,
-    solution: any
+    solution: any,
   ): Promise<{
     success: boolean;
     error?: string;
@@ -468,7 +473,7 @@ export class OAuthSecurityMiddleware {
     clientId?: string,
     details?: any,
     ipAddress?: string,
-    userAgent?: string
+    userAgent?: string,
   ): Promise<void> {
     try {
       const logEntry = {
@@ -494,7 +499,7 @@ export class OAuthSecurityMiddleware {
   async detectSuspiciousActivity(
     userId: string,
     ipAddress: string,
-    userAgent?: string
+    userAgent?: string,
   ): Promise<{
     suspicious: boolean;
     reasons?: string[];
@@ -562,7 +567,7 @@ export class OAuthSecurityMiddleware {
     userId?: string,
     ipAddress?: string,
     windowMinutes: number = 15,
-    maxRequests: number = 100
+    maxRequests: number = 100,
   ): Promise<{
     allowed: boolean;
     remainingRequests?: number;
@@ -571,7 +576,7 @@ export class OAuthSecurityMiddleware {
     try {
       // In a real implementation, you would check against a rate limiting store
       // const requestCount = await this.getRequestCount(clientId, userId, ipAddress, windowMinutes);
-      
+
       // For demonstration, we'll always allow requests
       const requestCount = 0;
       const remainingRequests = Math.max(0, maxRequests - requestCount);
@@ -595,7 +600,7 @@ export class OAuthSecurityMiddleware {
 export function createOAuthSecurityMiddleware(
   oauthService: OAuthService,
   securityService: SecurityService,
-  jwtService: JWTService
+  jwtService: JWTService,
 ): OAuthSecurityMiddleware {
   return new OAuthSecurityMiddleware(oauthService, securityService, jwtService);
 }

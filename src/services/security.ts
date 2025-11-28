@@ -30,7 +30,7 @@ export class SecurityService {
 
     if (method === PKCEMethod.S256) {
       codeChallenge = this.base64UrlEncode(
-        createHash("sha256").update(codeVerifier).digest()
+        createHash("sha256").update(codeVerifier).digest(),
       );
     } else {
       codeChallenge = codeVerifier;
@@ -49,13 +49,13 @@ export class SecurityService {
   verifyPKCEChallenge(
     codeVerifier: string,
     codeChallenge: string,
-    method: PKCEMethod
+    method: PKCEMethod,
   ): boolean {
     let expectedChallenge: string;
 
     if (method === PKCEMethod.S256) {
       expectedChallenge = this.base64UrlEncode(
-        createHash("sha256").update(codeVerifier).digest()
+        createHash("sha256").update(codeVerifier).digest(),
       );
     } else {
       expectedChallenge = codeVerifier;
@@ -93,7 +93,7 @@ export class SecurityService {
     httpMethod: string,
     httpUri: string,
     privateKey: CryptoKey,
-    jkt?: string
+    jkt?: string,
   ): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
     const jti = this.generateRandomString(16);
@@ -119,7 +119,7 @@ export class SecurityService {
 
     const signature = await this.signJWT(
       `${encodedHeader}.${encodedPayload}`,
-      privateKey
+      privateKey,
     );
 
     return `${encodedHeader}.${encodedPayload}.${signature}`;
@@ -132,7 +132,7 @@ export class SecurityService {
     dpopProof: string,
     httpMethod: string,
     httpUri: string,
-    publicKey?: CryptoKey
+    publicKey?: CryptoKey,
   ): Promise<{
     valid: boolean;
     payload?: DPoPProof;
@@ -146,7 +146,9 @@ export class SecurityService {
 
       const [encodedHeader, encodedPayload, signature] = parts;
       const header = JSON.parse(this.base64UrlDecode(encodedHeader));
-      const payload: DPoPProof = JSON.parse(this.base64UrlDecode(encodedPayload));
+      const payload: DPoPProof = JSON.parse(
+        this.base64UrlDecode(encodedPayload),
+      );
 
       // Verify required fields
       if (!payload.htu || !payload.htm || !payload.iat || !payload.jti) {
@@ -174,7 +176,7 @@ export class SecurityService {
         const isValid = await this.verifyJWTSignature(
           `${encodedHeader}.${encodedPayload}`,
           signature,
-          publicKey
+          publicKey,
         );
 
         if (!isValid) {
@@ -194,11 +196,11 @@ export class SecurityService {
   createChallenge(
     type: ChallengeType,
     data: any,
-    expiresInMinutes: number = this.CHALLENGE_EXPIRY_MINUTES
+    expiresInMinutes: number = this.CHALLENGE_EXPIRY_MINUTES,
   ): Omit<SecurityChallenge, "id" | "created_at"> {
     const challengeId = this.generateRandomString(32);
     const expiresAt = new Date(
-      Date.now() + expiresInMinutes * 60 * 1000
+      Date.now() + expiresInMinutes * 60 * 1000,
     ).toISOString();
 
     return {
@@ -215,7 +217,7 @@ export class SecurityService {
    */
   verifyChallenge(
     challenge: SecurityChallenge,
-    solution: any
+    solution: any,
   ): { valid: boolean; error?: string } {
     // Check if challenge is expired
     if (new Date() > new Date(challenge.expires_at)) {
@@ -230,7 +232,7 @@ export class SecurityService {
     // Verify solution based on challenge type
     try {
       const challengeData = JSON.parse(challenge.challenge_data);
-      
+
       switch (challenge.challenge_type) {
         case "captcha":
           return this.verifyCaptchaChallenge(challengeData, solution);
@@ -262,7 +264,10 @@ export class SecurityService {
   /**
    * Hash a password using a secure algorithm
    */
-  async hashPassword(password: string, salt?: string): Promise<{
+  async hashPassword(
+    password: string,
+    salt?: string,
+  ): Promise<{
     hash: string;
     salt: string;
   }> {
@@ -270,14 +275,18 @@ export class SecurityService {
     const hash = createHmac("sha512", passwordSalt)
       .update(password)
       .digest("hex");
-    
+
     return { hash, salt: passwordSalt };
   }
 
   /**
    * Verify a password against its hash
    */
-  async verifyPassword(password: string, hash: string, salt: string): Promise<boolean> {
+  async verifyPassword(
+    password: string,
+    hash: string,
+    salt: string,
+  ): Promise<boolean> {
     const { hash: computedHash } = await this.hashPassword(password, salt);
     return computedHash === hash;
   }
@@ -288,17 +297,22 @@ export class SecurityService {
   async encrypt(data: string, key: string): Promise<string> {
     const iv = randomBytes(16);
     // Ensure we have a 32-byte key for AES-256
-    const keyBuffer = Buffer.isBuffer(key) ? key : Buffer.from(key, 'hex');
-    const finalKey = keyBuffer.length < 32 ?
-      Buffer.concat([keyBuffer, Buffer.alloc(32 - keyBuffer.length)]) :
-      keyBuffer.slice(0, 32);
-    
-    const cipher = require("crypto").createCipheriv("aes-256-gcm", finalKey, iv);
+    const keyBuffer = Buffer.isBuffer(key) ? key : Buffer.from(key, "hex");
+    const finalKey =
+      keyBuffer.length < 32
+        ? Buffer.concat([keyBuffer, Buffer.alloc(32 - keyBuffer.length)])
+        : keyBuffer.slice(0, 32);
+
+    const cipher = require("crypto").createCipheriv(
+      "aes-256-gcm",
+      finalKey,
+      iv,
+    );
     cipher.setAAD(Buffer.from("additional-data"));
-    
+
     let encrypted = cipher.update(data, "utf8", "hex");
     encrypted += cipher.final("hex");
-    
+
     const authTag = cipher.getAuthTag();
     return iv.toString("hex") + ":" + authTag.toString("hex") + ":" + encrypted;
   }
@@ -311,24 +325,29 @@ export class SecurityService {
     if (parts.length !== 3) {
       throw new Error("Invalid encrypted data format");
     }
-    
+
     const iv = Buffer.from(parts[0], "hex");
     const authTag = Buffer.from(parts[1], "hex");
     const encrypted = parts[2];
-    
+
     // Ensure we have a 32-byte key for AES-256
-    const keyBuffer = Buffer.isBuffer(key) ? key : Buffer.from(key, 'hex');
-    const finalKey = keyBuffer.length < 32 ?
-      Buffer.concat([keyBuffer, Buffer.alloc(32 - keyBuffer.length)]) :
-      keyBuffer.slice(0, 32);
-    
-    const decipher = require("crypto").createDecipheriv("aes-256-gcm", finalKey, iv);
+    const keyBuffer = Buffer.isBuffer(key) ? key : Buffer.from(key, "hex");
+    const finalKey =
+      keyBuffer.length < 32
+        ? Buffer.concat([keyBuffer, Buffer.alloc(32 - keyBuffer.length)])
+        : keyBuffer.slice(0, 32);
+
+    const decipher = require("crypto").createDecipheriv(
+      "aes-256-gcm",
+      finalKey,
+      iv,
+    );
     decipher.setAAD(Buffer.from("additional-data"));
     decipher.setAuthTag(authTag);
-    
+
     let decrypted = decipher.update(encrypted, "hex", "utf8");
     decrypted += decipher.final("utf8");
-    
+
     return decrypted;
   }
 
@@ -336,14 +355,11 @@ export class SecurityService {
    * Base64 URL-safe encoding
    */
   private base64UrlEncode(data: string | Buffer): string {
-    const base64 = Buffer.isBuffer(data) 
+    const base64 = Buffer.isBuffer(data)
       ? data.toString("base64")
       : Buffer.from(data).toString("base64");
-    
-    return base64
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=/g, "");
+
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
   }
 
   /**
@@ -355,11 +371,9 @@ export class SecurityService {
     while (padded.length % 4) {
       padded += "=";
     }
-    
-    const base64 = padded
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
-    
+
+    const base64 = padded.replace(/-/g, "+").replace(/_/g, "/");
+
     return Buffer.from(base64, "base64").toString("utf8");
   }
 
@@ -378,9 +392,9 @@ export class SecurityService {
     const signature = await crypto.subtle.sign(
       { name: "ECDSA", hash: "SHA-256" },
       privateKey,
-      encoder.encode(data)
+      encoder.encode(data),
     );
-    
+
     return this.base64UrlEncode(Buffer.from(signature));
   }
 
@@ -390,19 +404,22 @@ export class SecurityService {
   private async verifyJWTSignature(
     data: string,
     signature: string,
-    publicKey: CryptoKey
+    publicKey: CryptoKey,
   ): Promise<boolean> {
     try {
       const encoder = new TextEncoder();
-      const signatureBuffer = Buffer.from(this.base64UrlDecode(signature), "base64");
-      
+      const signatureBuffer = Buffer.from(
+        this.base64UrlDecode(signature),
+        "base64",
+      );
+
       const isValid = await crypto.subtle.verify(
         { name: "ECDSA", hash: "SHA-256" },
         publicKey,
         signatureBuffer,
-        encoder.encode(data)
+        encoder.encode(data),
       );
-      
+
       return isValid;
     } catch (error) {
       return false;
@@ -412,67 +429,85 @@ export class SecurityService {
   /**
    * Challenge verification methods
    */
-  private verifyCaptchaChallenge(challengeData: any, solution: any): { valid: boolean; error?: string } {
+  private verifyCaptchaChallenge(
+    challengeData: any,
+    solution: any,
+  ): { valid: boolean; error?: string } {
     // Implementation would depend on the captcha service used
     // This is a placeholder for demonstration
     if (!solution || typeof solution !== "string") {
       return { valid: false, error: "Invalid captcha solution" };
     }
-    
+
     // In a real implementation, you would verify with the captcha service
     return { valid: true };
   }
 
-  private verifyBiometricChallenge(challengeData: any, solution: any): { valid: boolean; error?: string } {
+  private verifyBiometricChallenge(
+    challengeData: any,
+    solution: any,
+  ): { valid: boolean; error?: string } {
     // Implementation would depend on the biometric service used
     // This is a placeholder for demonstration
     if (!solution || !solution.biometricData) {
       return { valid: false, error: "Invalid biometric data" };
     }
-    
+
     // In a real implementation, you would verify the biometric data
     return { valid: true };
   }
 
-  private verifyDeviceChallenge(challengeData: any, solution: any): { valid: boolean; error?: string } {
+  private verifyDeviceChallenge(
+    challengeData: any,
+    solution: any,
+  ): { valid: boolean; error?: string } {
     // Implementation would verify device signature or certificate
     if (!solution || !solution.deviceSignature) {
       return { valid: false, error: "Invalid device signature" };
     }
-    
+
     // In a real implementation, you would verify the device signature
     return { valid: true };
   }
 
-  private verifyEmailChallenge(challengeData: any, solution: any): { valid: boolean; error?: string } {
+  private verifyEmailChallenge(
+    challengeData: any,
+    solution: any,
+  ): { valid: boolean; error?: string } {
     if (!solution || !solution.code) {
       return { valid: false, error: "Invalid verification code" };
     }
-    
+
     if (solution.code !== challengeData.expectedCode) {
       return { valid: false, error: "Incorrect verification code" };
     }
-    
+
     return { valid: true };
   }
 
-  private verifySMSChallenge(challengeData: any, solution: any): { valid: boolean; error?: string } {
+  private verifySMSChallenge(
+    challengeData: any,
+    solution: any,
+  ): { valid: boolean; error?: string } {
     if (!solution || !solution.code) {
       return { valid: false, error: "Invalid verification code" };
     }
-    
+
     if (solution.code !== challengeData.expectedCode) {
       return { valid: false, error: "Incorrect verification code" };
     }
-    
+
     return { valid: true };
   }
 
-  private verifyMFAChallenge(challengeData: any, solution: any): { valid: boolean; error?: string } {
+  private verifyMFAChallenge(
+    challengeData: any,
+    solution: any,
+  ): { valid: boolean; error?: string } {
     if (!solution || !solution.token) {
       return { valid: false, error: "Invalid MFA token" };
     }
-    
+
     // In a real implementation, you would verify the TOTP token
     // This is a placeholder for demonstration
     return { valid: true };

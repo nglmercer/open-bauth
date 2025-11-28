@@ -1,11 +1,15 @@
-import type { ColumnDefinition, ColumnType, TableSchema } from "../base-controller.ts";
+import type {
+  ColumnDefinition,
+  ColumnType,
+  TableSchema,
+} from "../base-controller.ts";
 
-type ConstructorType = 
-  | StringConstructor 
-  | NumberConstructor 
-  | BooleanConstructor 
-  | DateConstructor 
-  | ObjectConstructor 
+type ConstructorType =
+  | StringConstructor
+  | NumberConstructor
+  | BooleanConstructor
+  | DateConstructor
+  | ObjectConstructor
   | ArrayConstructor
   | BufferConstructor;
 
@@ -34,10 +38,10 @@ export interface SchemaTypeOptions {
   check?: string;
 }
 
-type SchemaField = 
-  | ConstructorType 
-  | SchemaTypeOptions 
-  | { [key: string]: SchemaField } 
+type SchemaField =
+  | ConstructorType
+  | SchemaTypeOptions
+  | { [key: string]: SchemaField }
   | SchemaField[];
 
 export interface SchemaDefinition {
@@ -60,7 +64,7 @@ export class Schema {
     return {
       tableName,
       columns,
-      indexes: indexes.length > 0 ? indexes : undefined
+      indexes: indexes.length > 0 ? indexes : undefined,
     };
   }
 
@@ -90,10 +94,10 @@ export class Schema {
 
     // Convertir índices a opciones
     if (tableSchema.indexes && tableSchema.indexes.length > 0) {
-      options.indexes = tableSchema.indexes.map(index => ({
+      options.indexes = tableSchema.indexes.map((index) => ({
         name: index.name,
         columns: index.columns,
-        unique: index.unique
+        unique: index.unique,
       }));
     }
 
@@ -106,14 +110,17 @@ export class Schema {
   public equals(other: Schema, tableName: string = "test"): boolean {
     const thisTableSchema = this.toTableSchema(tableName);
     const otherTableSchema = other.toTableSchema(tableName);
-    
+
     return this.compareTableSchemas(thisTableSchema, otherTableSchema);
   }
 
   /**
    * Compara dos TableSchemas para verificar si son equivalentes
    */
-  public static compareTableSchemas(schema1: TableSchema, schema2: TableSchema): boolean {
+  public static compareTableSchemas(
+    schema1: TableSchema,
+    schema2: TableSchema,
+  ): boolean {
     // Comparar tableName
     if (schema1.tableName !== schema2.tableName) {
       return false;
@@ -125,7 +132,7 @@ export class Schema {
     }
 
     for (const col1 of schema1.columns) {
-      const col2 = schema2.columns.find(c => c.name === col1.name);
+      const col2 = schema2.columns.find((c) => c.name === col1.name);
       if (!col2) {
         return false;
       }
@@ -144,14 +151,16 @@ export class Schema {
     }
 
     for (const idx1 of indexes1) {
-      const idx2 = indexes2.find(i => i.name === idx1.name);
+      const idx2 = indexes2.find((i) => i.name === idx1.name);
       if (!idx2) {
         return false;
       }
 
-      if (idx1.columns.length !== idx2.columns.length ||
-          !idx1.columns.every(col => idx2.columns.includes(col)) ||
-          idx1.unique !== idx2.unique) {
+      if (
+        idx1.columns.length !== idx2.columns.length ||
+        !idx1.columns.every((col) => idx2.columns.includes(col)) ||
+        idx1.unique !== idx2.unique
+      ) {
         return false;
       }
     }
@@ -159,9 +168,11 @@ export class Schema {
     return true;
   }
 
-  private static convertColumnToSchemaField(column: ColumnDefinition): SchemaField {
+  private static convertColumnToSchemaField(
+    column: ColumnDefinition,
+  ): SchemaField {
     const field: SchemaTypeOptions = {
-      type: this.mapSQLToConstructor(column.type)
+      type: this.mapSQLToConstructor(column.type),
     };
 
     if (column.primaryKey) {
@@ -182,7 +193,10 @@ export class Schema {
     if (column.defaultValue !== undefined) {
       if (column.defaultValue === "CURRENT_TIMESTAMP") {
         field.default = Date.now;
-      } else if (typeof column.defaultValue === 'object' && column.defaultValue !== null) {
+      } else if (
+        typeof column.defaultValue === "object" &&
+        column.defaultValue !== null
+      ) {
         // Para objetos, hacer una copia profunda para evitar problemas de referencia
         field.default = JSON.parse(JSON.stringify(column.defaultValue));
       } else {
@@ -197,7 +211,9 @@ export class Schema {
     return field;
   }
 
-  private static mapSQLToConstructor(type: ColumnType): ConstructorType | ColumnType {
+  private static mapSQLToConstructor(
+    type: ColumnType,
+  ): ConstructorType | ColumnType {
     switch (type) {
       case "TEXT":
       case "VARCHAR":
@@ -220,14 +236,21 @@ export class Schema {
     }
   }
 
-  private static compareColumns(col1: ColumnDefinition, col2: ColumnDefinition): boolean {
+  private static compareColumns(
+    col1: ColumnDefinition,
+    col2: ColumnDefinition,
+  ): boolean {
     // Comparar propiedades básicas
     if (col1.name !== col2.name || col1.type !== col2.type) {
       return false;
     }
 
     // Comparar booleanos
-    const boolProps: (keyof ColumnDefinition)[] = ['primaryKey', 'notNull', 'unique'];
+    const boolProps: (keyof ColumnDefinition)[] = [
+      "primaryKey",
+      "notNull",
+      "unique",
+    ];
     for (const prop of boolProps) {
       if (col1[prop] !== col2[prop]) {
         return false;
@@ -237,13 +260,25 @@ export class Schema {
     // Comparar defaultValue
     if (col1.defaultValue !== col2.defaultValue) {
       // Manejar casos especiales como CURRENT_TIMESTAMP
-      if (col1.defaultValue === "CURRENT_TIMESTAMP" && col2.defaultValue === "CURRENT_TIMESTAMP") {
+      if (
+        col1.defaultValue === "CURRENT_TIMESTAMP" &&
+        col2.defaultValue === "CURRENT_TIMESTAMP"
+      ) {
         // OK, son iguales
-      } else if (col1.defaultValue === Date.now && col2.defaultValue === Date.now) {
+      } else if (
+        col1.defaultValue === Date.now &&
+        col2.defaultValue === Date.now
+      ) {
         // OK, son iguales
-      } else if (typeof col1.defaultValue === 'object' && typeof col2.defaultValue === 'object') {
+      } else if (
+        typeof col1.defaultValue === "object" &&
+        typeof col2.defaultValue === "object"
+      ) {
         // Comparar objetos usando JSON.stringify
-        if (JSON.stringify(col1.defaultValue) !== JSON.stringify(col2.defaultValue)) {
+        if (
+          JSON.stringify(col1.defaultValue) !==
+          JSON.stringify(col2.defaultValue)
+        ) {
           return false;
         }
         // OK, los objetos son iguales
@@ -259,8 +294,10 @@ export class Schema {
 
     // Comparar references
     if (col1.references && col2.references) {
-      if (col1.references.table !== col2.references.table ||
-          col1.references.column !== col2.references.column) {
+      if (
+        col1.references.table !== col2.references.table ||
+        col1.references.column !== col2.references.column
+      ) {
         return false;
       }
     } else if (col1.references || col2.references) {
@@ -271,13 +308,16 @@ export class Schema {
     return true;
   }
 
-  private compareTableSchemas(schema1: TableSchema, schema2: TableSchema): boolean {
+  private compareTableSchemas(
+    schema1: TableSchema,
+    schema2: TableSchema,
+  ): boolean {
     return Schema.compareTableSchemas(schema1, schema2);
   }
 
   private parseColumns(): ColumnDefinition[] {
-    return Object.entries(this.definition).map(([name, value]) => 
-      this.parseField(name, value)
+    return Object.entries(this.definition).map(([name, value]) =>
+      this.parseField(name, value),
     );
   }
 
@@ -293,8 +333,12 @@ export class Schema {
       return { name, type: "TEXT", defaultValue: "[]" };
     }
 
-    if (typeof value === "object" && !value.type && !this.isConstructor(value)) {
-       return { name, type: "TEXT", defaultValue: "{}" };
+    if (
+      typeof value === "object" &&
+      !value.type &&
+      !this.isConstructor(value)
+    ) {
+      return { name, type: "TEXT", defaultValue: "{}" };
     }
 
     if (typeof value === "object" && value.type) {
@@ -317,12 +361,12 @@ export class Schema {
       } else if (value.ref) {
         sqlColumn.references = { table: value.ref, column: "id" };
       }
-      
+
       if (value.default !== undefined) {
         if (value.default === Date.now) {
           sqlColumn.defaultValue = "CURRENT_TIMESTAMP";
-        } else if (typeof value.default === 'function') {
-           sqlColumn.defaultValue = value.default(); 
+        } else if (typeof value.default === "function") {
+          sqlColumn.defaultValue = value.default();
         } else {
           sqlColumn.defaultValue = value.default;
         }
@@ -335,21 +379,30 @@ export class Schema {
   }
 
   private isConstructor(value: any): boolean {
-    return [String, Number, Boolean, Date, Object, Array, Buffer].includes(value);
+    return [String, Number, Boolean, Date, Object, Array, Buffer].includes(
+      value,
+    );
   }
 
   private mapConstructorToSQL(type: any): ColumnType {
     if (typeof type === "string") return type as ColumnType;
 
     switch (type) {
-      case String: return "TEXT";
-      case Number: return "INTEGER";
-      case Boolean: return "BOOLEAN";
-      case Date: return "DATETIME";
+      case String:
+        return "TEXT";
+      case Number:
+        return "INTEGER";
+      case Boolean:
+        return "BOOLEAN";
+      case Date:
+        return "DATETIME";
       case Object:
-      case Array: return "TEXT";
-      case Buffer: return "BLOB";
-      default: return "TEXT";
+      case Array:
+        return "TEXT";
+      case Buffer:
+        return "BLOB";
+      default:
+        return "TEXT";
     }
   }
 }

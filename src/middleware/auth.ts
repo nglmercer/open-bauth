@@ -1,9 +1,14 @@
 // src/middleware/auth.ts
 
-import { JWTService } from '../services/jwt';
-import { AuthService } from '../services/auth';
-import { PermissionService } from '../services/permissions';
-import type { AuthContext, PermissionOptions, AuthRequest, User } from '../types/auth';
+import { JWTService } from "../services/jwt";
+import { AuthService } from "../services/auth";
+import { PermissionService } from "../services/permissions";
+import type {
+  AuthContext,
+  PermissionOptions,
+  AuthRequest,
+  User,
+} from "../types/auth";
 
 // --- Dependencias (Singleton Pattern) ---
 // En una aplicación real, usarías inyección de dependencias.
@@ -33,33 +38,56 @@ import type { AuthContext, PermissionOptions, AuthRequest, User } from '../types
  */
 export async function authenticateRequest(
   request: AuthRequest,
-  services: { jwtService: JWTService, authService: AuthService, permissionService: PermissionService }
-): Promise<{ success: boolean; context?: AuthContext; error?: string; statusCode?: number }> {
-
-  const tokenHeader = request.headers['authorization'];
+  services: {
+    jwtService: JWTService;
+    authService: AuthService;
+    permissionService: PermissionService;
+  },
+): Promise<{
+  success: boolean;
+  context?: AuthContext;
+  error?: string;
+  statusCode?: number;
+}> {
+  const tokenHeader = request.headers["authorization"];
   if (!tokenHeader) {
-    return { success: false, error: 'Authorization header is missing', statusCode: 401 };
+    return {
+      success: false,
+      error: "Authorization header is missing",
+      statusCode: 401,
+    };
   }
 
   const token = services.jwtService.extractTokenFromHeader(tokenHeader);
   if (!token) {
-    return { success: false, error: 'Bearer token is missing or malformed', statusCode: 401 };
+    return {
+      success: false,
+      error: "Bearer token is missing or malformed",
+      statusCode: 401,
+    };
   }
 
   try {
     const payload = await services.jwtService.verifyToken(token);
-    const user = await services.authService.findUserById(payload.userId, { includeRoles: true });
+    const user = await services.authService.findUserById(payload.userId, {
+      includeRoles: true,
+    });
 
     if (!user || !user.is_active) {
-      return { success: false, error: 'User not found or is inactive', statusCode: 401 };
+      return {
+        success: false,
+        error: "User not found or is inactive",
+        statusCode: 401,
+      };
     }
 
     // Obtener todos los permisos del usuario a través de sus roles
     const userRoles = await services.authService.getUserRoles(user.id);
     let userPermissions: string[] = [];
     for (const role of userRoles) {
-        const rolePermissions = await services.permissionService.getRolePermissions(role.id);
-        userPermissions.push(...rolePermissions.map(p => p.name));
+      const rolePermissions =
+        await services.permissionService.getRolePermissions(role.id);
+      userPermissions.push(...rolePermissions.map((p) => p.name));
     }
     // Eliminar duplicados
     userPermissions = [...new Set(userPermissions)];
@@ -72,9 +100,12 @@ export async function authenticateRequest(
     };
 
     return { success: true, context: context };
-
   } catch (error: any) {
-    return { success: false, error: 'Invalid or expired token', statusCode: 401 };
+    return {
+      success: false,
+      error: "Invalid or expired token",
+      statusCode: 401,
+    };
   }
 }
 
@@ -86,12 +117,17 @@ export async function authenticateRequest(
  *                   Si es `false`, intentará autenticar pero continuará si no hay token.
  */
 export function createAuthMiddleware(
-    services: { jwtService: JWTService, authService: AuthService, permissionService: PermissionService },
-    required: boolean = true
+  services: {
+    jwtService: JWTService;
+    authService: AuthService;
+    permissionService: PermissionService;
+  },
+  required: boolean = true,
 ) {
-  return async (context: any) => { // 'context' es 'c' en Hono, o el objeto de contexto en Elysia
+  return async (context: any) => {
+    // 'context' es 'c' en Hono, o el objeto de contexto en Elysia
     const request: AuthRequest = { headers: context.request.headers };
-    
+
     const result = await authenticateRequest(request, services);
 
     if (result.success) {
@@ -100,16 +136,19 @@ export function createAuthMiddleware(
     }
 
     if (required) {
-        context.set.status = result.statusCode || 401;
-        return { success: false, error: result.error };
+      context.set.status = result.statusCode || 401;
+      return { success: false, error: result.error };
     } else {
-        // Autenticación opcional: si falla, simplemente crea un contexto de invitado y continúa
-        context.auth = { user: undefined, isAuthenticated: false, permissions: [] };
-        return;
+      // Autenticación opcional: si falla, simplemente crea un contexto de invitado y continúa
+      context.auth = {
+        user: undefined,
+        isAuthenticated: false,
+        permissions: [],
+      };
+      return;
     }
   };
 }
-
 
 /**
  * Factory para crear un middleware de autorización basado en permisos.
@@ -122,28 +161,32 @@ export function createAuthMiddleware(
 export function createPermissionMiddleware(
   services: { permissionService: PermissionService },
   requiredPermissions: string[],
-  options: PermissionOptions = { requireAll: false }
+  options: PermissionOptions = { requireAll: false },
 ) {
   return async (context: any) => {
     const authContext: AuthContext | undefined = context.auth;
 
     if (!authContext?.isAuthenticated || !authContext.user) {
-        context.set.status = 401;
-        return { success: false, error: 'Authentication required' };
+      context.set.status = 401;
+      return { success: false, error: "Authentication required" };
     }
 
     let hasPermission = false;
     if (options.requireAll) {
       // El usuario debe tener TODOS los permisos de la lista
-      hasPermission = requiredPermissions.every(p => authContext.permissions.includes(p));
+      hasPermission = requiredPermissions.every((p) =>
+        authContext.permissions.includes(p),
+      );
     } else {
       // El usuario debe tener AL MENOS UNO de los permisos de la lista
-      hasPermission = requiredPermissions.some(p => authContext.permissions.includes(p));
+      hasPermission = requiredPermissions.some((p) =>
+        authContext.permissions.includes(p),
+      );
     }
 
     if (!hasPermission) {
-        context.set.status = 403; // Forbidden
-        return { success: false, error: 'Insufficient permissions' };
+      context.set.status = 403; // Forbidden
+      return { success: false, error: "Insufficient permissions" };
     }
 
     return; // El usuario tiene permiso, continuar
@@ -157,22 +200,27 @@ export function createPermissionMiddleware(
  * @param requiredRoles - Array de nombres de roles requeridos.
  */
 export function createRoleMiddleware(requiredRoles: string[]) {
-    return async (context: any) => {
-        const authContext: AuthContext | undefined = context.auth;
+  return async (context: any) => {
+    const authContext: AuthContext | undefined = context.auth;
 
-        if (!authContext?.isAuthenticated || !authContext.user?.roles) {
-            context.set.status = 401;
-            return { success: false, error: 'Authentication required' };
-        }
-
-        const userRoleNames = authContext.user.roles.map(r => r.name);
-        const hasRole = requiredRoles.some(requiredRole => userRoleNames.includes(requiredRole));
-        
-        if (!hasRole) {
-            context.set.status = 403;
-            return { success: false, error: 'Access denied. Required role not found.' };
-        }
-
-        return; // El usuario tiene el rol, continuar
+    if (!authContext?.isAuthenticated || !authContext.user?.roles) {
+      context.set.status = 401;
+      return { success: false, error: "Authentication required" };
     }
+
+    const userRoleNames = authContext.user.roles.map((r) => r.name);
+    const hasRole = requiredRoles.some((requiredRole) =>
+      userRoleNames.includes(requiredRole),
+    );
+
+    if (!hasRole) {
+      context.set.status = 403;
+      return {
+        success: false,
+        error: "Access denied. Required role not found.",
+      };
+    }
+
+    return; // El usuario tiene el rol, continuar
+  };
 }

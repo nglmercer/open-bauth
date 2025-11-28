@@ -45,7 +45,7 @@ describe("BaseController", () => {
     const initResult = await BaseController.initializeDatabase(
       db,
       [userSchema],
-      true
+      true,
     );
     expect(initResult.success).toBe(true);
 
@@ -230,7 +230,7 @@ describe("BaseController", () => {
 
     const result = await controller.query(
       "SELECT name, age FROM users WHERE age > ?",
-      [25]
+      [25],
     );
 
     expect(result.success).toBe(true);
@@ -282,7 +282,7 @@ describe("BaseController", () => {
     expect(randomResult.success).toBe(true);
     expect(randomResult.data?.length).toBe(1);
     expect(testRecords.map((r) => r.name)).toContain(
-      (randomResult.data as any[])[0].name
+      (randomResult.data as any[])[0].name,
     );
 
     const activeRandomResult = await controller.random({ is_active: true });
@@ -290,7 +290,7 @@ describe("BaseController", () => {
     expect(
       typeof activeRandomResult.data?.[0].is_active === "boolean"
         ? activeRandomResult.data?.[0].is_active
-        : Boolean(activeRandomResult.data?.[0].is_active)
+        : Boolean(activeRandomResult.data?.[0].is_active),
     ).toBe(true);
 
     const multipleRandomResult = await controller.random({}, 2);
@@ -330,7 +330,7 @@ describe("BaseController", () => {
     const randomUser = randomUserResponse.data![0];
     console.log(
       `Random user selected (offset ${randomOffset}):`,
-      randomUser.name
+      randomUser.name,
     );
 
     const validNames = ["User A", "User B", "User C"];
@@ -338,7 +338,7 @@ describe("BaseController", () => {
   });
   async function getRandomUsers(
     controller: BaseController<User>,
-    limit: number
+    limit: number,
   ): Promise<User[]> {
     const countResponse = await controller.count();
     if (
@@ -385,7 +385,7 @@ describe("BaseController", () => {
     expect(ids.size).toBe(2);
     console.log(
       "Selected random users:",
-      randomUsers.map((u) => u.name)
+      randomUsers.map((u) => u.name),
     );
   });
 });

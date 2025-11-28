@@ -1,13 +1,13 @@
-import { test, expect, describe, beforeAll, afterAll } from 'bun:test';
-import { Database } from 'bun:sqlite';
-import { DatabaseInitializer } from '../src/database/database-initializer';
-import { JWTService } from '../src/services/jwt';
-import { AuthService } from '../src/services/auth';
-import { PermissionService } from '../src/services/permissions';
-import { SecurityService } from '../src/services/security';
-import { PKCEMethod } from '../src/types/oauth';
+import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import { Database } from "bun:sqlite";
+import { DatabaseInitializer } from "../src/database/database-initializer";
+import { JWTService } from "../src/services/jwt";
+import { AuthService } from "../src/services/auth";
+import { PermissionService } from "../src/services/permissions";
+import { SecurityService } from "../src/services/security";
+import { PKCEMethod } from "../src/types/oauth";
 
-describe('Basic Services Tests', () => {
+describe("Basic Services Tests", () => {
   let db: Database;
   let dbInitializer: DatabaseInitializer;
   let jwtService: JWTService;
@@ -17,13 +17,13 @@ describe('Basic Services Tests', () => {
 
   beforeAll(async () => {
     // Initialize database with basic schemas only
-    db = new Database(':memory:');
+    db = new Database(":memory:");
     dbInitializer = new DatabaseInitializer({ database: db });
     await dbInitializer.initialize();
     await dbInitializer.seedDefaults();
 
     // Initialize services
-    jwtService = new JWTService('test-secret-key', '1h');
+    jwtService = new JWTService("test-secret-key", "1h");
     authService = new AuthService(dbInitializer, jwtService);
     permissionService = new PermissionService(dbInitializer);
     securityService = new SecurityService();
@@ -33,14 +33,14 @@ describe('Basic Services Tests', () => {
     db.close();
   });
 
-  describe('Auth Service', () => {
-    test('should register a new user successfully', async () => {
+  describe("Auth Service", () => {
+    test("should register a new user successfully", async () => {
       const userData = {
-        first_name: 'Test',
-        last_name: 'User',
-        username: 'testuser',
-        email: 'test@example.com',
-        password: 'password123',
+        first_name: "Test",
+        last_name: "User",
+        username: "testuser",
+        email: "test@example.com",
+        password: "password123",
       };
 
       const result = await authService.register(userData);
@@ -51,14 +51,14 @@ describe('Basic Services Tests', () => {
       expect(result.token).toBeDefined();
     });
 
-    test('should log in an existing user successfully', async () => {
+    test("should log in an existing user successfully", async () => {
       // First register a user
       const userData = {
-        first_name: 'Login',
-        last_name: 'User',
-        username: 'loginuser',
-        email: 'login@example.com',
-        password: 'password123',
+        first_name: "Login",
+        last_name: "User",
+        username: "loginuser",
+        email: "login@example.com",
+        password: "password123",
       };
 
       const registerResult = await authService.register(userData);
@@ -66,8 +66,8 @@ describe('Basic Services Tests', () => {
 
       // Now try to login
       const loginData = {
-        email: 'login@example.com',
-        password: 'password123',
+        email: "login@example.com",
+        password: "password123",
       };
 
       const loginResult = await authService.login(loginData);
@@ -77,10 +77,10 @@ describe('Basic Services Tests', () => {
       expect(loginResult.token).toBeDefined();
     });
 
-    test('should fail to log in with incorrect password', async () => {
+    test("should fail to log in with incorrect password", async () => {
       const loginData = {
-        email: 'test@example.com',
-        password: 'wrongpassword',
+        email: "test@example.com",
+        password: "wrongpassword",
       };
 
       const result = await authService.login(loginData);
@@ -88,13 +88,13 @@ describe('Basic Services Tests', () => {
       expect(result.error).toBeDefined();
     });
 
-    test('should fail to register a user with a duplicate email', async () => {
+    test("should fail to register a user with a duplicate email", async () => {
       const userData = {
-        first_name: 'Duplicate',
-        last_name: 'User',
-        username: 'duplicateuser',
-        email: 'duplicate@example.com',
-        password: 'password123',
+        first_name: "Duplicate",
+        last_name: "User",
+        username: "duplicateuser",
+        email: "duplicate@example.com",
+        password: "password123",
       };
 
       // First registration should succeed
@@ -104,25 +104,25 @@ describe('Basic Services Tests', () => {
       // Second registration should fail
       const secondResult = await authService.register(userData);
       expect(secondResult.success).toBe(false);
-      expect(secondResult.error?.type).toBe('USER_ALREADY_EXISTS' as any);
+      expect(secondResult.error?.type).toBe("USER_ALREADY_EXISTS" as any);
     });
   });
 
-  describe('JWT Service', () => {
-    test('should generate and verify JWT token', async () => {
+  describe("JWT Service", () => {
+    test("should generate and verify JWT token", async () => {
       const payload = {
-        id: 'test-user-id',
-        email: 'test@example.com',
-        first_name: 'Test',
-        last_name: 'User',
+        id: "test-user-id",
+        email: "test@example.com",
+        first_name: "Test",
+        last_name: "User",
         is_active: true,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
-      
+
       const token = await jwtService.generateToken(payload as any);
       expect(token).toBeDefined();
-      expect(typeof token).toBe('string');
+      expect(typeof token).toBe("string");
 
       const verified = await jwtService.verifyToken(token);
       expect(verified).toBeDefined();
@@ -130,35 +130,38 @@ describe('Basic Services Tests', () => {
       expect((verified as any).email).toBe(payload.email);
     });
 
-    test('should reject expired token', async () => {
+    test("should reject expired token", async () => {
       // Create a mock expired token manually
-      const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0ZXN0LXVzZXIiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJpYXQiOjE2MDAwMDAwMDAsImV4cCI6MTYwMDAwMDAwMX0.invalid-signature';
-      
+      const expiredToken =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0ZXN0LXVzZXIiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJpYXQiOjE2MDAwMDAwMDAsImV4cCI6MTYwMDAwMDAwMX0.invalid-signature";
+
       // Try to verify expired token and expect it to throw
       await expect(jwtService.verifyToken(expiredToken)).rejects.toThrow();
     });
 
-    test('should generate and verify refresh token', async () => {
+    test("should generate and verify refresh token", async () => {
       const userId = 123;
-      
+
       const refreshToken = await jwtService.generateRefreshToken(userId);
       expect(refreshToken).toBeDefined();
-      expect(typeof refreshToken).toBe('string');
+      expect(typeof refreshToken).toBe("string");
 
       const verified = await jwtService.verifyRefreshToken(refreshToken);
       expect(verified).toBe(userId);
     });
 
-    test('should reject invalid refresh token', async () => {
-      await expect(jwtService.verifyRefreshToken('invalid-token')).rejects.toThrow();
+    test("should reject invalid refresh token", async () => {
+      await expect(
+        jwtService.verifyRefreshToken("invalid-token"),
+      ).rejects.toThrow();
     });
   });
 
-  describe('Permission Service', () => {
-    test('should create and find a role by name', async () => {
+  describe("Permission Service", () => {
+    test("should create and find a role by name", async () => {
       const roleData = {
-        name: 'test-role',
-        description: 'Test role for OAuth',
+        name: "test-role",
+        description: "Test role for OAuth",
       };
 
       const createResult = await permissionService.createRole(roleData);
@@ -166,37 +169,39 @@ describe('Basic Services Tests', () => {
       expect(createResult.data).toBeDefined();
       expect(createResult.data!.name).toBe(roleData.name);
 
-      const findResult = await permissionService.findRoleByName('test-role');
+      const findResult = await permissionService.findRoleByName("test-role");
       expect(findResult).toBeDefined();
       expect(findResult!.name).toBe(roleData.name);
     });
 
-    test('should create and find a permission by name', async () => {
+    test("should create and find a permission by name", async () => {
       const permissionData = {
-        name: 'test-permission',
-        resource: 'test-resource',
-        action: 'test-action',
-        description: 'Test permission for OAuth',
+        name: "test-permission",
+        resource: "test-resource",
+        action: "test-action",
+        description: "Test permission for OAuth",
       };
 
-      const createResult = await permissionService.createPermission(permissionData);
+      const createResult =
+        await permissionService.createPermission(permissionData);
       expect(createResult.success).toBe(true);
       expect(createResult.data).toBeDefined();
       expect(createResult.data!.name).toBe(permissionData.name);
 
-      const findResult = await permissionService.findPermissionByName('test-permission');
+      const findResult =
+        await permissionService.findPermissionByName("test-permission");
       expect(findResult).toBeDefined();
       expect(findResult!.name).toBe(permissionData.name);
     });
 
-    test('should assign role to user', async () => {
+    test("should assign role to user", async () => {
       // First create a user
       const userData = {
-        first_name: 'Role',
-        last_name: 'User',
-        username: 'roleuser',
-        email: 'role@example.com',
-        password: 'password123',
+        first_name: "Role",
+        last_name: "User",
+        username: "roleuser",
+        email: "role@example.com",
+        password: "password123",
       };
 
       const userResult = await authService.register(userData);
@@ -204,8 +209,8 @@ describe('Basic Services Tests', () => {
 
       // Create a role
       const roleData = {
-        name: 'user-role',
-        description: 'User role for testing',
+        name: "user-role",
+        description: "User role for testing",
       };
 
       const roleResult = await permissionService.createRole(roleData);
@@ -227,10 +232,10 @@ describe('Basic Services Tests', () => {
     });
   });
 
-  describe('Security Service', () => {
-    test('should generate and verify PKCE challenge with S256', () => {
+  describe("Security Service", () => {
+    test("should generate and verify PKCE challenge with S256", () => {
       const challenge = securityService.generatePKCEChallenge(PKCEMethod.S256);
-      
+
       expect(challenge.code_challenge).toBeDefined();
       expect(challenge.code_challenge_method).toBe(PKCEMethod.S256);
       expect(challenge.code_verifier).toBeDefined();
@@ -240,15 +245,15 @@ describe('Basic Services Tests', () => {
       const isValid = securityService.verifyPKCEChallenge(
         challenge.code_verifier,
         challenge.code_challenge,
-        challenge.code_challenge_method
+        challenge.code_challenge_method,
       );
-      
+
       expect(isValid).toBe(true);
     });
 
-    test('should generate and verify PKCE challenge with plain method', () => {
+    test("should generate and verify PKCE challenge with plain method", () => {
       const challenge = securityService.generatePKCEChallenge(PKCEMethod.PLAIN);
-      
+
       expect(challenge.code_challenge).toBeDefined();
       expect(challenge.code_challenge_method).toBe(PKCEMethod.PLAIN);
       expect(challenge.code_verifier).toBeDefined();
@@ -257,59 +262,67 @@ describe('Basic Services Tests', () => {
       const isValid = securityService.verifyPKCEChallenge(
         challenge.code_verifier,
         challenge.code_challenge,
-        challenge.code_challenge_method
+        challenge.code_challenge_method,
       );
-      
+
       expect(isValid).toBe(true);
     });
 
-    test('should reject invalid PKCE verifier', () => {
+    test("should reject invalid PKCE verifier", () => {
       const challenge = securityService.generatePKCEChallenge(PKCEMethod.S256);
-      
+
       const isValid = securityService.verifyPKCEChallenge(
-        'invalid-verifier',
+        "invalid-verifier",
         challenge.code_challenge,
-        challenge.code_challenge_method
+        challenge.code_challenge_method,
       );
-      
+
       expect(isValid).toBe(false);
     });
 
-    test('should generate secure token', () => {
+    test("should generate secure token", () => {
       const token = securityService.generateSecureToken(32);
       expect(token).toBeDefined();
-      expect(typeof token).toBe('string');
+      expect(typeof token).toBe("string");
       expect(token.length).toBe(64); // 32 bytes = 64 hex characters
     });
 
-    test('should generate different tokens each time', () => {
+    test("should generate different tokens each time", () => {
       const token1 = securityService.generateSecureToken(32);
       const token2 = securityService.generateSecureToken(32);
-      
+
       expect(token1).not.toBe(token2);
     });
 
-    test('should hash and verify password', async () => {
-      const password = 'test-password-123';
-      
+    test("should hash and verify password", async () => {
+      const password = "test-password-123";
+
       const { hash, salt } = await securityService.hashPassword(password);
       expect(hash).toBeDefined();
       expect(salt).toBeDefined();
       expect(hash).not.toBe(password);
 
-      const isValid = await securityService.verifyPassword(password, hash, salt);
+      const isValid = await securityService.verifyPassword(
+        password,
+        hash,
+        salt,
+      );
       expect(isValid).toBe(true);
 
-      const isInvalid = await securityService.verifyPassword('wrong-password', hash, salt);
+      const isInvalid = await securityService.verifyPassword(
+        "wrong-password",
+        hash,
+        salt,
+      );
       expect(isInvalid).toBe(false);
     });
 
-    test('should encrypt and decrypt data', async () => {
-      const data = 'sensitive-user-data';
+    test("should encrypt and decrypt data", async () => {
+      const data = "sensitive-user-data";
       // Generate a proper 32-byte key for AES-256
-      const crypto = require('crypto');
-      const encryptionKey = crypto.randomBytes(32).toString('hex');
-      
+      const crypto = require("crypto");
+      const encryptionKey = crypto.randomBytes(32).toString("hex");
+
       const encrypted = await securityService.encrypt(data, encryptionKey);
       expect(encrypted).toBeDefined();
       expect(encrypted).not.toBe(data);

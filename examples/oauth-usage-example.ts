@@ -7,23 +7,19 @@
 
 import { DatabaseInitializer } from "../src/database/database-initializer";
 import { Database } from "bun:sqlite";
-import { 
-  AuthService, 
-  JWTService, 
-  PermissionService 
+import { AuthService, JWTService, PermissionService } from "../src/services";
+import {
+  OAuthService,
+  SecurityService,
+  EnhancedUserService,
 } from "../src/services";
-import { 
-  OAuthService, 
-  SecurityService, 
-  EnhancedUserService 
-} from "../src/services";
-import { 
-  OAuthGrantType, 
-  OAuthResponseType, 
+import {
+  OAuthGrantType,
+  OAuthResponseType,
   PKCEMethod,
   MFAType,
   BiometricType,
-  DeviceType
+  DeviceType,
 } from "../src/types/oauth";
 import { createOAuthSecurityMiddleware } from "../src/middleware/oauth-security";
 
@@ -35,13 +31,29 @@ async function main() {
   const dbInitializer = new DatabaseInitializer({ database: db });
 
   // 2. Inicializar servicios
-  const jwtService = new JWTService("your-super-secret-jwt-key", "1h", "https://your-auth-server.com", "your-api");
+  const jwtService = new JWTService(
+    "your-super-secret-jwt-key",
+    "1h",
+    "https://your-auth-server.com",
+    "your-api",
+  );
   const securityService = new SecurityService();
   const authService = new AuthService(dbInitializer, jwtService);
   const permissionService = new PermissionService(dbInitializer);
-  const oauthService = new OAuthService(dbInitializer, securityService, jwtService);
-  const enhancedUserService = new EnhancedUserService(dbInitializer, securityService);
-  const oauthSecurityMiddleware = createOAuthSecurityMiddleware(oauthService, securityService, jwtService);
+  const oauthService = new OAuthService(
+    dbInitializer,
+    securityService,
+    jwtService,
+  );
+  const enhancedUserService = new EnhancedUserService(
+    dbInitializer,
+    securityService,
+  );
+  const oauthSecurityMiddleware = createOAuthSecurityMiddleware(
+    oauthService,
+    securityService,
+    jwtService,
+  );
 
   // 3. Inicializar base de datos con esquemas OAuth
   await dbInitializer.initialize();
@@ -53,8 +65,14 @@ async function main() {
     client_id: "demo-client-id",
     client_secret: "demo-client-secret",
     client_name: "Demo Application",
-    redirect_uris: ["https://demo-app.com/callback", "http://localhost:3000/callback"],
-    grant_types: [OAuthGrantType.AUTHORIZATION_CODE, OAuthGrantType.REFRESH_TOKEN],
+    redirect_uris: [
+      "https://demo-app.com/callback",
+      "http://localhost:3000/callback",
+    ],
+    grant_types: [
+      OAuthGrantType.AUTHORIZATION_CODE,
+      OAuthGrantType.REFRESH_TOKEN,
+    ],
     response_types: [OAuthResponseType.CODE],
     scope: "read write profile",
     is_public: false,
@@ -93,7 +111,7 @@ async function main() {
     user.id,
     BiometricType.FINGERPRINT,
     "encrypted-biometric-template-data", // En producción, datos biométricos encriptados
-    "device-123"
+    "device-123",
   );
 
   if (biometricResult.success) {
@@ -107,7 +125,7 @@ async function main() {
     "iPhone 14 Pro",
     DeviceType.MOBILE,
     "iOS",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15"
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15",
   );
 
   if (deviceResult.success) {
@@ -141,10 +159,11 @@ async function main() {
   };
 
   // Validar solicitud de autorización
-  const validationResult = await oauthSecurityMiddleware.validateAuthorizationRequest(
-    authRequest,
-    oauthClient
-  );
+  const validationResult =
+    await oauthSecurityMiddleware.validateAuthorizationRequest(
+      authRequest,
+      oauthClient,
+    );
 
   if (!validationResult.valid) {
     console.error("❌ Validación fallida:", validationResult.errorDescription);
@@ -154,11 +173,14 @@ async function main() {
   console.log("✅ Solicitud de autorización validada");
 
   // Simular usuario autenticado y consentimiento dado
-  const authResponse = await oauthService.handleAuthorizationRequest(authRequest, user);
+  const authResponse = await oauthService.handleAuthorizationRequest(
+    authRequest,
+    user,
+  );
 
   if (authResponse.code) {
     console.log("✅ Authorization code generado:", authResponse.code);
-    
+
     // 11. Demostrar intercambio de código por token
     console.log("\n🔄 Demostrando intercambio de código por token...");
 
@@ -189,7 +211,9 @@ async function main() {
       console.log("\n🔍 Demostrando verificación de token...");
 
       try {
-        const payload = await jwtService.verifyToken(tokenResponse.access_token);
+        const payload = await jwtService.verifyToken(
+          tokenResponse.access_token,
+        );
         console.log("✅ Token verificado:", {
           userId: payload.userId,
           email: payload.email,
@@ -210,7 +234,8 @@ async function main() {
           client_secret: "demo-client-secret",
         };
 
-        const refreshResponse = await oauthService.handleTokenRequest(refreshRequest);
+        const refreshResponse =
+          await oauthService.handleTokenRequest(refreshRequest);
 
         if (refreshResponse.access_token) {
           console.log("✅ Nuevo access token generado via refresh");
@@ -225,9 +250,8 @@ async function main() {
         token: tokenResponse.access_token,
       };
 
-      const introspectionResponse = await oauthService.handleIntrospectionRequest(
-        introspectionRequest
-      );
+      const introspectionResponse =
+        await oauthService.handleIntrospectionRequest(introspectionRequest);
 
       console.log("📋 Introspección:", {
         active: introspectionResponse.active,
@@ -245,9 +269,8 @@ async function main() {
         client_secret: "demo-client-secret",
       };
 
-      const revocationResult = await oauthService.handleRevocationRequest(
-        revocationRequest
-      );
+      const revocationResult =
+        await oauthService.handleRevocationRequest(revocationRequest);
 
       if (revocationResult.success) {
         console.log("✅ Token revocado exitosamente");
@@ -263,9 +286,8 @@ async function main() {
     scope: "read write profile",
   };
 
-  const deviceAuthResponse = await oauthService.handleDeviceAuthorizationRequest(
-    deviceAuthRequest
-  );
+  const deviceAuthResponse =
+    await oauthService.handleDeviceAuthorizationRequest(deviceAuthRequest);
 
   if (deviceAuthResponse.device_code) {
     console.log("✅ Device authorization generado:", {
@@ -275,23 +297,30 @@ async function main() {
       expires_in: deviceAuthResponse.expires_in,
     });
 
-    console.log("📱 Usuario debe visitar:", deviceAuthResponse.verification_uri_complete);
+    console.log(
+      "📱 Usuario debe visitar:",
+      deviceAuthResponse.verification_uri_complete,
+    );
     console.log("📱 E ingresar código:", deviceAuthResponse.user_code);
   }
 
   // 17. Demostrar autenticación biométrica
   console.log("\n👆 Demostrando autenticación biométrica...");
 
-  const biometricAuthResult = await enhancedUserService.verifyBiometricCredential(
-    user.id,
-    BiometricType.FINGERPRINT,
-    "provided-biometric-data" // En producción, datos biométricos del dispositivo
-  );
+  const biometricAuthResult =
+    await enhancedUserService.verifyBiometricCredential(
+      user.id,
+      BiometricType.FINGERPRINT,
+      "provided-biometric-data", // En producción, datos biométricos del dispositivo
+    );
 
   if (biometricAuthResult.success) {
     console.log("✅ Autenticación biométrica exitosa");
   } else {
-    console.error("❌ Autenticación biométrica fallida:", biometricAuthResult.error);
+    console.error(
+      "❌ Autenticación biométrica fallida:",
+      biometricAuthResult.error,
+    );
   }
 
   // 18. Demostrar SSO con device secret
@@ -299,7 +328,7 @@ async function main() {
 
   const deviceSecretResult = await enhancedUserService.verifyDeviceSecret(
     "device-unique-id",
-    "provided-device-secret" // En producción, secreto almacenado en dispositivo
+    "provided-device-secret", // En producción, secreto almacenado en dispositivo
   );
 
   if (deviceSecretResult.success) {
@@ -311,11 +340,12 @@ async function main() {
   // 19. Demostrar detección de actividad sospechosa
   console.log("\n🚨 Demostrando detección de actividad sospechosa...");
 
-  const suspiciousActivityResult = await oauthSecurityMiddleware.detectSuspiciousActivity(
-    user.id,
-    "192.168.1.100", // IP de ejemplo
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-  );
+  const suspiciousActivityResult =
+    await oauthSecurityMiddleware.detectSuspiciousActivity(
+      user.id,
+      "192.168.1.100", // IP de ejemplo
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    );
 
   console.log("🔍 Análisis de seguridad:", {
     suspicious: suspiciousActivityResult.suspicious,
@@ -329,7 +359,7 @@ async function main() {
   const rateLimitResult = await oauthSecurityMiddleware.checkRateLimit(
     oauthClient.client_id,
     user.id,
-    "192.168.1.100"
+    "192.168.1.100",
   );
 
   console.log("📊 Rate limiting:", {

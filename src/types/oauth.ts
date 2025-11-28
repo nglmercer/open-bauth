@@ -415,7 +415,10 @@ export interface OAuthClientRepositoryInterface {
   create(data: CreateOAuthClientData): Promise<OAuthClient>;
   update(id: string, data: UpdateOAuthClientData): Promise<OAuthClient>;
   delete(id: string): Promise<boolean>;
-  authenticateClient(clientId: string, clientSecret?: string): Promise<OAuthClient | null>;
+  authenticateClient(
+    clientId: string,
+    clientSecret?: string,
+  ): Promise<OAuthClient | null>;
   validateRedirectUri(clientId: string, redirectUri: string): Promise<boolean>;
 }
 
