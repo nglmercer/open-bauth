@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { z } from "zod";
+import { z } from "zod"; // Import temporal - después de build usar: import { z } from "open-bauth";
 import { createSchemaExtractor } from "../../src/database/schema/schema-extractor";
 import { DatabaseInitializer } from "../../src/database/database-initializer";
 import {
