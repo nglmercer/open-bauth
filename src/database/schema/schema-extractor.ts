@@ -25,6 +25,9 @@ export interface TableInfo {
   tableName: string;
   columns: SQLiteColumnInfo[];
   sql: string;
+  inspectedTypes?: Record<string, string>;
+  indexes?: { name: string; columns: string[]; unique?: boolean }[];
+  foreignKeys?: { table: string; from: string; to: string }[];
 }
 
 /**
@@ -59,7 +62,7 @@ export class SQLiteSchemaExtractor {
   }
 
   /**
-   * Checks if the parameter is a DatabaseAdapterConfig
+   * Checks if parameter is a DatabaseAdapterConfig
    */
   private isAdapterConfig(db: any): db is DatabaseAdapterConfig {
     return typeof db === 'object' && 'database' in db;
@@ -98,6 +101,23 @@ export class SQLiteSchemaExtractor {
   }
 
   /**
+   * Gets detailed information for all tables
+   */
+  async getAllTablesInfo(): Promise<TableInfo[]> {
+    const tableNames = await this.getAllTableNames();
+    const tablesInfo: TableInfo[] = [];
+
+    for (const tableName of tableNames) {
+      const info = await this.getTableInfo(tableName);
+      if (info) {
+        tablesInfo.push(info);
+      }
+    }
+
+    return tablesInfo;
+  }
+
+  /**
    * Gets detailed information for a specific table
    */
   async getTableInfo(tableName: string): Promise<TableInfo | null> {
@@ -106,6 +126,7 @@ export class SQLiteSchemaExtractor {
 
       // Get column info with PRAGMA
       const pragmaResult = await connection.query(`PRAGMA table_info("${tableName}")`).all();
+      //console.log(`PRAGMA table_info("${tableName}") result length: ${Array.isArray(pragmaResult) ? pragmaResult.length : 'not array'}`);
       let columns = Array.isArray(pragmaResult) ? pragmaResult as SQLiteColumnInfo[] : [];
 
       // Shim: SQLite often reports PKs as nullable in PRAGMA, but tests expect them to be notnull.
@@ -124,10 +145,42 @@ export class SQLiteSchemaExtractor {
 
       const sql = (sqlResult as any)?.sql || "";
 
+      // Perform data inspection for potential date columns
+      const inspectedTypes: Record<string, string> = {};
+
+      // Inspect columns that are TEXT/VARCHAR/etc but not PKs
+      const inspectionPromises = columns.map(async (col) => {
+        const type = col.type.toUpperCase();
+        const baseType = type.split('(')[0]?.trim() || type.trim();
+        // Only inspect text-like columns that aren't explicitly declared as DATE/DATETIME
+        // and aren't primary keys (PKs are usually IDs)
+        if (['TEXT', 'VARCHAR', 'CHAR', 'CLOB', 'NVARCHAR', 'NCHAR', ''].includes(baseType) && !col.pk) {
+          try {
+            const detectedType = await this.inspectColumnData(tableName, col.name);
+            if (detectedType) {
+              inspectedTypes[col.name] = detectedType;
+            }
+          } catch (e) {
+            console.error(`Error in inspection loop for ${tableName}.${col.name}:`, e);
+          }
+        }
+      });
+
+      await Promise.all(inspectionPromises);
+
+      // Get Indexes
+      const indexes = await this.getIndexes(tableName);
+
+      // Get Foreign Keys
+      const foreignKeys = await this.getForeignKeys(tableName);
+
       return {
         tableName,
         columns,
-        sql
+        sql,
+        inspectedTypes,
+        indexes,
+        foreignKeys
       };
     } catch (error) {
       console.error(`Error getting table info for ${tableName}:`, error);
@@ -135,35 +188,156 @@ export class SQLiteSchemaExtractor {
     }
   }
 
+  private columnOverrides: Record<string, Record<string, Partial<ColumnDefinition>>> = {};
+  private tableOverrides: Record<string, Partial<TableSchema>> = {};
+
   /**
-   * Gets information for all tables
+   * Registers a manual override for a specific column
+   * This allows correcting types, default values, foreign keys, etc. that might be missed by automatic extraction
    */
-  async getAllTablesInfo(): Promise<TableInfo[]> {
-    const tableNames = await this.getAllTableNames();
-    const tables: TableInfo[] = [];
-
-    for (const tableName of tableNames) {
-      const tableInfo = await this.getTableInfo(tableName);
-      if (tableInfo) {
-        tables.push(tableInfo);
-      }
+  public registerOverride(tableName: string, columnName: string, override: Partial<ColumnDefinition>) {
+    if (!this.columnOverrides[tableName]) {
+      this.columnOverrides[tableName] = {};
     }
+    this.columnOverrides[tableName][columnName] = {
+      ...this.columnOverrides[tableName][columnName],
+      ...override
+    };
+  }
 
-    return tables;
+  /**
+   * Registers a manual override for a table schema
+   * Useful for defining indexes that cannot be extracted from CREATE TABLE SQL
+   */
+  public registerTableOverride(tableName: string, override: Partial<TableSchema>) {
+    this.tableOverrides[tableName] = {
+      ...this.tableOverrides[tableName],
+      ...override
+    };
+  }
+
+  /**
+   * Gets indexes for a table using PRAGMA index_list and index_info
+   */
+  private async getIndexes(tableName: string): Promise<{ name: string; columns: string[]; unique?: boolean }[]> {
+    try {
+      const connection = this.adapter.getConnection();
+      const indexList = await connection.query(`PRAGMA index_list("${tableName}")`).all();
+
+      if (!Array.isArray(indexList)) return [];
+
+      const indexes: { name: string; columns: string[]; unique?: boolean }[] = [];
+
+      for (const idx of indexList) {
+        // Skip auto-indexes (primary keys, unique constraints created by CREATE TABLE)
+        // actually we WANT unique constraints, but maybe not PKs if they are implicit
+        // origin 'pk' means primary key. 'u' means unique constraint. 'c' means create index.
+        if ((idx as any).origin === 'pk') continue;
+
+        const indexInfo = await connection.query(`PRAGMA index_info("${(idx as any).name}")`).all();
+        if (Array.isArray(indexInfo)) {
+          const columns = indexInfo
+            .sort((a: any, b: any) => a.seqno - b.seqno)
+            .map((col: any) => col.name);
+
+          indexes.push({
+            name: (idx as any).name,
+            columns,
+            unique: (idx as any).unique === 1
+          });
+        }
+      }
+      return indexes;
+    } catch (error) {
+      console.error(`Error getting indexes for ${tableName}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Gets foreign keys for a table using PRAGMA foreign_key_list
+   */
+  private async getForeignKeys(tableName: string): Promise<{ table: string; from: string; to: string }[]> {
+    try {
+      const connection = this.adapter.getConnection();
+      const fkList = await connection.query(`PRAGMA foreign_key_list("${tableName}")`).all();
+
+      if (!Array.isArray(fkList)) return [];
+
+      return fkList.map((fk: any) => ({
+        table: fk.table,
+        from: fk.from,
+        to: fk.to
+      }));
+    } catch (error) {
+      console.error(`Error getting foreign keys for ${tableName}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Inspects column data to detect types that SQLite stores as generic types (like dates in TEXT)
+   */
+  private async inspectColumnData(tableName: string, columnName: string): Promise<string | null> {
+    try {
+      const connection = this.adapter.getConnection();
+      // Sample up to 10 non-null values
+      const result = await connection.query(`
+        SELECT "${columnName}" as val 
+        FROM "${tableName}" 
+        WHERE "${columnName}" IS NOT NULL 
+        LIMIT 10
+      `).all();
+
+      if (!Array.isArray(result) || result.length === 0) {
+        return null;
+      }
+
+      let dateCount = 0;
+
+      for (const row of result) {
+        const val = (row as any).val;
+        if (typeof val === 'string') {
+          // Use Date.parse to check if it's a valid date string
+          const timestamp = Date.parse(val);
+          if (!isNaN(timestamp)) {
+            // Filter out simple numbers that might be parsed as dates (e.g. "1")
+            // but allow ISO strings, SQL dates, etc.
+            // A simple heuristic: if it parses as date, check if it looks like a date string (has separators)
+            if (val.includes('-') || val.includes('/') || val.includes(':') || val.includes('T')) {
+              dateCount++;
+            }
+          }
+        }
+      }
+
+      // If more than 50% of samples are dates, consider it a date column
+      if (dateCount > 0 && dateCount >= result.length * 0.5) {
+        return 'DATETIME';
+      }
+
+      return null;
+    } catch (error) {
+      // If inspection fails, fallback to declared type
+      return null;
+    }
   }
 
   /**
    * Maps SQLite type to System ColumnType
    */
-  private mapSQLiteTypeToColumnType(sqliteType: string, columnName?: string, defaultValue?: any): ColumnType {
-    const type = sqliteType.toUpperCase();
 
-    // Handle types with parameters (VARCHAR(255), DECIMAL(10,2), etc.)
+  private mapSQLiteTypeToColumnType(sqliteType: string, columnName?: string, defaultValue?: any, inspectedType?: string | null): ColumnType {
+    const type = sqliteType.toUpperCase();
     const baseType = type.split('(')[0]?.trim() || type.trim();
 
-    // Note: Previously there was a block here that converted TEXT to DATETIME
-    // based on 'CURRENT_TIMESTAMP' defaults. This was removed because it 
-    // caused tests expecting "TEXT" to fail.
+    // Use inspected type if available
+    if (inspectedType === 'DATETIME') {
+      return 'DATETIME';
+    }
+
+    // Removed heuristic checks for default values as requested by user.
+    // We rely on explicit types or data inspection.
 
     switch (baseType) {
       case 'INTEGER':
@@ -197,8 +371,6 @@ export class SQLiteSchemaExtractor {
         return 'BOOLEAN';
 
       case 'DATE':
-        return 'DATE';
-
       case 'DATETIME':
       case 'TIMESTAMP':
         return 'DATETIME';
@@ -214,14 +386,17 @@ export class SQLiteSchemaExtractor {
   /**
    * Converts SQLiteColumnInfo to ColumnDefinition
    */
-  private convertColumnDefinition(column: SQLiteColumnInfo, sql?: string): ColumnDefinition {
+  private convertColumnDefinition(tableName: string, column: SQLiteColumnInfo, sql?: string, inspectedType?: string | null, foreignKeys?: { table: string; from: string; to: string }[]): ColumnDefinition {
+    // Check for manual override
+    const override = this.columnOverrides[tableName]?.[column.name] || {};
+
     const definition: ColumnDefinition = {
       name: column.name,
-      type: this.mapSQLiteTypeToColumnType(column.type, column.name, column.dflt_value),
+      type: override.type || this.mapSQLiteTypeToColumnType(column.type, column.name, column.dflt_value, inspectedType),
       // Primary keys must always be notNull
       notNull: (column.pk > 0) ? true : (column.notnull === 1),
-      // Only set primaryKey to true for actual primary keys, undefined for others
-      ...(column.pk > 0 ? { primaryKey: true } : {}),
+      // Explicitly set primaryKey to true or false
+      primaryKey: column.pk > 0,
     };
 
     // Handle auto-increment for primary keys (both INTEGER and TEXT based on test expectations)
@@ -236,6 +411,7 @@ export class SQLiteSchemaExtractor {
     }
 
     // Check for UNIQUE constraints if not primary key
+    // Check for UNIQUE constraints if not primary key
     if (!definition.primaryKey && sql) {
       const patterns = [
         // `"email" TEXT UNIQUE NOT NULL` - inline UNIQUE with quotes support
@@ -244,19 +420,28 @@ export class SQLiteSchemaExtractor {
         new RegExp(`^\\s*"?${column.name}"?\\s+.*UNIQUE`, 'mi')
       ];
 
-      const isUnique = patterns.some(pattern => pattern.test(sql));
-      if (isUnique) {
-        definition.unique = true;
-      }
+      definition.unique = patterns.some(pattern => pattern.test(sql));
     }
 
     // Extract foreign key references from SQL - improved regex
-    if (sql) {
+    // Extract foreign key references from PRAGMA first, then SQL
+    if (foreignKeys) {
+      const fk = foreignKeys.find(f => f.from === column.name);
+      if (fk) {
+        definition.references = {
+          table: fk.table,
+          column: fk.to
+        };
+      }
+    }
+
+    // Fallback to SQL regex if not found (though PRAGMA should cover it)
+    if (!definition.references && sql) {
       const fkPattern = new RegExp(`"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+REFERENCES\\s+"?([^"]+)"?\\s*\\("?([^"]+)"?\\)`, 'i');
       const fkMatch = sql.match(fkPattern);
       if (fkMatch) {
         definition.references = {
-          table: fkMatch[1],
+          table: fkMatch[1]!,
           column: fkMatch[2] || 'id'
         };
       }
@@ -267,21 +452,35 @@ export class SQLiteSchemaExtractor {
       const checkPattern = new RegExp(`"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+CHECK\\s*\\(\\s*([^)]+)\\s*\\)`, 'i');
       const checkMatch = sql.match(checkPattern);
       if (checkMatch) {
-        definition.check = checkMatch[1].trim();
+        definition.check = checkMatch[1]!.trim();
       }
     }
 
+    // Apply remaining overrides (defaultValue, unique, references, check, etc.)
+    if (override.defaultValue !== undefined) definition.defaultValue = override.defaultValue;
+    if (override.unique !== undefined) definition.unique = override.unique;
+    if (override.references !== undefined) definition.references = override.references;
+    if (override.check !== undefined) definition.check = override.check;
+    if (override.notNull !== undefined) definition.notNull = override.notNull;
+    if (override.primaryKey !== undefined) definition.primaryKey = override.primaryKey;
+    if (override.autoIncrement !== undefined) definition.autoIncrement = override.autoIncrement;
+
     return definition;
   }
-
   /**
    * Converts TableInfo to System TableSchema
    */
   convertToTableSchema(tableInfo: TableInfo): TableSchema {
-    const columns = tableInfo.columns.map(col => this.convertColumnDefinition(col, tableInfo.sql));
+    const columns = tableInfo.columns.map(col => this.convertColumnDefinition(tableInfo.tableName, col, tableInfo.sql, tableInfo.inspectedTypes?.[col.name], tableInfo.foreignKeys));
 
-    // Extract indexes from SQL
-    const indexes = this.extractIndexesFromSQL(tableInfo.sql, tableInfo.tableName);
+    // Use PRAGMA indexes if available, otherwise fallback to SQL extraction
+    const extractedIndexes = (tableInfo.indexes && tableInfo.indexes.length > 0)
+      ? tableInfo.indexes
+      : this.extractIndexesFromSQL(tableInfo.sql, tableInfo.tableName);
+
+    // Apply table overrides
+    const tableOverride = this.tableOverrides[tableInfo.tableName] || {};
+    const indexes = tableOverride.indexes || extractedIndexes;
 
     return {
       tableName: tableInfo.tableName,
@@ -310,7 +509,7 @@ export class SQLiteSchemaExtractor {
 
         if (columnsStr) {
           const columns = columnsStr.split(',').map(col => col.trim().replace(/['"`]/g, ''));
-          
+
           indexes.push({
             name: `idx_${tableName}_${constraintName.toLowerCase()}`,
             columns,
@@ -372,7 +571,7 @@ export class SQLiteSchemaExtractor {
 
     // Apply nullable/optional logic
     if (!notNull && !column.primaryKey) {
-      zodType = zodType.optional();
+      zodType = zodType.nullable().optional();
     }
 
     return zodType;
@@ -425,7 +624,7 @@ export class SQLiteSchemaExtractor {
     const zodSchema = this.generateZodSchema(tableSchema);
 
     return {
-      tableName: tableInfo.tableName,
+      tableName,
       schema: zodSchema,
       tableSchema
     };

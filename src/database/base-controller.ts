@@ -222,7 +222,7 @@ export class BaseController<T = Record<string, unknown>> {
   constructor(tableName: string, options: BaseControllerOptions) {
     this.tableName = tableName;
     this.schemas = options.schemas;
-    
+
     // Use provided adapter or create one from database
     if (options.adapter) {
       this.adapter = options.adapter;
@@ -329,6 +329,10 @@ export class BaseController<T = Record<string, unknown>> {
           columnDef += ` REFERENCES "${col.references.table}"("${col.references.column}")`;
         }
 
+        if (col.check) {
+          columnDef += ` CHECK (${col.check})`;
+        }
+
         return columnDef;
       })
       .join(", ");
@@ -361,11 +365,11 @@ export class BaseController<T = Record<string, unknown>> {
           return "TEXT";
         case "BOOLEAN":
         case "BIT":
-          return "INTEGER"; // Store booleans and bits as 0 or 1
+          return "BOOLEAN";
         case "DATE":
-          return "TEXT";
+          return "DATE";
         case "DATETIME":
-          return "TEXT";
+          return "DATETIME";
         default:
           return upperType;
       }
@@ -421,6 +425,10 @@ export class BaseController<T = Record<string, unknown>> {
       } else {
         return `'${value.replace(/'/g, "''")}'`;
       }
+    }
+
+    if (typeof value === "object") {
+      return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
     }
 
     return String(value);
@@ -632,8 +640,8 @@ export class BaseController<T = Record<string, unknown>> {
         ),
       );
       if (Object.keys(cleanData).length === 0) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: "No valid data provided",
           errorType: DatabaseErrorType.VALIDATION_ERROR
         };
@@ -1244,7 +1252,7 @@ export class BaseController<T = Record<string, unknown>> {
       const config = this.adapter.getConfig();
       const extractor = new SQLiteSchemaExtractor(config);
       const schema = await extractor.extractTableSchema(this.tableName);
-      
+
       if (!schema) {
         return {
           success: false,
@@ -1298,11 +1306,11 @@ export class BaseController<T = Record<string, unknown>> {
   ): Promise<BaseController<T>> {
     // Create extractor to get table information
     const extractor = new SQLiteSchemaExtractor(database);
-    
+
     try {
       // Extract schema for the specific table
       const extractedSchema = await extractor.extractTableSchema(tableName);
-      
+
       if (!extractedSchema) {
         throw new Error(`Could not extract schema for table: ${tableName}`);
       }
@@ -1311,16 +1319,16 @@ export class BaseController<T = Record<string, unknown>> {
       // For create, we need to exclude auto-increment primary keys
       const schemaDef = extractedSchema.schema._def as any;
       const createFields = { ...schemaDef.shape };
-      
+
       // Remove auto-increment primary key from create validation
       for (const column of extractedSchema.tableSchema.columns) {
         if (column.primaryKey && column.autoIncrement) {
           delete createFields[column.name];
         }
       }
-      
+
       const createSchema = z.object(createFields);
-      
+
       const schemas: SchemaCollection = {
         [tableName]: {
           create: createSchema,
@@ -1340,6 +1348,7 @@ export class BaseController<T = Record<string, unknown>> {
     }
   }
 }
+
 export * from "./config";
 export * from "./schema/schema-builder";
 export * from "./schema/oauth-schema-extensions";
