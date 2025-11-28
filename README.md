@@ -115,7 +115,29 @@ if (!login.success) throw new Error(login.error?.message);
 console.log('JWT:', login.token);
 ```
 
-### 4) Use advanced schema extensions and BIT type support:
+### 4) Extract schemas from an existing database:
+
+```typescript
+import { createSchemaExtractor, DatabaseInitializer } from 'open-bauth';
+
+// Extract schemas from an existing database
+const extractor = createSchemaExtractor("legacy.db");
+const schemas = await extractor.extractAllSchemas();
+
+// Use with DatabaseInitializer
+const dbInitializer = new DatabaseInitializer({
+  database: db,
+  externalSchemas: schemas.map(s => s.tableSchema)
+});
+
+// Access generated Zod schemas
+const userSchema = schemas.find(s => s.tableName === 'users')?.schema;
+if (userSchema) {
+  const validatedUser = userSchema.parse({ id: 1, email: "test@example.com" });
+}
+```
+
+### 5) Use advanced schema extensions and BIT type support:
 
 ```typescript
 import { setDatabaseConfig, SchemaExtensions } from 'open-bauth';
@@ -140,7 +162,7 @@ const activeNotifications = await notifications.search({
 });
 ```
 
-### 5) Use framework-agnostic middleware (example with Hono):
+### 6) Use framework-agnostic middleware (example with Hono):
 
 ```typescript
 import { Hono } from 'hono';
@@ -184,6 +206,7 @@ This library's public API is re-exported from the entrypoint so you can import f
 - [`BaseController`](docs/database-extension-spec.md#basecontroller) (generic CRUD + query helpers)
 - [`DatabaseInitializer`](docs/database-extension-spec.md#databaseinitializer) (migrations, integrity checks, seeds, controllers)
 - [`Schema Extensions`](docs/database-extension-spec.md#predefined-extensions) (addUserProfileFields, addSoftDelete, addMetadata, etc.)
+- [`Schema Extractor`](docs/schema-extractor/schema-extractor.md) (automatic schema extraction from existing databases)
 
 ### Configuration
 - [`setDatabaseConfig(), getDatabaseConfig()`](docs/database-extension-spec.md#global-configuration)

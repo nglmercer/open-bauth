@@ -8,6 +8,7 @@
       * 📋 [OAuth 2.0 Schema Extensions](docs/database-extension-spec.md#oauth-20-schema-extensions)
       * 🔨 [Schema Builder](docs/database-extension-spec.md#4-schema-builder)
       * 🏗️ [Schema Class](docs/database-extension-spec.md#schema-class)
+      * 🔍 [Schema Extractor](docs/schema-extractor/schema-extractor.md)
 
 * 🔐 **Autenticación & Seguridad**
   * [🔑 OAuth 2.0](docs/oauth-2.0-implementation.md)

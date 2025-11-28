@@ -1145,6 +1145,24 @@ const dbInitializer = new DatabaseInitializer({
 });
 ```
 
+## 🔄 Schema Extractor
+
+For existing databases, you can automatically extract table schemas using the [Schema Extractor](./schema-extractor/schema-extractor.md):
+
+```typescript
+import { createSchemaExtractor } from '../src/database/schema/schema-extractor';
+
+// Extract schemas from an existing database
+const extractor = createSchemaExtractor("legacy.db");
+const schemas = await extractor.extractAsTableSchemas();
+
+// Use with DatabaseInitializer
+const dbInitializer = new DatabaseInitializer({
+  database: db,
+  externalSchemas: schemas
+});
+```
+
 ## 🏭 DatabaseInitializer API
 
 ### Constructor Options

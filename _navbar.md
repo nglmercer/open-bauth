@@ -3,8 +3,9 @@
   * 🔐 Servicios
   * 🛡️ Middleware
   * 🗄️ Base de Datos
-    * 🔐 OAuth 2.0 Schemas
-    * 🔨 Schema Builder
+    * [🔐 OAuth 2.0 Schemas](docs/database-extension-spec.md#oauth-20-schema-extensions)
+    * [🔨 Schema Builder](docs/database-extension-spec.md#4-schema-builder)
+    * [🔍 Schema Extractor](docs/schema-extractor/schema-extractor.md)
   * 📝 Logger
   * 🧪 Testing
 * 🔗 **Links**

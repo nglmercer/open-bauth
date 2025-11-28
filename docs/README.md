@@ -20,6 +20,7 @@ See the main [README](../README.md) for basics and quick start.
 
 ### 🏗️ For Advanced Users
 - [**Database Extensions**](./database-extension-spec.md) - Schema extension specification
+- [**Schema Extractor**](./schema-extractor/schema-extractor.md) - Automatic schema extraction from existing databases
 - [**Testing**](./testing.md) - Complete testing guide
 
 ### 🛠️ For Development
@@ -38,6 +39,10 @@ See the main [README](../README.md) for basics and quick start.
   - **OAuth 2.0 Schema Extensions** - Complete OAuth 2.0 database schemas
   - **Schema Builder** - Built-in schemas for standard tables
   - **Schema Class** - Advanced schema definition and manipulation
+- [**Schema Extractor**](./schema-extractor/schema-extractor.md) - Automatic schema extraction from existing databases
+  - **SQLite Database Analysis** - Extract table structures, columns, indexes, and constraints
+  - **Zod Schema Generation** - Generate type-safe validation schemas from database tables
+  - **Legacy Database Support** - Work with existing databases without manual schema definitions
 
 ### 🛠️ Development Tools
 - [**Logger**](./logger.md) - Configurable and flexible logging system
@@ -64,7 +69,6 @@ See the main [README](../README.md) for basics and quick start.
 
 | Feature | Description |
 |---------|-------------|
-| **Version** | 1.3.5 |
 | **Runtime** | Bun |
 | **Database** | SQLite + adapters |
 | **Authentication** | JWT + RBAC + OAuth 2.0 |
