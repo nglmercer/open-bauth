@@ -3,6 +3,8 @@
   * 🔐 Servicios
   * 🛡️ Middleware
   * 🗄️ Base de Datos
+    * 🔐 OAuth 2.0 Schemas
+    * 🔨 Schema Builder
   * 📝 Logger
   * 🧪 Testing
 * 🔗 **Links**
@@ -10,4 +12,4 @@
   * 🐛 [GitHub](https://github.com/nglmercer/open-bauth)
   * 💬 [Discussions](https://github.com/nglmercer/open-bauth/discussions)
 
-* 🌐 **v1.3.2**
+* 🌐 **v1.3.5**

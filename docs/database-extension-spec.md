@@ -95,6 +95,92 @@ interface SchemaOptions {
 
 #### Advanced Schema Features
 
+The Schema class provides several advanced features for complex table definitions:
+
+```typescript
+// Quick schema using only constructors
+const quickSchema = new Schema({
+  id: String,
+  name: { type: String, required: true },
+  metadata: Object,
+  tags: Array,
+  profile: {
+    bio: String,
+    avatar: String
+  }
+});
+
+// Advanced schema with relationships and constraints
+const advancedSchema = new Schema({
+  user_id: { 
+    type: String, 
+    ref: "users" // Automatically creates references table: "users", column: "id"
+  },
+  status: { 
+    type: String, 
+    default: "active",
+    check: "status IN ('active', 'inactive', 'pending')"
+  },
+  expires_at: { 
+    type: Date, 
+    notNull: true 
+  },
+  is_premium: { 
+    type: Boolean, 
+    default: false 
+  }
+});
+```
+
+#### Schema Class Methods
+
+The Schema class provides several useful methods for schema manipulation:
+
+```typescript
+// Get columns as ColumnDefinition[]
+const columns = userSchema.getColumns();
+
+// Get the raw definition
+const definition = userSchema.getDefinition();
+
+// Get schema options
+const options = userSchema.getOptions();
+
+// Create a Schema from a TableSchema
+const tableSchema = { /* ... */ };
+const schemaInstance = Schema.fromTableSchema(tableSchema);
+
+// Compare two schemas for equivalence
+const isEqual = schema1.equals(schema2, "table_name");
+
+// Static method to compare TableSchemas
+const areSchemasEqual = Schema.compareTableSchemas(tableSchema1, tableSchema2);
+```
+
+#### Type Mapping
+
+The Schema class automatically maps TypeScript types to SQL column types:
+
+```typescript
+// The following mappings are automatically applied:
+// String → TEXT
+// Number → INTEGER
+// Boolean → BOOLEAN
+// Date → DATETIME
+// Object → TEXT (JSON)
+// Array → TEXT (JSON)
+// Buffer → BLOB
+
+// You can also use direct SQL types:
+const directTypeSchema = new Schema({
+  id: { type: "INTEGER", primaryKey: true, autoIncrement: true },
+  name: { type: "VARCHAR(100)", required: true },
+  price: { type: "DECIMAL(10,2)", default: 0 }
+});
+```
+
+#### Advanced Schema Features
+
 ```typescript
 // Using constructor shortcuts
 const quickSchema = new Schema({
@@ -338,6 +424,208 @@ const dbInitializer = new DatabaseInitializer({
 });
 ```
 
+### 4. Schema Builder
+
+Use the built-in schema builder for standard database schemas:
+
+```typescript
+import { buildDatabaseSchemas, getTableSchema, getTableSchemaByKey } from 'open-bauth/src/database/schema/schema-builder';
+
+// Build all standard schemas
+const allSchemas = buildDatabaseSchemas();
+
+// Get a specific table schema by table name
+const usersSchema = getTableSchema('users');
+
+// Get a specific table schema by key (users, roles, permissions, etc.)
+const rolesSchema = getTableSchemaByKey('roles');
+```
+
+#### Standard Base Schemas
+
+The schema builder includes these base schemas:
+
+```typescript
+// Users table
+{
+  tableName: "users",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "email", type: "TEXT", required: true, unique: true },
+    { name: "username", type: "TEXT" },
+    { name: "password_hash", type: "TEXT", required: true },
+    { name: "first_name", type: "TEXT" },
+    { name: "last_name", type: "TEXT" },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "updated_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "last_login_at", type: "DATETIME" },
+    { name: "is_active", type: "BOOLEAN", defaultValue: true }
+  ],
+  indexes: [
+    { name: "idx_users_email", columns: ["email"], unique: true },
+    { name: "idx_users_username", columns: ["username"], unique: true },
+    { name: "idx_users_active", columns: ["is_active"] }
+  ]
+}
+
+// Roles table
+{
+  tableName: "roles",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "name", type: "TEXT", required: true, unique: true },
+    { name: "description", type: "TEXT" },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "updated_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "is_active", type: "BOOLEAN", defaultValue: true }
+  ],
+  indexes: [
+    { name: "idx_roles_name", columns: ["name"], unique: true }
+  ]
+}
+
+// Permissions table
+{
+  tableName: "permissions",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "name", type: "TEXT", required: true, unique: true },
+    { name: "resource", type: "TEXT", required: true },
+    { name: "action", type: "TEXT", required: true },
+    { name: "description", type: "TEXT" },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_permissions_name", columns: ["name"], unique: true },
+    { name: "idx_permissions_resource", columns: ["resource"] },
+    { name: "idx_permissions_action", columns: ["action"] }
+  ]
+}
+
+// User-roles junction table
+{
+  tableName: "user_roles",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "user_id", type: "TEXT", required: true },
+    { name: "role_id", type: "TEXT", required: true },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "updated_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_user_roles_user_id", columns: ["user_id"] },
+    { name: "idx_user_roles_role_id", columns: ["role_id"] },
+    { name: "idx_user_roles_unique", columns: ["user_id", "role_id"], unique: true }
+  ]
+}
+
+// Role-permissions junction table
+{
+  tableName: "role_permissions",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "role_id", type: "TEXT", required: true },
+    { name: "permission_id", type: "TEXT", required: true },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "updated_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_role_permissions_role_id", columns: ["role_id"] },
+    { name: "idx_role_permissions_permission_id", columns: ["permission_id"] },
+    { name: "idx_role_permissions_unique", columns: ["role_id", "permission_id"], unique: true }
+  ]
+}
+
+// Sessions table
+{
+  tableName: "sessions",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "user_id", type: "TEXT", required: true },
+    { name: "token", type: "TEXT", required: true, unique: true },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "expires_at", type: "DATETIME", required: true },
+    { name: "last_activity", type: "DATETIME", defaultValue: Date.now },
+    { name: "ip_address", type: "TEXT" },
+    { name: "user_agent", type: "TEXT" },
+    { name: "is_active", type: "BOOLEAN", defaultValue: true }
+  ],
+  indexes: [
+    { name: "idx_sessions_user_id", columns: ["user_id"] },
+    { name: "idx_sessions_token", columns: ["token"], unique: true },
+    { name: "idx_sessions_expires_at", columns: ["expires_at"] },
+    { name: "idx_sessions_active", columns: ["is_active"] }
+  ]
+}
+```
+
+#### Schema Customization
+
+Customize schemas with extensions and table name mapping:
+
+```typescript
+import { setDatabaseConfig } from 'open-bauth/src/database/config';
+
+// Configure table names and extensions
+setDatabaseConfig({
+  tableNames: {
+    users: "app_users",
+    roles: "app_roles",
+    permissions: "app_permissions",
+    userRoles: "app_user_roles",
+    rolePermissions: "app_role_permissions",
+    sessions: "app_sessions"
+  },
+  schemaExtensions: {
+    users: {
+      additionalColumns: [
+        { name: "profile_image", type: "TEXT" },
+        { name: "phone_number", type: "TEXT" }
+      ],
+      additionalIndexes: [
+        { name: "idx_app_users_phone", columns: ["phone_number"] }
+      ]
+    }
+  }
+});
+```
+
+#### Schema Extension Processing
+
+The schema builder handles schema extensions automatically:
+
+```typescript
+// The schema builder processes:
+// 1. Base schemas with standard fields
+// 2. Applied schema extensions (add/remove/modify columns)
+// 3. Updated table references based on custom table names
+// 4. OAuth schema extensions if registered
+
+// Example of how extensions are applied:
+function applySchemaExtensions(baseSchema, extension) {
+  let columns = [...baseSchema.columns];
+  
+  // Remove columns
+  if (extension.removedColumns) {
+    const toRemove = new Set(extension.removedColumns);
+    columns = columns.filter(col => !toRemove.has(col.name));
+  }
+  
+  // Modify columns
+  if (extension.modifiedColumns) {
+    const modifications = new Map(extension.modifiedColumns.map(c => [c.name, c]));
+    columns = columns.map(col => modifications.get(col.name) || col);
+  }
+  
+  // Add columns
+  if (extension.additionalColumns) {
+    columns.push(...extension.additionalColumns);
+  }
+  
+  return { ...baseSchema, columns };
+}
+```
+
 ## 🎨 Predefined Extensions
 
 ### UserProfile Extension
@@ -494,7 +782,7 @@ setDatabaseConfig({
 
 ### OAuth 2.0 Schema Extensions
 
-Complete OAuth 2.0 implementation:
+Complete OAuth 2.0 implementation with advanced security features:
 
 ```typescript
 import { registerOAuthSchemaExtensions, getOAuthSchemas } from 'open-bauth/src/database/schema/oauth-schema-extensions';
@@ -510,18 +798,307 @@ const dbInitializer = new DatabaseInitializer({
   database: db,
   externalSchemas: oauthSchemas
 });
+```
 
-// Creates tables:
-// - oauth_clients
-// - authorization_codes
-// - refresh_tokens
-// - device_secrets
-// - biometric_credentials
-// - anonymous_users
-// - user_devices
-// - mfa_configurations
-// - security_challenges
-// - oauth_sessions
+#### OAuth Clients Schema
+
+```typescript
+// oauth_clients table definition
+{
+  tableName: "oauth_clients",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "client_id", type: "TEXT", required: true, unique: true },
+    { name: "client_secret", type: "TEXT" },
+    { name: "client_secret_salt", type: "TEXT" },
+    { name: "client_name", type: "TEXT", required: true },
+    { name: "redirect_uris", type: "TEXT", required: true }, // JSON array
+    { name: "grant_types", type: "TEXT", required: true },   // JSON array
+    { name: "response_types", type: "TEXT", required: true },// JSON array
+    { name: "scope", type: "TEXT", defaultValue: "" },
+    { name: "logo_uri", type: "TEXT" },
+    { name: "client_uri", type: "TEXT" },
+    { name: "policy_uri", type: "TEXT" },
+    { name: "tos_uri", type: "TEXT" },
+    { name: "jwks_uri", type: "TEXT" },
+    { name: "token_endpoint_auth_method", type: "TEXT", defaultValue: "client_secret_basic" },
+    { name: "is_public", type: "BOOLEAN", defaultValue: false },
+    { name: "is_active", type: "BOOLEAN", defaultValue: true },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "updated_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_oauth_clients_client_id", columns: ["client_id"], unique: true },
+    { name: "idx_oauth_clients_active", columns: ["is_active"] }
+  ]
+}
+```
+
+#### Authorization Codes Schema
+
+```typescript
+// authorization_codes table definition
+{
+  tableName: "authorization_codes",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "code", type: "TEXT", required: true, unique: true },
+    { name: "client_id", type: "TEXT", required: true },
+    { name: "user_id", type: "TEXT", required: true },
+    { name: "redirect_uri", type: "TEXT", required: true },
+    { name: "scope", type: "TEXT", defaultValue: "" },
+    { name: "state", type: "TEXT" },
+    { name: "nonce", type: "TEXT" },
+    { name: "code_challenge", type: "TEXT" },
+    { name: "code_challenge_method", type: "TEXT" },
+    { name: "expires_at", type: "DATETIME", required: true },
+    { name: "is_used", type: "BOOLEAN", defaultValue: false },
+    { name: "used_at", type: "DATETIME" },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_auth_codes_code", columns: ["code"], unique: true },
+    { name: "idx_auth_codes_client_id", columns: ["client_id"] },
+    { name: "idx_auth_codes_user_id", columns: ["user_id"] },
+    { name: "idx_auth_codes_expires_at", columns: ["expires_at"] },
+    { name: "idx_auth_codes_used", columns: ["is_used"] }
+  ]
+}
+```
+
+#### Refresh Tokens Schema
+
+```typescript
+// refresh_tokens table definition
+{
+  tableName: "refresh_tokens",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "token", type: "TEXT", required: true, unique: true },
+    { name: "client_id", type: "TEXT", required: true },
+    { name: "user_id", type: "TEXT", required: true },
+    { name: "scope", type: "TEXT", defaultValue: "" },
+    { name: "expires_at", type: "DATETIME", required: true },
+    { name: "is_revoked", type: "BOOLEAN", defaultValue: false },
+    { name: "revoked_at", type: "DATETIME" },
+    { name: "rotation_count", type: "INTEGER", defaultValue: 0 },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_refresh_tokens_token", columns: ["token"], unique: true },
+    { name: "idx_refresh_tokens_client_id", columns: ["client_id"] },
+    { name: "idx_refresh_tokens_user_id", columns: ["user_id"] },
+    { name: "idx_refresh_tokens_expires_at", columns: ["expires_at"] },
+    { name: "idx_refresh_tokens_revoked", columns: ["is_revoked"] }
+  ]
+}
+```
+
+#### Device Secrets Schema
+
+```typescript
+// device_secrets table definition
+{
+  tableName: "device_secrets",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "user_id", type: "TEXT", required: true },
+    { name: "device_id", type: "TEXT", required: true, unique: true },
+    { name: "device_name", type: "TEXT", required: true },
+    { name: "device_type", type: "TEXT", required: true },
+    { name: "secret_hash", type: "TEXT", required: true },
+    { name: "secret_salt", type: "TEXT" },
+    { name: "is_trusted", type: "BOOLEAN", defaultValue: false },
+    { name: "last_used_at", type: "DATETIME" },
+    { name: "expires_at", type: "DATETIME" },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_device_secrets_user_id", columns: ["user_id"] },
+    { name: "idx_device_secrets_device_id", columns: ["device_id"], unique: true },
+    { name: "idx_device_secrets_trusted", columns: ["is_trusted"] },
+    { name: "idx_device_secrets_expires_at", columns: ["expires_at"] }
+  ]
+}
+```
+
+#### Biometric Credentials Schema
+
+```typescript
+// biometric_credentials table definition
+{
+  tableName: "biometric_credentials",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "user_id", type: "TEXT", required: true },
+    { name: "biometric_type", type: "TEXT", required: true },
+    { name: "credential_data", type: "TEXT", required: true }, // Encrypted biometric data
+    { name: "device_id", type: "TEXT" },
+    { name: "is_active", type: "BOOLEAN", defaultValue: true },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "expires_at", type: "DATETIME" }
+  ],
+  indexes: [
+    { name: "idx_biometric_creds_user_id", columns: ["user_id"] },
+    { name: "idx_biometric_creds_type", columns: ["biometric_type"] },
+    { name: "idx_biometric_creds_device_id", columns: ["device_id"] },
+    { name: "idx_biometric_creds_active", columns: ["is_active"] },
+    { name: "idx_biometric_creds_expires_at", columns: ["expires_at"] }
+  ]
+}
+```
+
+#### Anonymous Users Schema
+
+```typescript
+// anonymous_users table definition
+{
+  tableName: "anonymous_users",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "anonymous_id", type: "TEXT", required: true, unique: true },
+    { name: "session_data", type: "TEXT", required: true }, // JSON
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "promoted_to_user_id", type: "TEXT" },
+    { name: "promoted_at", type: "DATETIME" },
+    { name: "expires_at", type: "DATETIME", required: true }
+  ],
+  indexes: [
+    { name: "idx_anon_users_anonymous_id", columns: ["anonymous_id"], unique: true },
+    { name: "idx_anon_users_promoted_to", columns: ["promoted_to_user_id"] },
+    { name: "idx_anon_users_expires_at", columns: ["expires_at"] }
+  ]
+}
+```
+
+#### User Devices Schema
+
+```typescript
+// user_devices table definition
+{
+  tableName: "user_devices",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "user_id", type: "TEXT", required: true },
+    { name: "device_id", type: "TEXT", required: true, unique: true },
+    { name: "device_name", type: "TEXT", required: true },
+    { name: "device_type", type: "TEXT", required: true },
+    { name: "platform", type: "TEXT" },
+    { name: "user_agent", type: "TEXT" },
+    { name: "is_trusted", type: "BOOLEAN", defaultValue: false },
+    { name: "last_seen_at", type: "DATETIME" },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_user_devices_user_id", columns: ["user_id"] },
+    { name: "idx_user_devices_device_id", columns: ["device_id"], unique: true },
+    { name: "idx_user_devices_trusted", columns: ["is_trusted"] },
+    { name: "idx_user_devices_last_seen", columns: ["last_seen_at"] }
+  ]
+}
+```
+
+#### MFA Configurations Schema
+
+```typescript
+// mfa_configurations table definition
+{
+  tableName: "mfa_configurations",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "user_id", type: "TEXT", required: true },
+    { name: "mfa_type", type: "TEXT", required: true },
+    { name: "is_enabled", type: "BOOLEAN", defaultValue: false },
+    { name: "is_primary", type: "BOOLEAN", defaultValue: false },
+    { name: "secret", type: "TEXT" },
+    { name: "phone_number", type: "TEXT" },
+    { name: "email", type: "TEXT" },
+    { name: "backup_codes", type: "TEXT" }, // JSON array
+    { name: "configuration_data", type: "TEXT" }, // JSON
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now },
+    { name: "updated_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_mfa_configs_user_id", columns: ["user_id"] },
+    { name: "idx_mfa_configs_type", columns: ["mfa_type"] },
+    { name: "idx_mfa_configs_enabled", columns: ["is_enabled"] },
+    { name: "idx_mfa_configs_primary", columns: ["is_primary"] }
+  ]
+}
+```
+
+#### Security Challenges Schema
+
+```typescript
+// security_challenges table definition
+{
+  tableName: "security_challenges",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "challenge_id", type: "TEXT", required: true, unique: true },
+    { name: "challenge_type", type: "TEXT", required: true },
+    { name: "challenge_data", type: "TEXT", required: true },
+    { name: "expires_at", type: "DATETIME", required: true },
+    { name: "is_solved", type: "BOOLEAN", defaultValue: false },
+    { name: "solved_at", type: "DATETIME" },
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_security_challenges_challenge_id", columns: ["challenge_id"], unique: true },
+    { name: "idx_security_challenges_type", columns: ["challenge_type"] },
+    { name: "idx_security_challenges_expires_at", columns: ["expires_at"] },
+    { name: "idx_security_challenges_solved", columns: ["is_solved"] }
+  ]
+}
+```
+
+#### OAuth Sessions Schema
+
+```typescript
+// oauth_sessions table definition
+{
+  tableName: "oauth_sessions",
+  columns: [
+    { name: "id", type: "TEXT", primaryKey: true, defaultValue: "(lower(hex(randomblob(16))))" },
+    { name: "session_id", type: "TEXT", required: true, unique: true },
+    { name: "client_id", type: "TEXT", required: true },
+    { name: "user_id", type: "TEXT" },
+    { name: "auth_time", type: "DATETIME" },
+    { name: "expires_at", type: "DATETIME", required: true },
+    { name: "is_active", type: "BOOLEAN", defaultValue: true },
+    { name: "session_data", type: "TEXT" }, // JSON
+    { name: "created_at", type: "DATETIME", defaultValue: Date.now }
+  ],
+  indexes: [
+    { name: "idx_oauth_sessions_session_id", columns: ["session_id"], unique: true },
+    { name: "idx_oauth_sessions_client_id", columns: ["client_id"] },
+    { name: "idx_oauth_sessions_user_id", columns: ["user_id"] },
+    { name: "idx_oauth_sessions_expires_at", columns: ["expires_at"] },
+    { name: "idx_oauth_sessions_active", columns: ["is_active"] }
+  ]
+}
+```
+
+#### Schema Integration
+
+```typescript
+// Complete OAuth schema registration
+import { registerOAuthSchemaExtensions } from 'open-bauth/src/database/schema/oauth-schema-extensions';
+
+// Register all OAuth schema extensions in the database config
+registerOAuthSchemaExtensions();
+
+// This creates the following tables:
+// - oauth_clients: OAuth 2.0 client applications
+// - authorization_codes: Authorization codes for PKCE flow
+// - refresh_tokens: Refresh tokens with rotation support
+// - device_secrets: Device secrets for SSO
+// - biometric_credentials: Encrypted biometric credentials
+// - anonymous_users: Anonymous user sessions with promotion
+// - user_devices: User device registry
+// - mfa_configurations: Multi-factor authentication configurations
+// - security_challenges: Security challenges (CAPTCHA, etc.)
+// - oauth_sessions: OAuth session management
 ```
 
 ### Custom Business Logic Schemas

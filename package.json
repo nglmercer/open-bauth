@@ -1,7 +1,7 @@
 {
   "name": "open-bauth",
-  "version": "1.3.5",
-  "description": "Framework-agnostic authentication library built with Bun, TypeScript, and SQLite",
+  "version": "1.3.6",
+  "description": "Framework-agnostic authentication with OAuth 2.0, advanced schema management, and security features built with Bun, TypeScript, and SQLite",
   "main": "dist/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
@@ -38,6 +38,9 @@
     "authorization",
     "jwt",
     "rbac",
+    "oauth2",
+    "openid-connect",
+    "schema",
     "bun",
     "typescript",
     "sqlite",
@@ -46,7 +49,9 @@
     "express",
     "websocket",
     "middleware",
-    "security"
+    "security",
+    "mfa",
+    "biometric"
   ],
   "author": "melser",
   "license": "MIT",

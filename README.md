@@ -1,19 +1,49 @@
-# Framework-Agnostic Authentication Library
+# Framework-Agnostic Authentication & OAuth 2.0 Library
 
 [![Bun](https://img.shields.io/badge/Bun-%23FFEB3A?style=for-the-badge&logo=bun&logoColor=white)](https://bun.sh/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=json-web-tokens&logoColor=white)](https://jwt.io/)
+[![OAuth 2.0](https://img.shields.io/badge/OAuth%202.0-5856D6?style=for-the-badge&logo=oauth&logoColor=white)](https://oauth.net/2/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-A comprehensive, framework-agnostic authentication and authorization library built with TypeScript, Bun, and SQLite. It provides JWT-based auth, RBAC (roles and permissions), framework-neutral middleware, and a flexible database layer.
+A comprehensive, framework-agnostic authentication and authorization library with complete OAuth 2.0 implementation. Built with TypeScript, Bun, and SQLite. It provides JWT-based auth, RBAC (roles and permissions), OAuth 2.0 flows, MFA support, biometric authentication, and advanced schema management.
 
 - **Runtime**: Bun (Node.js compatible for most features)
 - **Storage**: SQLite by default (via Bun), **extensible to other databases via adapter system**
 - **Language**: TypeScript, with full type definitions
-- **Features**: Schema extensions, BIT type support, advanced filtering, RBAC, JWT auth, **custom database adapters**
+- **Features**: Schema extensions, BIT type support, advanced filtering, RBAC, JWT auth, **custom database adapters**, **OAuth 2.0**, **MFA**, **Biometric Authentication**
 
 ---
+
+## ✨ Key Features
+
+### 🔐 Core Authentication
+- **JWT-based authentication** with secure token generation and validation
+- **Role-Based Access Control (RBAC)** with flexible permissions system
+- **Complete OAuth 2.0 implementation** with all standard flows
+- **Multi-Factor Authentication (MFA)** support with various methods
+- **Biometric Authentication** with secure credential storage
+
+### 🗄️ Database & Schema Management
+- **Advanced Schema Class** for flexible table definitions
+- **Built-in Schema Builder** with standard authentication tables
+- **OAuth 2.0 Schema Extensions** for complete implementation
+- **Schema Extension System** for custom table modifications
+- **Custom Database Adapters** for PostgreSQL, MySQL, and others
+
+### 🛡️ Security Features
+- **PKCE support** (RFC 7636) for public clients
+- **DPoP implementation** (RFC 9449) for token binding
+- **Device secrets** for Single Sign-On (SSO)
+- **Security challenges** for additional verification
+- **Audit logging** for compliance and monitoring
+
+### 🌐 Framework Integration
+- **Framework-agnostic middleware** for Hono, Express, Elysia, Fastify
+- **Type-safe interfaces** for all framework integrations
+- **Context injection** for request-scoped data
+- **Error handling** with consistent responses
 
 ## Installation
 
@@ -272,6 +302,53 @@ export class MyCustomAdapter implements IDatabaseAdapter {
 
 ## Core Concepts and APIs
 
+### Database Schema Management
+Advanced schema system for defining and managing database tables:
+
+```typescript
+// Create custom schemas with the Schema class
+const customSchema = new Schema({
+  id: { type: String, primaryKey: true },
+  name: { type: String, required: true },
+  metadata: { type: Object, default: {} },
+  is_active: { type: Boolean, default: true }
+}, {
+  indexes: [
+    { name: "idx_custom_name", columns: ["name"] }
+  ]
+});
+
+// Register OAuth 2.0 schema extensions
+registerOAuthSchemaExtensions();
+
+// Get built-in schemas
+const usersSchema = getTableSchemaByKey('users');
+const rolesSchema = getTableSchemaByKey('roles');
+
+// Build all standard schemas
+const allSchemas = buildDatabaseSchemas();
+```
+
+### OAuthService
+Complete OAuth 2.0 implementation with all standard flows:
+
+- `createClient(data: CreateOAuthClientData) -> OAuthClient`
+- `handleAuthorizationRequest(request, user) -> AuthResponse`
+- `handleTokenRequest(request) -> TokenResponse`
+- `rotateRefreshToken(oldTokenId, newToken) -> RefreshToken`
+- `revokeToken(tokenId) -> boolean`
+- `introspectToken(token) -> TokenInfo`
+
+### SecurityService
+Advanced security features for modern authentication:
+
+- `generatePKCEChallenge(method) -> PKCEChallenge`
+- `generateDPoPProof(method, url, privateKey, jkt) -> DPoPProof`
+- `createChallenge(type, data, ttl) -> SecurityChallenge`
+- `verifyChallenge(challengeId, solution) -> ChallengeResult`
+- `generateState() -> string`
+- `generateNonce() -> string`
+
 ### AuthService
 High-level auth flows: register, login, user lookup/update, role assignment, etc. Depends on the database layer and JWT service.
 
@@ -282,12 +359,14 @@ High-level auth flows: register, login, user lookup/update, role assignment, etc
 - `getUsers(page?, limit?, options?) -> { users, total }`
 
 ### JWTService
-Minimal, native Web Crypto–based JWT operations.
+Minimal, native Web Crypto–based JWT operations with DPoP support:
 
-- `generateToken(user)`
-- `verifyToken(token)`
-- `extractTokenFromHeader('Bearer ...')`
-- `getTokenRemainingTime(token), isTokenExpired(token)`
+- `generateToken(user, options?) -> string`
+- `verifyToken(token, options?) -> TokenPayload`
+- `extractTokenFromHeader('Bearer ...') -> string`
+- `getTokenRemainingTime(token) -> number`
+- `isTokenExpired(token) -> boolean`
+- `verifyDPoPProof(dpopHeader, method, url) -> DPoPResult`
 - `refreshTokenIfNeeded(token, user, threshold?)`
 
 ### PermissionService

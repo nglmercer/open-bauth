@@ -35,6 +35,9 @@ See the main [README](../README.md) for basics and quick start.
 ### 🗄️ Database & Storage
 - [**Database Adapters**](./adapter-usage.md) - Customizable database adapter system
 - [**Database Extensions**](./database-extension-spec.md) - Specification for extending initial tables
+  - **OAuth 2.0 Schema Extensions** - Complete OAuth 2.0 database schemas
+  - **Schema Builder** - Built-in schemas for standard tables
+  - **Schema Class** - Advanced schema definition and manipulation
 
 ### 🛠️ Development Tools
 - [**Logger**](./logger.md) - Configurable and flexible logging system
@@ -147,6 +150,9 @@ const authMw = createAuthMiddleware({
 - **SQLite by default** with Bun runtime optimization
 - **Custom adapter system** for PostgreSQL, MySQL, and custom databases
 - **Schema extensions** for custom table definitions
+  - **OAuth 2.0 schemas** with complete implementation
+  - **Schema Builder** with predefined table structures
+  - **Advanced Schema Class** with flexible field definitions
 - **Automatic migrations** with rollback support
 - **Advanced querying** with complex filtering and pagination
 
@@ -247,7 +253,10 @@ const permissionService = new PermissionService(dbInitializer);
 ### Complete OAuth 2.0 Implementation
 
 ```typescript
-import { OAuthService, SecurityService } from 'open-bauth';
+import { OAuthService, SecurityService, registerOAuthSchemaExtensions } from 'open-bauth';
+
+// Register OAuth schema extensions
+registerOAuthSchemaExtensions();
 
 const oauthService = new OAuthService(dbInitializer, securityService, jwtService);
 
@@ -271,6 +280,31 @@ const authResponse = await oauthService.handleAuthorizationRequest({
   code_challenge: pkceChallenge.code_challenge,
   code_challenge_method: PKCEMethod.S256
 }, user);
+```
+
+### Advanced Schema Management
+
+```typescript
+import { Schema, buildDatabaseSchemas, getTableSchemaByKey } from 'open-bauth/src/database/schema';
+
+// Create a custom schema
+const customSchema = new Schema({
+  id: { type: String, primaryKey: true },
+  name: { type: String, required: true },
+  metadata: { type: Object, default: {} },
+  is_active: { type: Boolean, default: true }
+}, {
+  indexes: [
+    { name: "idx_custom_name", columns: ["name"] }
+  ]
+});
+
+// Get built-in schemas
+const usersSchema = getTableSchemaByKey('users');
+const rolesSchema = getTableSchemaByKey('roles');
+
+// Build all standard schemas
+const allSchemas = buildDatabaseSchemas();
 ```
 
 ### Custom Database Adapter

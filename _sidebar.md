@@ -4,7 +4,10 @@
   * [🔐 Servicios](docs/services.md)
   * [🛡️ Middleware](docs/middleware.md)
   * [🗄️ Adaptadores de Base de Datos](docs/adapter-usage.md)
-  * [📖 Extensiones de Base de Datos](docs/database-extension-spec.md)
+  * 🗄️ [📖 Extensiones de Base de Datos](docs/database-extension-spec.md)
+      * 📋 [OAuth 2.0 Schema Extensions](docs/database-extension-spec.md#oauth-20-schema-extensions)
+      * 🔨 [Schema Builder](docs/database-extension-spec.md#4-schema-builder)
+      * 🏗️ [Schema Class](docs/database-extension-spec.md#schema-class)
 
 * 🔐 **Autenticación & Seguridad**
   * [🔑 OAuth 2.0](docs/oauth-2.0-implementation.md)
