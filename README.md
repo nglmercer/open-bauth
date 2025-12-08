@@ -31,6 +31,7 @@ A comprehensive, framework-agnostic authentication and authorization library wit
 - **OAuth 2.0 Schema Extensions** for complete implementation
 - **Schema Extension System** for custom table modifications
 - **Custom Database Adapters** for PostgreSQL, MySQL, and others
+- **Cascade Delete Support** for defining relationships with automatic cleanup
 
 ### 🛡️ Security Features
 - **PKCE support** (RFC 7636) for public clients
@@ -693,6 +694,7 @@ For in-depth guides and specifications, see the [docs/](./docs/) directory:
 
 ### 📋 Reference
 - [**Docs Index**](./docs/README.md) - Complete documentation navigation
+- [**Zod Usage**](./docs/zod-usage.md) - Zod integration and type mapping guide
 
 ---
 

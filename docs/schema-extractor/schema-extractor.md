@@ -200,7 +200,8 @@ Closes the adapter connection and cleans up resources.
 The extractor automatically detects column types and enhances them where possible:
 
 - **Date Detection**: Analyzes TEXT columns to detect if they contain date values
-- **Foreign Key Detection**: Extracts foreign key relationships from PRAGMA data and table SQL
+- **Flexible Boolean Support**: Automatically handles `BIT` and `BOOLEAN` types, supporting various database representations (0/1, boolean, buffers)
+- **Foreign Key Detection**: Extracts foreign key relationships from PRAGMA data and table SQL, including `ON DELETE` logic
 - **Index Extraction**: Identifies both single-column and multi-column indexes
 - **Constraint Analysis**: Extracts unique constraints and check constraints
 

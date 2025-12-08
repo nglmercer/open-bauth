@@ -248,4 +248,43 @@ El reexport de Zod en open-bauth proporciona:
 - ✅ Menos configuración
 - ✅ imports más limpios
 
-Esta decisión optimiza tanto el desarrollo como la producción, manteniendo toda la flexibilidad de Zod mientras se simplifica su uso con open-bauth.
+
+## Mapeo Automático de Tipos
+
+open-bauth utiliza una utilidad centralizada para mapear tipos de SQL y constructores de JavaScript a validadores Zod. Esto asegura consistencia en toda la aplicación.
+
+### Tipos Soportados
+
+| SQL Type / Constructor | Zod Validator | Notas |
+|------------------------|---------------|-------|
+| `TEXT`, `VARCHAR`, `String` | `z.string()` | |
+| `INTEGER`, `INT`, `Number` | `z.number()` | Validado como entero en algunos contextos |
+| `REAL`, `FLOAT` | `z.number()` | |
+| `DATE`, `DATETIME`, `Date` | `z.date().or(z.string())` | Acepta objetos Date o strings ISO |
+| `BLOB`, `BINARY`, `Buffer` | `z.any()` | Flexible para Buffer, Uint8Array, etc. |
+| `JSON` | `z.record(z.string(), z.any())` | |
+
+### Manejo Flexible de Booleanos (BIT/BOOLEAN)
+
+Para mejorar la compatibilidad con diferentes drivers de base de datos (especialmente SQLite y SQL Server) y formas de transmisión de datos, los tipos `BIT` y `BOOLEAN` utilizan un validador flexible:
+
+```typescript
+const flexibleBoolean = z.union([
+  z.boolean(),
+  z.number(),
+  z.instanceof(Uint8Array),
+  z.any()
+]);
+```
+
+Esto significa que tus campos booleanos aceptarán:
+- `true` / `false` (Booleans nativos)
+- `1` / `0` (Enteros usados por SQLite/MySQL)
+- `Uint8Array([1])` / `Buffer.from([0])` (Representaciones binarias)
+
+Esto es transparente para el usuario final y evita errores de validación comunes en integraciones complejas.
+
+## Soporte para Cascade Delete
+
+Los esquemas generados y las definiciones de tabla ahora soportan `ON DELETE CASCADE`. Esto se refleja en los tipos Zod generados implícitamente al manejar relaciones, asegurando que la validación lógica coincida con el comportamiento de la base de datos.
+
