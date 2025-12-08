@@ -29,7 +29,7 @@ export interface ILogger {
 }
 
 // Maintain backward compatibility
-export interface DatabaseLogger extends ILogger {}
+export interface DatabaseLogger extends ILogger { }
 
 export interface MigrationResult {
   success: boolean;
@@ -54,13 +54,14 @@ const defaultLogger: DatabaseLogger = {
     console.error(`[ERROR] ${msg}`, ...args),
 };
 const silenceLogger: DatabaseLogger = {
-  info: (msg: string, ...args: any[]) => {},
-  warn: (msg: string, ...args: any[]) => {},
-  error: (msg: string, ...args: any[]) => {},
+  info: (msg: string, ...args: any[]) => { },
+  warn: (msg: string, ...args: any[]) => { },
+  error: (msg: string, ...args: any[]) => { },
 };
 // Database table schemas using your existing structure
 // Import dynamic schema builder
 import { buildDatabaseSchemas } from "./schema/schema-builder";
+import { Schema, type ModelZodSchemas } from "./schema/schema";
 
 // Legacy export for backward compatibility - now uses dynamic schemas
 export const DATABASE_SCHEMAS: TableSchema[] = [];
@@ -533,6 +534,18 @@ export class DatabaseInitializer {
   }
 
   /**
+   * Get all Zod schemas for registered tables
+   */
+  getZodSchemas(): SchemaCollection {
+    const collection: SchemaCollection = {};
+    for (const tableSchema of this.schemas.getAll()) {
+      const schemaInstance = Schema.fromTableSchema(tableSchema);
+      collection[tableSchema.tableName] = schemaInstance.toZod();
+    }
+    return collection;
+  }
+
+  /**
    * Create a controller instance for a specific table
    */
   createController<T = Record<string, unknown>>(
@@ -541,7 +554,17 @@ export class DatabaseInitializer {
     return new BaseController<T>(tableName, {
       database: this.database,
       isSQLite: true,
+      schemas: this.getZodSchemas(),
     });
+  }
+
+  /**
+   * Get Zod schema for a specific table
+   */
+  getSchema(tableName: string): ModelZodSchemas | null {
+    const tableSchema = this.schemas.get(tableName);
+    if (!tableSchema) return null;
+    return Schema.fromTableSchema(tableSchema).toZod();
   }
 
   /**

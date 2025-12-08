@@ -118,6 +118,7 @@ export interface ColumnDefinition {
     table: string;
     column: string;
   };
+  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
 }
 
 export interface TableSchema {
@@ -340,6 +341,9 @@ export class BaseController<T = Record<string, unknown>> {
 
         if (col.references) {
           columnDef += ` REFERENCES "${col.references.table}"("${col.references.column}")`;
+          if (col.onDelete) {
+            columnDef += ` ON DELETE ${col.onDelete}`;
+          }
         }
 
         if (col.check) {
@@ -350,7 +354,8 @@ export class BaseController<T = Record<string, unknown>> {
       })
       .join(", ");
 
-    return `CREATE TABLE IF NOT EXISTS "${schema.tableName}" (${columns})`;
+    const sql = `CREATE TABLE IF NOT EXISTS "${schema.tableName}" (${columns})`;
+    return sql;
   }
 
   private static generateCreateIndexSQL(
@@ -610,9 +615,9 @@ export class BaseController<T = Record<string, unknown>> {
           .all();
         return Array.isArray(result)
           ? (result as any[]).map((col: any) => ({
-              name: col.name,
-              pk: col.pk,
-            }))
+            name: col.name,
+            pk: col.pk,
+          }))
           : [];
       } else {
         // Generic SQL for PostgreSQL
@@ -998,8 +1003,8 @@ export class BaseController<T = Record<string, unknown>> {
         .getConnection()
         .query(query)
         .get(...params)) as {
-        total: number;
-      };
+          total: number;
+        };
 
       return {
         success: true,
@@ -1393,6 +1398,16 @@ export class BaseController<T = Record<string, unknown>> {
     } finally {
       await extractor.close();
     }
+  }
+  /**
+   * Returns the validation schema (Zod) used for this controller.
+   * This allows accessing the schema with which the controller was created.
+   * @param operation The operation to get the schema for (create, update, read)
+   */
+  public getValidationSchema(
+    operation: "create" | "update" | "read" = "read",
+  ): ValidationSchema | undefined {
+    return this.schemas?.[this.tableName]?.[operation];
   }
 }
 

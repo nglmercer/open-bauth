@@ -9,6 +9,7 @@ import type {
 import type { IDatabaseAdapter, DatabaseAdapterConfig } from "../adapter";
 import { AdapterFactory } from "../adapter";
 import { Schema } from "./schema";
+import { mapSqlTypeToZodType } from "./zod-mapping";
 
 /**
  * Interface for extracted SQLite column info
@@ -639,39 +640,7 @@ export class SQLiteSchemaExtractor {
   private createZodTypeFromColumn(column: ColumnDefinition): z.ZodTypeAny {
     const { type, notNull } = column;
 
-    let zodType: z.ZodTypeAny;
-
-    switch (type) {
-      case "INTEGER":
-      case "SERIAL": // Added SERIAL case to match INTEGER
-        zodType = z.number().int();
-        break;
-
-      case "REAL":
-        zodType = z.number();
-        break;
-
-      case "TEXT":
-        zodType = z.string();
-        break;
-
-      case "BOOLEAN":
-        zodType = z.boolean();
-        break;
-
-      case "DATE":
-      case "DATETIME":
-        zodType = z.date();
-        break;
-
-      case "BLOB":
-        zodType = z.instanceof(Uint8Array).or(z.string());
-        break;
-
-      default:
-        zodType = z.string();
-        break;
-    }
+    let zodType = mapSqlTypeToZodType(type);
 
     // Apply nullable/optional logic
     if (!notNull && !column.primaryKey) {

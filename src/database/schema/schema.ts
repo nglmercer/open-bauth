@@ -12,6 +12,14 @@ type ConstructorType =
   | ObjectConstructor
   | ArrayConstructor
   | BufferConstructor;
+import { z } from "zod";
+import { mapSqlTypeToZodType, mapConstructorToZodType } from "./zod-mapping";
+
+export interface ModelZodSchemas {
+  create: z.ZodObject<any>;
+  update: z.ZodObject<any>;
+  read: z.ZodObject<any>;
+}
 
 export interface SchemaIndex {
   name: string;
@@ -36,6 +44,7 @@ export interface SchemaTypeOptions {
     column: string;
   };
   check?: string;
+  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
 }
 
 type SchemaField =
@@ -81,18 +90,109 @@ export class Schema {
   }
 
   /**
-   * Convierte un TableSchema a una instancia de Schema
+   * Generates Zod schemas (create, update, read) from the schema definition
    */
+  public toZod(): ModelZodSchemas {
+    const shape = this.parseZodShape(this.definition);
+    const baseSchema = z.object(shape);
+
+    const createShape: Record<string, z.ZodTypeAny> = {};
+    const updateShape: Record<string, z.ZodTypeAny> = {};
+    const readShape: Record<string, z.ZodTypeAny> = { ...shape };
+
+    for (const [key, field] of Object.entries(this.definition)) {
+      const zodType = this.mapFieldToZod(field);
+
+      let isRequiredForCreate = false; // Default to optional (nullable in SQL defaults to NULL if omitted)
+
+      if (!this.isConstructor(field) && typeof field === "object" && !Array.isArray(field)) {
+        const opts = field as SchemaTypeOptions;
+        // If explicitly required or notNull or primaryKey, set to required
+        if (opts.required || opts.notNull) {
+          isRequiredForCreate = true;
+        }
+
+        // Override if default exists (can be omitted)
+        if (opts.default !== undefined) {
+          isRequiredForCreate = false;
+        }
+        // Primary Key is usually auto-generated
+        if (opts.primaryKey) {
+          isRequiredForCreate = false;
+        }
+      }
+
+      createShape[key] = isRequiredForCreate ? zodType : zodType.optional();
+      updateShape[key] = zodType.optional();
+    }
+
+    return {
+      create: z.object(createShape),
+      update: z.object(updateShape),
+      read: baseSchema,
+    };
+  }
+
+  private parseZodShape(definition: SchemaDefinition): Record<string, z.ZodTypeAny> {
+    const shape: Record<string, z.ZodTypeAny> = {};
+    for (const [key, value] of Object.entries(definition)) {
+      shape[key] = this.mapFieldToZod(value);
+    }
+    return shape;
+  }
+
+  private mapFieldToZod(field: SchemaField): z.ZodTypeAny {
+    if (this.isConstructor(field)) {
+      // Raw constructor implies nullable in our system (no notNull flag)
+      return this.mapConstructorToZod(field as ConstructorType).nullable();
+    }
+
+    if (Array.isArray(field)) {
+      if (field.length > 0) {
+        return z.array(this.mapFieldToZod(field[0]));
+      }
+      return z.array(z.any());
+    }
+
+    if (typeof field === "object" && field !== null) {
+      if ((field as any).type && (this.isConstructor((field as any).type) || typeof (field as any).type === 'string')) {
+        const options = field as SchemaTypeOptions;
+        let zodType = this.mapConstructorToZod(options.type);
+
+        if (options.check) {
+          // checks ignored for Zod types currently
+        }
+
+        // Apply nullable if NOT (required OR notNull OR primaryKey)
+        if (!options.notNull && !options.required && !options.primaryKey) {
+          zodType = zodType.nullable();
+        }
+
+        return zodType;
+      } else {
+        const shape = this.parseZodShape(field as SchemaDefinition);
+        return z.object(shape);
+      }
+    }
+
+    return z.any();
+  }
+
+  private mapConstructorToZod(type: ConstructorType | ColumnType): z.ZodTypeAny {
+    if (typeof type === 'string') {
+      return mapSqlTypeToZodType(type);
+    }
+    return mapConstructorToZodType(type);
+  }
+
   public static fromTableSchema(tableSchema: TableSchema): Schema {
     const definition: SchemaDefinition = {};
     const options: SchemaOptions = {};
 
-    // Convertir columnas a definición de schema
     for (const column of tableSchema.columns) {
       definition[column.name] = this.convertColumnToSchemaField(column);
     }
 
-    // Convertir índices a opciones
     if (tableSchema.indexes && tableSchema.indexes.length > 0) {
       options.indexes = tableSchema.indexes.map((index) => ({
         name: index.name,
@@ -104,9 +204,6 @@ export class Schema {
     return new Schema(definition, options);
   }
 
-  /**
-   * Compara dos schemas para verificar si son equivalentes
-   */
   public equals(other: Schema, tableName: string = "test"): boolean {
     const thisTableSchema = this.toTableSchema(tableName);
     const otherTableSchema = other.toTableSchema(tableName);
@@ -114,19 +211,14 @@ export class Schema {
     return this.compareTableSchemas(thisTableSchema, otherTableSchema);
   }
 
-  /**
-   * Compara dos TableSchemas para verificar si son equivalentes
-   */
   public static compareTableSchemas(
     schema1: TableSchema,
     schema2: TableSchema,
   ): boolean {
-    // Comparar tableName
     if (schema1.tableName !== schema2.tableName) {
       return false;
     }
 
-    // Comparar columnas
     if (schema1.columns.length !== schema2.columns.length) {
       return false;
     }
@@ -142,7 +234,6 @@ export class Schema {
       }
     }
 
-    // Comparar índices
     const indexes1 = schema1.indexes || [];
     const indexes2 = schema2.indexes || [];
 
@@ -177,7 +268,7 @@ export class Schema {
 
     if (column.primaryKey) {
       field.primaryKey = true;
-      field.required = true; // primaryKey implica required
+      field.required = true;
     } else if (column.notNull) {
       field.required = true;
     }
@@ -190,6 +281,10 @@ export class Schema {
       field.check = column.check;
     }
 
+    if (column.onDelete) {
+      field.onDelete = column.onDelete;
+    }
+
     if (column.defaultValue !== undefined) {
       if (column.defaultValue === "CURRENT_TIMESTAMP") {
         field.default = Date.now;
@@ -197,7 +292,6 @@ export class Schema {
         typeof column.defaultValue === "object" &&
         column.defaultValue !== null
       ) {
-        // Para objetos, hacer una copia profunda para evitar problemas de referencia
         field.default = JSON.parse(JSON.stringify(column.defaultValue));
       } else {
         field.default = column.defaultValue;
@@ -232,7 +326,7 @@ export class Schema {
       case "BLOB":
         return Buffer;
       default:
-        return type; // Retornar el tipo string si no hay mapeo directo
+        return type;
     }
   }
 
@@ -240,12 +334,10 @@ export class Schema {
     col1: ColumnDefinition,
     col2: ColumnDefinition,
   ): boolean {
-    // Comparar propiedades básicas
     if (col1.name !== col2.name || col1.type !== col2.type) {
       return false;
     }
 
-    // Comparar booleanos
     const boolProps: (keyof ColumnDefinition)[] = [
       "primaryKey",
       "notNull",
@@ -257,42 +349,34 @@ export class Schema {
       }
     }
 
-    // Comparar defaultValue
     if (col1.defaultValue !== col2.defaultValue) {
-      // Manejar casos especiales como CURRENT_TIMESTAMP
       if (
         col1.defaultValue === "CURRENT_TIMESTAMP" &&
         col2.defaultValue === "CURRENT_TIMESTAMP"
       ) {
-        // OK, son iguales
       } else if (
         col1.defaultValue === Date.now &&
         col2.defaultValue === Date.now
       ) {
-        // OK, son iguales
       } else if (
         typeof col1.defaultValue === "object" &&
         typeof col2.defaultValue === "object"
       ) {
-        // Comparar objetos usando JSON.stringify
         if (
           JSON.stringify(col1.defaultValue) !==
           JSON.stringify(col2.defaultValue)
         ) {
           return false;
         }
-        // OK, los objetos son iguales
       } else {
         return false;
       }
     }
 
-    // Comparar check
     if (col1.check !== col2.check) {
       return false;
     }
 
-    // Comparar references
     if (col1.references && col2.references) {
       if (
         col1.references.table !== col2.references.table ||
@@ -301,7 +385,10 @@ export class Schema {
         return false;
       }
     } else if (col1.references || col2.references) {
-      // Uno tiene references y el otro no
+      return false;
+    }
+
+    if (col1.onDelete !== col2.onDelete) {
       return false;
     }
 
@@ -349,7 +436,7 @@ export class Schema {
 
       if (value.primaryKey) {
         sqlColumn.primaryKey = true;
-        sqlColumn.notNull = true; // Las columnas primaryKey siempre deben ser notNull
+        sqlColumn.notNull = true;
       } else if (value.required ?? value.notNull) {
         sqlColumn.notNull = true;
       }
@@ -360,6 +447,10 @@ export class Schema {
         sqlColumn.references = value.references;
       } else if (value.ref) {
         sqlColumn.references = { table: value.ref, column: "id" };
+      }
+
+      if (value.onDelete) {
+        sqlColumn.onDelete = value.onDelete;
       }
 
       if (value.default !== undefined) {
