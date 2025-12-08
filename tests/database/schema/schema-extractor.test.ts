@@ -251,7 +251,7 @@ describe("sqlite Schema Extractor", () => {
   });
 
   it("createSchemaExtractor helper should work", () => {
-    expect(() => createSchemaExtractor()).toThrow("Database path is required");
+    expect(() => createSchemaExtractor()).toThrow("Database is required");
   });
 
   it("should handle default values correctly (including booleans and numbers)", async () => {

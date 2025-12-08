@@ -62,6 +62,7 @@ const silenceLogger: DatabaseLogger = {
 // Import dynamic schema builder
 import { buildDatabaseSchemas } from "./schema/schema-builder";
 import { Schema, type ModelZodSchemas } from "./schema/schema";
+import { createSchemaExtractor } from "./schema/schema-extractor";
 
 // Legacy export for backward compatibility - now uses dynamic schemas
 export const DATABASE_SCHEMAS: TableSchema[] = [];
@@ -586,6 +587,22 @@ export class DatabaseInitializer {
   updateSchemas(): void {
     this.schemas.clear();
     this.schemas.registerMany(getSchemas());
+  }
+
+  /**
+   * Discovers all tables in the database and registers them.
+   * Useful for syncing with dynamically created tables.
+   */
+  async refreshSchemasFromDatabase(): Promise<void> {
+    const extractor = createSchemaExtractor(this.database);
+    try {
+      const newSchemas = await extractor.extractAsTableSchemas();
+      this.schemas.registerMany(newSchemas);
+      this.logger.info(`Refreshed schemas from database. Total tables: ${this.schemas.getAll().length}`);
+    } catch (error: any) {
+      this.logger.error("Failed to refresh schemas from database:", error);
+      throw error;
+    }
   }
 }
 

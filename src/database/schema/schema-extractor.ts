@@ -806,14 +806,16 @@ export class SQLiteSchemaExtractor {
  * Helper function to create an extractor quickly
  */
 export function createSchemaExtractor(
-  databasePath?: string,
+  databasePath?: string | Database,
 ): SQLiteSchemaExtractor {
-  if (databasePath) {
+  if (typeof databasePath === "string") {
     const db = new Database(databasePath);
     return new SQLiteSchemaExtractor(db);
+  } else if (databasePath instanceof Database) {
+    return new SQLiteSchemaExtractor(databasePath);
   }
 
   throw new Error(
-    "Database path is required when not providing a database instance",
+    "Database is required, path or instance",
   );
 }
