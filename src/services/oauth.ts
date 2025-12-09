@@ -28,6 +28,7 @@ import {
 } from "../types/oauth";
 import { SecurityService } from "./security";
 import { JWTService } from "./jwt";
+import { AuthService } from "./auth";
 
 /**
  * OAuth 2.0 Service for handling complete OAuth 2.0 flows
@@ -38,11 +39,13 @@ export class OAuthService {
   private refreshTokenController: BaseController<RefreshToken>;
   private securityService: SecurityService;
   private jwtService: JWTService;
+  private authService: AuthService;
 
   constructor(
     dbInitializer: DatabaseInitializer,
     securityService: SecurityService,
     jwtService: JWTService,
+    authService: AuthService,
   ) {
     this.clientController =
       dbInitializer.createController<OAuthClient>("oauth_clients");
@@ -53,6 +56,7 @@ export class OAuthService {
       dbInitializer.createController<RefreshToken>("refresh_tokens");
     this.securityService = securityService;
     this.jwtService = jwtService;
+    this.authService = authService;
   }
 
   // --- OAuth Client Management ---
@@ -75,14 +79,24 @@ export class OAuthService {
   }
 
   async createClient(data: CreateOAuthClientData): Promise<OAuthClient> {
-    // Hash client secret if provided
+    // Hash client secret if provided and not already hashed
     let clientSecret = data.client_secret;
     let clientSecretSalt = "";
+    
     if (clientSecret) {
-      const { hash, salt } =
-        await this.securityService.hashPassword(clientSecret);
-      clientSecret = hash;
-      clientSecretSalt = salt;
+      // Check if the secret looks like it's already hashed (bcrypt format)
+      const isAlreadyHashed = clientSecret.startsWith('$2') || clientSecret.length > 60;
+      
+      if (!isAlreadyHashed) {
+        // Hash the plain text secret
+        const { hash, salt } = await this.securityService.hashPassword(clientSecret);
+        clientSecret = hash;
+        clientSecretSalt = salt;
+      } else {
+        // Secret is already hashed, extract salt if possible
+        // For bcrypt, the salt is embedded in the hash, so we'll store it as is
+        clientSecretSalt = ""; // Salt is embedded in bcrypt hash
+      }
     }
 
     const result = await this.clientController.create({
@@ -103,7 +117,8 @@ export class OAuthService {
     });
 
     if (!result.success || !result.data) {
-      throw new Error("Failed to create OAuth client");
+      const errorMessage = typeof result.error === 'string' ? result.error : (result.error as any)?.message || 'Unknown error';
+      throw new Error(`Failed to create OAuth client: ${errorMessage}`);
     }
 
     return result.data;
@@ -169,11 +184,25 @@ export class OAuthService {
       return null;
     }
 
-    const isValid = await this.securityService.verifyPassword(
-      clientSecret,
-      client.client_secret,
-      (client as any).client_secret_salt || "",
-    );
+    let isValid: boolean;
+    
+    // Check if the stored secret is already hashed (bcrypt format)
+    if (client.client_secret.startsWith('$2')) {
+      // Use Bun's built-in password verification only
+      try {
+        isValid = await Bun.password.verify(clientSecret, client.client_secret);
+      } catch (bunError) {
+        console.error('Bun.password.verify failed:', bunError);
+        return null;
+      }
+    } else {
+      // Use the security service for other hashing methods
+      isValid = await this.securityService.verifyPassword(
+        clientSecret,
+        client.client_secret,
+        (client as any).client_secret_salt || "",
+      );
+    }
 
     return isValid ? client : null;
   }
@@ -759,6 +788,17 @@ export class OAuthService {
       };
     }
 
+    // Check if client is public (public clients cannot use client credentials)
+    if (client.is_public) {
+      return {
+        error: OAuthErrorType.UNAUTHORIZED_CLIENT,
+        error_description: "Public clients cannot use client credentials grant",
+        access_token: "",
+        token_type: "Bearer",
+        expires_in: 0,
+      };
+    }
+
     // Generate access token (no user context)
     const accessToken = await this.generateAccessToken(
       client,
@@ -780,16 +820,78 @@ export class OAuthService {
   private async handlePasswordGrant(
     request: TokenRequest,
   ): Promise<TokenResponse> {
-    // This would typically use the AuthService to validate credentials
-    // For now, we'll return an error as this grant type is not recommended
-    return {
-      error: OAuthErrorType.UNSUPPORTED_GRANT_TYPE,
-      error_description:
-        "Resource owner password credentials grant is not supported",
-      access_token: "",
-      token_type: "Bearer",
-      expires_in: 0,
-    };
+    try {
+      // Validate client credentials
+      const client = await this.authenticateClient(
+        request.client_id!,
+        request.client_secret,
+      );
+      if (!client) {
+        return {
+          error: OAuthErrorType.INVALID_CLIENT,
+          error_description: "Invalid client credentials",
+          access_token: "",
+          token_type: "Bearer",
+          expires_in: 0,
+        };
+      }
+
+      // For password grant, we need username and password from the request
+      // These are not in the standard TokenRequest type, but are passed in the request
+      const username = (request as any).username;
+      const password = (request as any).password;
+      
+      if (!username || !password) {
+        return {
+          error: OAuthErrorType.INVALID_REQUEST,
+          error_description: "Username and password are required for password grant",
+          access_token: "",
+          token_type: "Bearer",
+          expires_in: 0,
+        };
+      }
+
+      // Validate user credentials using AuthService
+      const loginResult = await this.authService.login({ email: username, password });
+      
+      if (!loginResult.success || !loginResult.user) {
+        return {
+          error: OAuthErrorType.INVALID_GRANT,
+          error_description: "Invalid user credentials",
+          access_token: "",
+          token_type: "Bearer",
+          expires_in: 0,
+        };
+      }
+
+      // Generate tokens
+      const accessToken = await this.generateAccessToken(
+        client,
+        loginResult.user,
+        request.scope || client.scope,
+      );
+      const refreshToken = await this.createRefreshToken({
+        client_id: client.client_id,
+        user_id: loginResult.user.id,
+        scope: request.scope || client.scope,
+      });
+
+      return {
+        access_token: accessToken,
+        token_type: "Bearer",
+        expires_in: 3600,
+        refresh_token: refreshToken.token,
+        scope: request.scope || client.scope,
+      };
+    } catch (error: any) {
+      return {
+        error: OAuthErrorType.SERVER_ERROR,
+        error_description: error.message,
+        access_token: "",
+        token_type: "Bearer",
+        expires_in: 0,
+      };
+    }
   }
 
   /**
@@ -886,8 +988,7 @@ export class OAuthService {
           scope: (payload as unknown as { scope?: string }).scope || "",
           client_id: (payload as unknown as { client_id?: string }).client_id,
           username: (payload as unknown as { email?: string }).email,
-          token_type: (payload as unknown as { token_type?: string })
-            .token_type,
+          token_type: "Bearer",
           exp: (payload as unknown as { exp?: number }).exp,
           iat: (payload as unknown as { iat?: number }).iat,
           sub: (payload as unknown as { sub?: string }).sub,
@@ -908,7 +1009,7 @@ export class OAuthService {
             active: true,
             scope: refreshToken.scope,
             client_id: refreshToken.client_id,
-            token_type: "refresh_token",
+            token_type: "Bearer",
             exp: Math.floor(new Date(refreshToken.expires_at).getTime() / 1000),
             sub: refreshToken.user_id,
           };

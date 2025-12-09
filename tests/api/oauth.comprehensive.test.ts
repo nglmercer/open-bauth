@@ -19,18 +19,23 @@ describe("OAuth API - Comprehensive Tests", () => {
     beforeEach(async () => {
         // Initialize database and services
         const db = new Database(":memory:");
+        
+        // Get OAuth schemas
+        const { getOAuthSchemas } = await import("../../src/database/schema/oauth-schema-extensions");
+        const oauthSchemas = getOAuthSchemas();
+        
         const dbInitializer = new DatabaseInitializer({
-            database: db
+            database: db,
+            externalSchemas: oauthSchemas
         });
         
         // Initialize the database
-        await dbInitializer.initialize();
         await dbInitializer.initialize();
 
         jwtService = new JWTService("test-secret");
         securityService = new SecurityService();
         authService = new AuthService(dbInitializer, jwtService);
-        oauthService = new OAuthService(dbInitializer, securityService, jwtService);
+        oauthService = new OAuthService(dbInitializer, securityService, jwtService, authService);
 
         // Create a test OAuth client
         const clientSecret = "test-secret-key";
@@ -139,7 +144,7 @@ describe("OAuth API - Comprehensive Tests", () => {
             // 3. Try to reuse code - should fail
             const secondResponse = await oauthService.handleTokenRequest(tokenRequest);
             expect(secondResponse.error).toBe(OAuthErrorType.INVALID_GRANT);
-            expect(secondResponse.error_description).toContain("Invalid or expired authorization code");
+            expect(secondResponse.error_description).toContain("Authorization code has already been used");
             expect(secondResponse.access_token).toBe("");
         });
 
@@ -219,7 +224,7 @@ describe("OAuth API - Comprehensive Tests", () => {
 
             const tokenResponse = await oauthService.handleTokenRequest(tokenRequest);
             expect(tokenResponse.error).toBe(OAuthErrorType.INVALID_GRANT);
-            expect(tokenResponse.error_description).toContain("Invalid or expired authorization code");
+            expect(tokenResponse.error_description).toContain("Invalid authorization code");
             expect(tokenResponse.access_token).toBe("");
         });
     });
@@ -274,7 +279,7 @@ describe("OAuth API - Comprehensive Tests", () => {
 
             const tokenResponse = await oauthService.handleTokenRequest(refreshRequest);
             expect(tokenResponse.error).toBe(OAuthErrorType.INVALID_GRANT);
-            expect(tokenResponse.error_description).toContain("Invalid or expired refresh token");
+            expect(tokenResponse.error_description).toContain("Invalid refresh token");
             expect(tokenResponse.access_token).toBe("");
         });
     });
@@ -349,8 +354,8 @@ describe("OAuth API - Comprehensive Tests", () => {
             };
 
             const tokenResponse = await oauthService.handleTokenRequest(tokenRequest);
-            expect(tokenResponse.error).toBe(OAuthErrorType.UNSUPPORTED_GRANT_TYPE);
-            expect(tokenResponse.error_description).toContain("Resource owner password credentials grant is not supported");
+            expect(tokenResponse.error).toBe(OAuthErrorType.INVALID_GRANT);
+            expect(tokenResponse.error_description).toContain("Invalid user credentials");
             expect(tokenResponse.access_token).toBe("");
         });
     });

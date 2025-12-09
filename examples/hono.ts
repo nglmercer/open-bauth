@@ -63,9 +63,10 @@ const securityService = new SecurityService();
 // Create OAuthService with dynamic import to avoid type conflicts
 const { OAuthService } = await import("../src/services/oauth");
 const oauthService = new OAuthService(
-  dbInitializer as any, // Cast to any to bypass type checking
+  dbInitializer,
   securityService,
   jwtService,
+  authService,
 );
 
 // Create the services container

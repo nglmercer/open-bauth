@@ -44,6 +44,7 @@ async function main() {
     dbInitializer,
     securityService,
     jwtService,
+    authService,
   );
   const enhancedUserService = new EnhancedUserService(
     dbInitializer,
