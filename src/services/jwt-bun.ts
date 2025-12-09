@@ -413,12 +413,15 @@ export class JWTServiceBun implements IJWTServiceExtended {
   async generateRefreshToken(userId: string | number): Promise<string> {
     try {
       const now = Math.floor(Date.now() / 1000);
+      // Generar un nonce aleatorio para garantizar unicidad
+      const nonce = Math.random().toString(36).substring(2, 15);
 
       const payload = {
         userId,
         type: "refresh",
         iat: now,
         exp: now + 30 * 24 * 60 * 60, // 30 días fijo
+        jti: nonce, // JWT ID para garantizar que cada token sea único
       };
 
       const header = {
