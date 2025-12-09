@@ -27,7 +27,6 @@ describe("Schema to Zod Generation", () => {
         });
 
         const zSchema = simple.toZod();
-        console.log("zSchema", zSchema);
         expect(() => zSchema.create.parse({ name: "a", count: 1 })).not.toThrow();
         // Missing fields - count/name are optional by default in SQL/Mongoose-lite logic if not required:true
         expect(() => zSchema.create.parse({})).not.toThrow();

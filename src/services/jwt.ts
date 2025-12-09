@@ -1,6 +1,7 @@
 // src/services/jwt.ts
 import type { JWTPayload, User } from "../types/auth";
 import type { OAuthJWTPayload } from "../types/oauth";
+import type { IJWTServiceExtended } from "../types/jwt-service";
 import { ServiceErrors } from "./constants";
 
 /**
@@ -8,7 +9,7 @@ import { ServiceErrors } from "./constants";
  * Utiliza Web Crypto API nativo para firmas HMAC
  * Soporta DPoP (RFC 9449), tokens OIDC y rotación de refresh tokens
  */
-export class JWTService {
+export class JWTService implements IJWTServiceExtended {
   private secret: string;
   private expiresIn: string;
   private issuer: string;

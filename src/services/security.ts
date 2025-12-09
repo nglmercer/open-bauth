@@ -343,8 +343,119 @@ export class SecurityService {
   }
 
   /**
-   * Hash a password using a secure algorithm
+   * Non-cryptographic hashing using Bun.hash (Wyhash algorithm)
+   * Optimized for speed over collision-resistance
    */
+  hashData(data: string | Uint8Array | ArrayBuffer | DataView, seed?: number | bigint): bigint {
+    return Bun.hash(data, seed) as bigint;
+  }
+
+  /**
+   * Non-cryptographic hashing with specific algorithms
+   */
+  hashWithAlgorithm(
+    algorithm: 'wyhash' | 'crc32' | 'adler32' | 'cityHash32' | 'cityHash64' |
+             'xxHash32' | 'xxHash64' | 'xxHash3' | 'murmur32v3' | 'murmur32v2' |
+             'murmur64v2' | 'rapidhash',
+    data: string | Uint8Array | ArrayBuffer | DataView,
+    seed?: number | bigint
+  ): number | bigint {
+    switch (algorithm) {
+      case 'wyhash':
+        return Bun.hash.wyhash(data, seed as bigint | undefined);
+      case 'crc32':
+        return Bun.hash.crc32(data);
+      case 'adler32':
+        return Bun.hash.adler32(data);
+      case 'cityHash32':
+        return Bun.hash.cityHash32(data);
+      case 'cityHash64':
+        return Bun.hash.cityHash64(data, seed as bigint | undefined);
+      case 'xxHash32':
+        return Bun.hash.xxHash32(data, seed as number | undefined);
+      case 'xxHash64':
+        return Bun.hash.xxHash64(data, seed as bigint | undefined);
+      case 'xxHash3':
+        return Bun.hash.xxHash3(data, seed as bigint | undefined);
+      case 'murmur32v3':
+        return Bun.hash.murmur32v3(data, seed as number | undefined);
+      case 'murmur32v2':
+        return Bun.hash.murmur32v2(data, seed as number | undefined);
+      case 'murmur64v2':
+        return Bun.hash.murmur64v2(data, seed as bigint | undefined);
+      case 'rapidhash':
+        return Bun.hash.rapidhash(data, seed as bigint | undefined);
+      default:
+        throw new Error(`Unsupported hash algorithm: ${algorithm}`);
+    }
+  }
+
+  /**
+   * Cryptographic hashing using Bun.CryptoHasher
+   * Supports multiple cryptographic hash algorithms
+   */
+  cryptoHash(
+    algorithm: 'blake2b256' | 'blake2b512' | 'md4' | 'md5' | 'ripemd160' |
+             'sha1' | 'sha224' | 'sha256' | 'sha384' | 'sha512' | 'sha512-224' |
+             'sha512-256' | 'sha3-224' | 'sha3-256' | 'sha3-384' | 'sha3-512' |
+             'shake128' | 'shake256',
+    data: string | Uint8Array | ArrayBuffer,
+    encoding: 'hex' | 'base64' | 'uint8array' = 'hex'
+  ): string | Uint8Array {
+    const hasher = new Bun.CryptoHasher(algorithm);
+    hasher.update(data);
+    
+    switch (encoding) {
+      case 'hex':
+        return hasher.digest('hex');
+      case 'base64':
+        return hasher.digest('base64');
+      case 'uint8array':
+        return hasher.digest();
+      default:
+        return hasher.digest('hex');
+    }
+  }
+
+  /**
+   * HMAC (Hash-based Message Authentication Code) using Bun.CryptoHasher
+   */
+  hmac(
+    algorithm: 'blake2b512' | 'md5' | 'sha1' | 'sha224' | 'sha256' | 'sha384' |
+             'sha512-224' | 'sha512-256' | 'sha512',
+    key: string | Uint8Array,
+    data: string | Uint8Array,
+    encoding: 'hex' | 'base64' | 'uint8array' = 'hex'
+  ): string | Uint8Array {
+    const hasher = new Bun.CryptoHasher(algorithm, key);
+    hasher.update(data);
+    
+    switch (encoding) {
+      case 'hex':
+        return hasher.digest('hex');
+      case 'base64':
+        return hasher.digest('base64');
+      case 'uint8array':
+        return hasher.digest();
+      default:
+        return hasher.digest('hex');
+    }
+  }
+
+  /**
+   * Incremental cryptographic hashing for large data
+   * Returns a hasher object that can be updated incrementally
+   */
+  createIncrementalHasher(
+    algorithm: 'blake2b256' | 'blake2b512' | 'md4' | 'md5' | 'ripemd160' |
+             'sha1' | 'sha224' | 'sha256' | 'sha384' | 'sha512' | 'sha512-224' |
+             'sha512-256' | 'sha3-224' | 'sha3-256' | 'sha3-384' | 'sha3-512' |
+             'shake128' | 'shake256',
+    key?: string | Uint8Array
+  ): Bun.CryptoHasher {
+    return new Bun.CryptoHasher(algorithm, key);
+  }
+
   /**
    * Hash a password using Bun.password (Argon2id default)
    */
