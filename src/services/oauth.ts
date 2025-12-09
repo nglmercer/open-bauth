@@ -512,14 +512,32 @@ export class OAuthService {
 
     // Validate authorization code
     const authCode = await this.findAuthCodeByCode(request.code);
-    if (
-      !authCode ||
-      authCode.is_used ||
-      new Date() > new Date(authCode.expires_at)
-    ) {
+    
+    // ✅ VALIDACIÓN MEJORADA: Verificar si el código ya fue usado PRIMERO
+    if (!authCode) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
-        error_description: "Invalid or expired authorization code",
+        error_description: "Invalid authorization code",
+        access_token: "",
+        token_type: "Bearer",
+        expires_in: 0,
+      };
+    }
+    
+    if (authCode.is_used) {
+      return {
+        error: OAuthErrorType.INVALID_GRANT,
+        error_description: "Authorization code has already been used",
+        access_token: "",
+        token_type: "Bearer",
+        expires_in: 0,
+      };
+    }
+    
+    if (new Date() > new Date(authCode.expires_at)) {
+      return {
+        error: OAuthErrorType.INVALID_GRANT,
+        error_description: "Authorization code has expired",
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -574,7 +592,7 @@ export class OAuthService {
       }
     }
 
-    // Mark authorization code as used
+    // ✅ Marcar el código como usado ANTES de generar tokens
     await this.markAuthCodeAsUsed(authCode.id);
 
     // Get user (this would typically use the AuthService)
@@ -622,14 +640,32 @@ export class OAuthService {
     const refreshToken = await this.findRefreshTokenByToken(
       request.refresh_token,
     );
-    if (
-      !refreshToken ||
-      refreshToken.is_revoked ||
-      new Date() > new Date(refreshToken.expires_at)
-    ) {
+    
+    // ✅ VALIDACIÓN MEJORADA
+    if (!refreshToken) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
-        error_description: "Invalid or expired refresh token",
+        error_description: "Invalid refresh token",
+        access_token: "",
+        token_type: "Bearer",
+        expires_in: 0,
+      };
+    }
+    
+    if (refreshToken.is_revoked) {
+      return {
+        error: OAuthErrorType.INVALID_GRANT,
+        error_description: "Refresh token has been revoked",
+        access_token: "",
+        token_type: "Bearer",
+        expires_in: 0,
+      };
+    }
+    
+    if (new Date() > new Date(refreshToken.expires_at)) {
+      return {
+        error: OAuthErrorType.INVALID_GRANT,
+        error_description: "Refresh token has expired",
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -641,7 +677,9 @@ export class OAuthService {
       request.client_id!,
       request.client_secret,
     );
-    if (!client || client.client_id !== refreshToken.client_id) {
+    
+    // ✅ VALIDACIÓN MEJORADA del cliente
+    if (!client) {
       return {
         error: OAuthErrorType.INVALID_CLIENT,
         error_description: "Invalid client credentials",
@@ -650,12 +688,33 @@ export class OAuthService {
         expires_in: 0,
       };
     }
+    
+    if (client.client_id !== refreshToken.client_id) {
+      return {
+        error: OAuthErrorType.INVALID_CLIENT,
+        error_description: "Client mismatch for refresh token",
+        access_token: "",
+        token_type: "Bearer",
+        expires_in: 0,
+      };
+    }
 
-    // Rotate refresh token
-    const newRefreshToken = await this.rotateRefreshToken(
-      refreshToken.id,
-      refreshToken.token,
-    );
+    // ✅ ROTACIÓN MEJORADA de refresh token
+    let newRefreshToken: RefreshToken;
+    try {
+      newRefreshToken = await this.rotateRefreshToken(
+        refreshToken.id,
+        refreshToken.token,
+      );
+    } catch (error) {
+      return {
+        error: OAuthErrorType.SERVER_ERROR,
+        error_description: "Failed to rotate refresh token",
+        access_token: "",
+        token_type: "Bearer",
+        expires_in: 0,
+      };
+    }
 
     // Get user (this would typically use the AuthService)
     const user = {

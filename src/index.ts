@@ -4,6 +4,7 @@ export * from "./logger";
 export * from "./services";
 export * from "./database";
 export * from "./types/auth";
+export * from "./types/oauth";
 
 // Reexportar Zod para conveniencia de usuarios y control de versiones
 // Usamos export * con exclusión para evitar conflicto con la clase Schema
