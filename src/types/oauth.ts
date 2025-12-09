@@ -388,9 +388,9 @@ export interface DPoPProof {
   jti: string; // JWT ID
 }
 
-export interface SecurityChallenge {
+export interface SecurityChallenge extends BaseEntity {
   challenge_id: string;
-  challenge_type: ChallengeType;
+  challenge_type: ChallengeType | string;
   challenge_data: string;
   expires_at: string;
   is_solved: boolean;
@@ -404,6 +404,7 @@ export enum ChallengeType {
   EMAIL_VERIFICATION = "email_verification",
   SMS_VERIFICATION = "sms_verification",
   MFA = "mfa",
+  BACKUP_CODE = "backup_code",
 }
 
 /**

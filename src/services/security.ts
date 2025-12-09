@@ -1,13 +1,35 @@
 // src/services/security.ts
 
-import { createHash, randomBytes, createHmac } from "crypto";
+import { createHash, randomBytes, createHmac, scrypt, createCipheriv, createDecipheriv } from "crypto";
 import type {
   PKCEChallenge,
   DPoPProof,
   SecurityChallenge,
-  ChallengeType,
 } from "../types/oauth";
-import { PKCEMethod } from "../types/oauth";
+import { PKCEMethod, ChallengeType } from "../types/oauth";
+import { TOTPVerifier } from "./verifiers/totp";
+import { SecureCodeVerifier } from "./verifiers/code";
+import { VerifierMessages } from "./verifiers/constants";
+import { BackupCodeVerifier } from "./verifiers/backup-code";
+
+export { PKCEMethod, ChallengeType };
+export type { PKCEChallenge, DPoPProof, SecurityChallenge };
+
+/**
+ * Result of a challenge verification
+ */
+export interface ChallengeVerificationResult<T = any> {
+  valid: boolean;
+  error?: string;
+  data?: T;
+}
+
+/**
+ * Interface for implementing custom security challenge verifiers
+ */
+export interface ChallengeVerifier<T = any, S = any> {
+  verify(challengeData: T, solution: S): Promise<ChallengeVerificationResult> | ChallengeVerificationResult;
+}
 
 /**
  * Security Service for handling OAuth 2.0 security features
@@ -19,6 +41,48 @@ export class SecurityService {
   private readonly NONCE_LENGTH = 32;
   private readonly CODE_VERIFIER_LENGTH = 128;
   private readonly CODE_CHALLENGE_LENGTH = 128;
+
+  private verifiers: Map<string, ChallengeVerifier> = new Map();
+
+  constructor() {
+    this.registerDefaultVerifiers();
+  }
+
+  /**
+   * Register a custom challenge verifier
+   */
+  registerVerifier(type: ChallengeType | string, verifier: ChallengeVerifier) {
+    this.verifiers.set(type.toString(), verifier);
+  }
+
+  /**
+   * Register default verifiers for standard challenge types
+   */
+
+  private registerDefaultVerifiers() {
+    // Real TOTP implementation
+    this.registerVerifier(ChallengeType.MFA, new TOTPVerifier());
+
+    // Secure Code implementation for Email/SMS
+    // Note: This verifies the CODE, validation of delivery is external
+    const codeVerifier = new SecureCodeVerifier();
+    this.registerVerifier(ChallengeType.EMAIL_VERIFICATION, codeVerifier);
+    this.registerVerifier(ChallengeType.SMS_VERIFICATION, codeVerifier);
+
+    // Backup Code implementation
+    this.registerVerifier(ChallengeType.BACKUP_CODE, new BackupCodeVerifier());
+
+    // Placeholders that throw errors to force implementation
+    this.registerVerifier(ChallengeType.CAPTCHA, {
+      verify: () => ({ valid: false, error: VerifierMessages.CAPTCHA_NOT_CONFIGURED })
+    });
+    this.registerVerifier(ChallengeType.BIOMETRIC, {
+      verify: () => ({ valid: false, error: VerifierMessages.BIOMETRIC_NOT_CONFIGURED })
+    });
+    this.registerVerifier(ChallengeType.DEVICE_VERIFICATION, {
+      verify: () => ({ valid: false, error: VerifierMessages.DEVICE_NOT_CONFIGURED })
+    });
+  }
 
   /**
    * Generate a PKCE (Proof Key for Code Exchange) challenge
@@ -145,9 +209,9 @@ export class SecurityService {
       }
 
       const [encodedHeader, encodedPayload, signature] = parts;
-      const header = JSON.parse(this.base64UrlDecode(encodedHeader));
+      const header = JSON.parse(this.base64UrlDecode(encodedHeader).toString("utf8"));
       const payload: DPoPProof = JSON.parse(
-        this.base64UrlDecode(encodedPayload),
+        this.base64UrlDecode(encodedPayload).toString("utf8"),
       );
 
       // Verify required fields
@@ -194,10 +258,10 @@ export class SecurityService {
    * Create a security challenge
    */
   createChallenge(
-    type: ChallengeType,
+    type: ChallengeType | string,
     data: any,
     expiresInMinutes: number = this.CHALLENGE_EXPIRY_MINUTES,
-  ): Omit<SecurityChallenge, "id" | "created_at"> {
+  ): Omit<SecurityChallenge, "id" | "created_at" | "updated_at"> {
     const challengeId = this.generateRandomString(32);
     const expiresAt = new Date(
       Date.now() + expiresInMinutes * 60 * 1000,
@@ -215,40 +279,30 @@ export class SecurityService {
   /**
    * Verify a security challenge solution
    */
-  verifyChallenge(
+  async verifyChallenge(
     challenge: SecurityChallenge,
     solution: any,
-  ): { valid: boolean; error?: string } {
+  ): Promise<ChallengeVerificationResult> {
     // Check if challenge is expired
     if (new Date() > new Date(challenge.expires_at)) {
-      return { valid: false, error: "Challenge has expired" };
+      return { valid: false, error: VerifierMessages.CHALLENGE_EXPIRED };
     }
 
     // Check if challenge is already solved
     if (challenge.is_solved) {
-      return { valid: false, error: "Challenge has already been solved" };
+      return { valid: false, error: VerifierMessages.CHALLENGE_SOLVED };
     }
 
     // Verify solution based on challenge type
     try {
       const challengeData = JSON.parse(challenge.challenge_data);
+      const handler = this.verifiers.get(challenge.challenge_type.toString());
 
-      switch (challenge.challenge_type) {
-        case "captcha":
-          return this.verifyCaptchaChallenge(challengeData, solution);
-        case "biometric":
-          return this.verifyBiometricChallenge(challengeData, solution);
-        case "device_verification":
-          return this.verifyDeviceChallenge(challengeData, solution);
-        case "email_verification":
-          return this.verifyEmailChallenge(challengeData, solution);
-        case "sms_verification":
-          return this.verifySMSChallenge(challengeData, solution);
-        case "mfa":
-          return this.verifyMFAChallenge(challengeData, solution);
-        default:
-          return { valid: false, error: "Unknown challenge type" };
+      if (!handler) {
+        return { valid: false, error: `${VerifierMessages.UNKNOWN_TYPE}: ${challenge.challenge_type}` };
       }
+
+      return await handler.verify(challengeData, solution);
     } catch (error: unknown) {
       return { valid: false, error: (error as Error).message };
     }
@@ -264,19 +318,20 @@ export class SecurityService {
   /**
    * Hash a password using a secure algorithm
    */
+  /**
+   * Hash a password using Bun.password (Argon2id default)
+   */
   async hashPassword(
     password: string,
-    salt?: string,
+    _salt?: string, // Salt is handled internally by Bun.password/Argon2
   ): Promise<{
     hash: string;
     salt: string;
   }> {
-    const passwordSalt = salt || randomBytes(32).toString("hex");
-    const hash = createHmac("sha512", passwordSalt)
-      .update(password)
-      .digest("hex");
-
-    return { hash, salt: passwordSalt };
+    // Bun.password.hash generates a salted hash in PHC string format
+    // processing is much heavier and secure than simple HMAC
+    const hash = await Bun.password.hash(password);
+    return { hash, salt: "" }; // Salt is embedded in the hash string
   }
 
   /**
@@ -287,7 +342,18 @@ export class SecurityService {
     hash: string,
     salt: string,
   ): Promise<boolean> {
-    const { hash: computedHash } = await this.hashPassword(password, salt);
+    // Check if it's a PHC string (Argon2 or Bcrypt) supported by Bun
+    if (hash.startsWith("$argon2") || hash.startsWith("$2") || hash.startsWith("$scrypt")) {
+      return await Bun.password.verify(password, hash);
+    }
+
+    // Legacy fallback for HMAC-SHA512 hashes
+    // This allows existing hashes to still work while new ones use Argon2
+    const passwordSalt = salt;
+    const computedHash = createHmac("sha512", passwordSalt)
+      .update(password)
+      .digest("hex");
+
     return computedHash === hash;
   }
 
@@ -365,7 +431,7 @@ export class SecurityService {
   /**
    * Base64 URL-safe decoding
    */
-  private base64UrlDecode(data: string): string {
+  private base64UrlDecode(data: string): Buffer {
     // Add padding if needed
     let padded = data;
     while (padded.length % 4) {
@@ -374,7 +440,7 @@ export class SecurityService {
 
     const base64 = padded.replace(/-/g, "+").replace(/_/g, "/");
 
-    return Buffer.from(base64, "base64").toString("utf8");
+    return Buffer.from(base64, "base64");
   }
 
   /**
@@ -408,15 +474,12 @@ export class SecurityService {
   ): Promise<boolean> {
     try {
       const encoder = new TextEncoder();
-      const signatureBuffer = Buffer.from(
-        this.base64UrlDecode(signature),
-        "base64",
-      );
+      const signatureBuffer = this.base64UrlDecode(signature);
 
       const isValid = await crypto.subtle.verify(
         { name: "ECDSA", hash: "SHA-256" },
         publicKey,
-        signatureBuffer,
+        new Uint8Array(signatureBuffer),
         encoder.encode(data),
       );
 
@@ -427,92 +490,61 @@ export class SecurityService {
   }
 
   /**
-   * Challenge verification methods
+   * Encrypt data using a password (derives key using scrypt)
+   * This replaces the deprecated createCipher by using createCipheriv with a derived key
    */
-  private verifyCaptchaChallenge(
-    challengeData: any,
-    solution: any,
-  ): { valid: boolean; error?: string } {
-    // Implementation would depend on the captcha service used
-    // This is a placeholder for demonstration
-    if (!solution || typeof solution !== "string") {
-      return { valid: false, error: "Invalid captcha solution" };
-    }
+  async encryptWithPassword(data: string, password: string): Promise<string> {
+    const salt = randomBytes(16);
 
-    // In a real implementation, you would verify with the captcha service
-    return { valid: true };
+    // Derive key using scrypt (secure key derivation)
+    const key = (await new Promise<Buffer>((resolve, reject) => {
+      scrypt(password, salt, 32, (err, derivedKey) => {
+        if (err) reject(err);
+        else resolve(derivedKey as Buffer);
+      });
+    })) as Buffer;
+
+    const iv = randomBytes(16);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+
+    let encrypted = cipher.update(data, "utf8", "hex");
+    encrypted += cipher.final("hex");
+
+    const authTag = cipher.getAuthTag();
+
+    // Format: salt:iv:authTag:encryptedData
+    return `${salt.toString("hex")}:${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted}`;
   }
 
-  private verifyBiometricChallenge(
-    challengeData: any,
-    solution: any,
-  ): { valid: boolean; error?: string } {
-    // Implementation would depend on the biometric service used
-    // This is a placeholder for demonstration
-    if (!solution || !solution.biometricData) {
-      return { valid: false, error: "Invalid biometric data" };
+  /**
+   * Decrypt data using a password
+   * This replaces the deprecated createDecipher by using createDecipheriv with a derived key
+   */
+  async decryptWithPassword(encryptedData: string, password: string): Promise<string> {
+    const parts = encryptedData.split(":");
+    if (parts.length !== 4) {
+      throw new Error("Invalid encrypted data format");
     }
 
-    // In a real implementation, you would verify the biometric data
-    return { valid: true };
-  }
+    const [saltHex, ivHex, authTagHex, encryptedHex] = parts;
+    const salt = Buffer.from(saltHex, "hex");
+    const iv = Buffer.from(ivHex, "hex");
+    const authTag = Buffer.from(authTagHex, "hex");
 
-  private verifyDeviceChallenge(
-    challengeData: any,
-    solution: any,
-  ): { valid: boolean; error?: string } {
-    // Implementation would verify device signature or certificate
-    if (!solution || !solution.deviceSignature) {
-      return { valid: false, error: "Invalid device signature" };
-    }
+    // Derive same key using scrypt
+    const key = (await new Promise<Buffer>((resolve, reject) => {
+      scrypt(password, salt, 32, (err, derivedKey) => {
+        if (err) reject(err);
+        else resolve(derivedKey as Buffer);
+      });
+    })) as Buffer;
 
-    // In a real implementation, you would verify the device signature
-    return { valid: true };
-  }
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
 
-  private verifyEmailChallenge(
-    challengeData: any,
-    solution: any,
-  ): { valid: boolean; error?: string } {
-    if (!solution || !solution.code) {
-      return { valid: false, error: "Invalid verification code" };
-    }
+    let decrypted = decipher.update(encryptedHex, "hex", "utf8");
+    decrypted += decipher.final("utf8");
 
-    if (solution.code !== challengeData.expectedCode) {
-      return { valid: false, error: "Incorrect verification code" };
-    }
-
-    return { valid: true };
-  }
-
-  private verifySMSChallenge(
-    challengeData: any,
-    solution: any,
-  ): { valid: boolean; error?: string } {
-    if (!solution || !solution.code) {
-      return { valid: false, error: "Invalid verification code" };
-    }
-
-    if (solution.code !== challengeData.expectedCode) {
-      return { valid: false, error: "Incorrect verification code" };
-    }
-
-    return { valid: true };
-  }
-
-  private verifyMFAChallenge(
-    challengeData: any,
-    solution: any,
-  ): { valid: boolean; error?: string } {
-    if (!solution || !solution.token) {
-      return { valid: false, error: "Invalid MFA token" };
-    }
-
-    // In a real implementation, you would verify the TOTP token
-    // This is a placeholder for demonstration
-    return { valid: true };
+    return decrypted;
   }
 }
-
-// Create cipher and decipher functions (Node.js crypto compatibility)
-// Note: createCipher/createDecipher are deprecated, using createCipheriv/createDecipheriv instead

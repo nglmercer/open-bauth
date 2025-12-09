@@ -407,6 +407,7 @@ export class OAuthSecurityMiddleware {
       // In a real implementation, you would store this in the database
       // For now, we'll return the challenge data
       const challenge: SecurityChallenge = {
+        id: challengeData.challenge_id,
         challenge_id: challengeData.challenge_id,
         challenge_type: challengeData.challenge_type,
         challenge_data: challengeData.challenge_data,
@@ -437,6 +438,7 @@ export class OAuthSecurityMiddleware {
       // In a real implementation, you would retrieve the challenge from database
       // For now, we'll create a mock challenge
       const challenge: SecurityChallenge = {
+        id: challengeId,
         challenge_id: challengeId,
         challenge_type: "captcha" as ChallengeType,
         challenge_data: JSON.stringify({ expectedCode: "123456" }),
@@ -444,7 +446,7 @@ export class OAuthSecurityMiddleware {
         is_solved: false,
       };
 
-      const result = this.securityService.verifyChallenge(challenge, solution);
+      const result = await this.securityService.verifyChallenge(challenge, solution);
 
       if (result.valid) {
         // Mark challenge as solved in database
