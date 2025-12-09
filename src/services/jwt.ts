@@ -18,8 +18,8 @@ export class JWTService {
   constructor(
     secret: string,
     expiresIn: string = "24h",
-    issuer: string = "https://your-auth-server.com",
-    audience: string = "your-api",
+    issuer: string = "http://localhost",
+    audience: string = "audience",
   ) {
     if (!secret) {
       throw new Error(ServiceErrors.JWT_SECRET_REQUIRED);

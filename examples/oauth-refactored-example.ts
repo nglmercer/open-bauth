@@ -262,10 +262,10 @@ oauth.get("/userinfo", createAuthMiddlewareForHono(services), async (c) => {
 async function handleAuthorizationCodeFlow(validated: any, client: any, c: any) {
   // Generate authorization code
   const generatedCode = securityService ? await securityService.generateSecureToken(32) : Math.random().toString(36).substring(2, 15);
-  
+
   // Get or create test user
   const userId = await getOrCreateTestUser();
-  
+
   // Create authorization code
   const authCode = oauthService ? await oauthService.createAuthCode({
     code: generatedCode,
@@ -290,13 +290,13 @@ async function handleAuthorizationCodeFlow(validated: any, client: any, c: any) 
     // Build redirect URL
     const redirectUrl = new URL(validated.redirect_uri);
     redirectUrl.searchParams.set("code", authCode.code);
-  if (validated.state) {
-    redirectUrl.searchParams.set("state", validated.state);
-  }
+    if (validated.state) {
+      redirectUrl.searchParams.set("state", validated.state);
+    }
 
     return redirectUrl.toString();
   }
-  
+
   throw new Error("Failed to create authorization code");
 }
 
@@ -324,7 +324,7 @@ async function handleImplicitFlow(validated: any, client: any, c: any) {
 
 async function authenticateClient(clientId: string, clientSecret?: string) {
   const client = oauthService ? await oauthService.findClientByClientId(clientId) : null;
-  
+
   if (!client || !client.is_active) {
     return null;
   }
@@ -344,21 +344,12 @@ async function authenticateClient(clientId: string, clientSecret?: string) {
 
 async function verifyClientSecret(client: any, clientSecret: string) {
   try {
-    // Try Bun.password.verify first
+    // Try Bun.password.verify
     const isValid = await Bun.password.verify(clientSecret, client.client_secret);
     return isValid ? client : null;
   } catch (bunError) {
     defaultLogger.error("Bun.password.verify failed", bunError as Error);
-    
-    // Fallback to bcrypt
-    try {
-      const bcrypt = await import('bcrypt');
-      const isValid = await bcrypt.compare(clientSecret, client.client_secret);
-      return isValid ? client : null;
-    } catch (bcryptError) {
-      defaultLogger.error("bcrypt comparison failed", bcryptError as Error);
-      return null;
-    }
+    return null;
   }
 }
 
@@ -372,7 +363,7 @@ async function handleAuthorizationCodeGrant(validated: any, client: any) {
 
   // Verify authorization code
   const authCode = oauthService ? await oauthService.findAuthCodeByCode(validated.code) : null;
-  
+
   if (!authCode || authCode.is_used || new Date() > new Date(authCode.expires_at)) {
     return {
       error: "invalid_grant",
@@ -449,7 +440,7 @@ async function handleRefreshTokenGrant(validated: any, client: any) {
 
   // Verify refresh token
   const refreshToken = oauthService ? await oauthService.findRefreshTokenByToken(validated.refresh_token) : null;
-  
+
   if (!refreshToken || refreshToken.is_revoked || new Date() > new Date(refreshToken.expires_at)) {
     return {
       error: "invalid_grant",
@@ -480,10 +471,10 @@ async function handleRefreshTokenGrant(validated: any, client: any) {
   // Rotate refresh token if configured
   if (process.env['ENABLE_REFRESH_TOKEN_ROTATION'] === "true") {
     const newRefreshToken = await services.jwtService.generateRefreshToken(user.id);
-    
+
     // Revoke old refresh token
     if (oauthService) await oauthService.revokeRefreshToken(refreshToken.id);
-    
+
     // Create new refresh token record
     await createRefreshTokenRecord(newRefreshToken, user.id, client.client_id, refreshToken.scope);
 
@@ -647,11 +638,11 @@ async function getOrCreateTestUser() {
   try {
     // First try to find an existing test user
     const testUsers = await services.authService.getUsers(1, 10, { search: "oauth-test@example.com" });
-    
+
     if (testUsers.users && testUsers.users.length > 0) {
       return testUsers.users[0].id;
     }
-    
+
     // Create a test user for OAuth flows
     const registerResult = await services.authService.register({
       email: "oauth-test@example.com",
@@ -660,11 +651,11 @@ async function getOrCreateTestUser() {
       first_name: "OAuth",
       last_name: "Test User"
     });
-    
+
     if (registerResult.success && registerResult.user) {
       return registerResult.user.id;
     }
-    
+
     throw new Error("Failed to create test user");
   } catch (error) {
     defaultLogger.error("Could not create/find test user", error as Error);
@@ -735,7 +726,7 @@ export { oauth as oauthRoutes };
 // Main function to test the OAuth router
 async function main() {
   console.log("🚀 Testing OAuth 2.0 Refactored Router Example...");
-  
+
   try {
     // Create a test client
     const testClient = await oauthService.createClient({
@@ -749,10 +740,10 @@ async function main() {
       is_public: false,
       is_active: true
     });
-    
+
     console.log("✅ Test client created:", testClient.client_id);
-    
-    
+
+
   } catch (error) {
     console.error("❌ Error testing OAuth router:", error);
   }

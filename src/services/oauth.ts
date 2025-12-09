@@ -32,6 +32,14 @@ import { AuthService } from "./auth";
 import { ServiceErrors } from "./constants";
 
 /**
+ * Configuration options for the OAuthService.
+ */
+export interface OAuthConfig {
+  issuer: string;
+  deviceVerificationUri: string;
+}
+
+/**
  * OAuth 2.0 Service for handling complete OAuth 2.0 flows
  */
 export class OAuthService {
@@ -41,12 +49,14 @@ export class OAuthService {
   private securityService: SecurityService;
   private jwtService: JWTService;
   private authService: AuthService;
+  private config: OAuthConfig;
 
   constructor(
     dbInitializer: DatabaseInitializer,
     securityService: SecurityService,
     jwtService: JWTService,
     authService: AuthService,
+    config?: Partial<OAuthConfig>,
   ) {
     this.clientController =
       dbInitializer.createController<OAuthClient>("oauth_clients");
@@ -58,6 +68,15 @@ export class OAuthService {
     this.securityService = securityService;
     this.jwtService = jwtService;
     this.authService = authService;
+    this.config = {
+      issuer: "https://your-auth-server.com",
+      deviceVerificationUri: "https://your-auth-server.com/device",
+      ...config,
+    };
+  }
+
+  updateConfig(config: Partial<OAuthConfig>): void {
+    this.config = { ...this.config, ...config };
   }
 
   // --- OAuth Client Management ---
@@ -905,7 +924,7 @@ export class OAuthService {
   ): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
     const payload: OAuthJWTPayload = {
-      iss: "https://your-auth-server.com", // Should be configurable
+      iss: this.config.issuer,
       sub: user?.id || client.client_id,
       aud: [client.client_id],
       exp: now + 3600, // 1 hour
@@ -954,8 +973,8 @@ export class OAuthService {
     return {
       device_code: deviceCode,
       user_code: userCode,
-      verification_uri: "https://your-auth-server.com/device",
-      verification_uri_complete: `https://your-auth-server.com/device?user_code=${userCode}`,
+      verification_uri: this.config.deviceVerificationUri,
+      verification_uri_complete: `${this.config.deviceVerificationUri}?user_code=${userCode}`,
       expires_in: 1800, // 30 minutes
       interval: 5, // Poll every 5 seconds
     };
