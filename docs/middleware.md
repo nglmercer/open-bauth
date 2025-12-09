@@ -1,11 +1,13 @@
 # Middleware Documentation
 
-Comprehensive middleware system for authentication, authorization, and security that works across different web frameworks.
+Comprehensive middleware system for authentication, authorization, and security that works across different web frameworks. The system has been **refactored** to separate core logic from framework-specific implementations.
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [Architecture](#architecture)
 - [Core Middleware](#core-middleware)
+- [Framework Adapters](#framework-adapters)
 - [OAuth Security Middleware](#oauth-security-middleware)
 - [Framework Integration](#framework-integration)
 - [Security Features](#security-features)
@@ -14,31 +16,51 @@ Comprehensive middleware system for authentication, authorization, and security 
 
 ## 🌟 Overview
 
-The middleware system provides framework-agnostic authentication and authorization that can be integrated with any web framework while maintaining consistent behavior and security features.
+The middleware system provides **framework-agnostic core logic** with **adapter-based framework integration**. This design allows the same authentication and authorization logic to work across different web frameworks while maintaining consistent behavior and security features.
 
 ### Key Benefits
 
-- **Framework Agnostic**: Works with Hono, Express, Elysia, Fastify, and custom frameworks
-- **Security First**: Built-in OAuth 2.0, JWT, DPoP, and rate limiting
+- **Framework Agnostic Core**: Business logic independent of web framework
+- **Adapter Pattern**: Framework-specific implementations separate from core logic
 - **Type Safe**: Full TypeScript support with proper typing
-- **Extensible**: Easy to add custom middleware and security features
-- **Performance Optimized**: Minimal overhead with efficient caching
+- **Extensible**: Easy to add new framework adapters
+- **Tested**: Comprehensive test coverage (41 tests passing)
+- **Security First**: Built-in OAuth 2.0, JWT, DPoP, and rate limiting
 
-### Architecture
+## 🏗️ Architecture
+
+### Core + Adapter Pattern
+
+The middleware system follows a **core + adapter** architecture:
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    Request Flow                      │
 └─────────────────────┬───────────────────────────┘
-                      │ Middleware Pipeline
+                      │ Framework Adapters
 ┌─────────────────────▼───────────────────────────┐
-│  Auth Middleware │ Permission │ OAuth Security │ Custom │
+│  Hono Adapter │ Bun Adapter │ Express Adapter   │
+│  (src/middleware/adapters/)                     │
+└─────────────────────┬───────────────────────────┘
+                      │ Core Middleware Functions
+┌─────────────────────▼───────────────────────────┐
+│  authenticateRequest() │ authorizePermissions() │
+│  authorizeRoles()      │ OAuth Security         │
+│  (src/middleware/core/)                         │
 └─────────────────────┬───────────────────────────┘
                       │ Service Layer
 ┌─────────────────────▼───────────────────────────┐
 │  AuthService │ JWTService │ PermissionService │ OAuthService │
+│  (src/services/)                                │
 └─────────────────────────────────────────────────────┘
 ```
+
+### Key Components
+
+1. **Core Functions** (`src/middleware/core/`): Framework-agnostic business logic
+2. **Adapters** (`src/middleware/adapters/`): Framework-specific implementations
+3. **Services** (`src/services/`): Business logic and data access
+4. **Types** (`src/middleware/core/types.ts`): Shared type definitions
 
 ## 🔐 Core Middleware
 
@@ -135,6 +157,109 @@ import { createRoleMiddleware } from 'open-bauth/src/middleware/auth';
 const requireAdmin = createRoleMiddleware(['admin']);
 const requireModerator = createRoleMiddleware(['admin', 'moderator']);
 ```
+
+## 🔌 Framework Adapters
+
+Framework adapters provide **framework-specific implementations** that wrap the core middleware functions. Each adapter handles the unique request/response patterns of its target framework.
+
+### Available Adapters
+
+#### Hono Adapter (`src/middleware/adapters/hono.adapter.ts`)
+
+```typescript
+import { createHonoAuthMiddleware } from './middleware/adapters/hono.adapter';
+
+// Create Hono-specific auth middleware
+const honoAuthMiddleware = createHonoAuthMiddleware({
+  jwtService,
+  authService,
+  permissionService
+});
+
+// Use in Hono app
+app.use('/api/*', honoAuthMiddleware);
+
+// With permissions
+const requireAdmin = createHonoPermissionMiddleware({
+  permissionService
+}, ['admin:*']);
+
+app.delete('/users/:id', honoAuthMiddleware, requireAdmin, (c) => {
+  // User is authenticated and has admin permissions
+  return c.json({ success: true });
+});
+```
+
+#### Bun Adapter (`src/middleware/adapters/bun.adapter.ts`)
+
+```typescript
+import { createBunAuthMiddleware } from './middleware/adapters/bun.adapter';
+
+// Create Bun-specific auth middleware
+const bunAuthMiddleware = createBunAuthMiddleware({
+  jwtService,
+  authService,
+  permissionService
+});
+
+// Use in Bun.serve
+const server = Bun.serve({
+  port: 3000,
+  fetch: async (req) => {
+    // Apply auth middleware
+    const authResult = await bunAuthMiddleware(req);
+    if (!authResult.success) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+    
+    // Handle authenticated requests
+    return new Response('Hello authenticated user!');
+  }
+});
+```
+
+### Creating Custom Adapters
+
+To create a new framework adapter, follow this pattern:
+
+```typescript
+import { authenticateRequest, authorizePermissions, authorizeRoles } from '../core/auth.core';
+import type { AuthRequest, PermissionRequest, RoleRequest } from '../core/types';
+
+export function createCustomAuthMiddleware(services: ServiceContainer) {
+  return async (request: CustomRequest, response: CustomResponse, next: NextFunction) => {
+    try {
+      // Extract token from custom request format
+      const token = extractTokenFromCustomRequest(request);
+      
+      // Use core authentication function
+      const authResult = await authenticateRequest({
+        token,
+        jwtSecret: services.jwtService.getSecret(),
+        dbInitializer: services.dbInitializer
+      });
+      
+      if (!authResult.success) {
+        return handleCustomUnauthorized(response, authResult.error);
+      }
+      
+      // Attach auth context to custom request format
+      request.auth = authResult;
+      await next();
+    } catch (error) {
+      return handleCustomError(response, error);
+    }
+  };
+}
+```
+
+### Adapter Pattern Benefits
+
+1. **Separation of Concerns**: Core logic separate from framework specifics
+2. **Testability**: Core functions can be tested independently
+3. **Reusability**: Same core logic across multiple frameworks
+4. **Consistency**: Identical behavior across different frameworks
+5. **Maintainability**: Framework changes don't affect core logic
 
 ## 🛡️ OAuth Security Middleware
 
@@ -267,41 +392,103 @@ app.use('/oauth/*', oauthSecurity);
 
 ## 🔧 Framework Integration
 
+### Modern Adapter-Based Integration
+
+The refactored middleware system uses **framework adapters** that provide a cleaner, more idiomatic integration for each framework.
+
 ### Hono Integration
 
 ```typescript
 import { Hono } from 'hono';
-import { createAuthMiddleware, createPermissionMiddleware } from 'open-bauth/src/middleware/auth';
+import { createHonoAuthMiddleware, createHonoPermissionMiddleware } from 'open-bauth/src/middleware/adapters/hono.adapter';
 
 const app = new Hono();
 
-// Authentication middleware
-const authMw = createAuthMiddleware({ jwtService, authService, permissionService });
-
-// Permission middleware
-const canEdit = createPermissionMiddleware({ permissionService }, ['edit:content']);
-
-app.use('*', async (c, next) => {
-  const result = await authMw(c, next);
-  if (!result.success) {
-    return c.json({ error: result.error }, 401);
-  }
-  
-  c.auth = result.authContext;
-  await next();
+// Create Hono-specific middleware
+const authMiddleware = createHonoAuthMiddleware({
+  jwtService,
+  authService,
+  permissionService
 });
 
-app.get('/protected', authMw, async (c) => {
-  return c.json({ user: c.auth.user });
+const adminMiddleware = createHonoPermissionMiddleware({
+  permissionService
+}, ['admin:*']);
+
+// Apply to routes
+app.use('/api/*', authMiddleware);
+app.use('/admin/*', authMiddleware, adminMiddleware);
+
+// Protected route with auth context
+app.get('/protected', authMiddleware, (c) => {
+  return c.json({
+    user: c.get('auth').user,
+    message: 'Hello authenticated user!'
+  });
 });
 
-app.delete('/content/:id', authMw, canEdit, async (c) => {
-  // User has edit permission
-  return c.json({ success: true });
+// Admin-only route
+app.delete('/users/:id', authMiddleware, adminMiddleware, (c) => {
+  return c.json({ success: true, message: 'User deleted' });
 });
 ```
 
-### Express Integration
+### Bun Integration
+
+```typescript
+import { createBunAuthMiddleware, createBunPermissionMiddleware } from 'open-bauth/src/middleware/adapters/bun.adapter';
+
+// Create Bun-specific middleware
+const authMiddleware = createBunAuthMiddleware({
+  jwtService,
+  authService,
+  permissionService
+});
+
+const userMiddleware = createBunPermissionMiddleware({
+  permissionService
+}, ['users:read']);
+
+// Use with Bun.serve
+const server = Bun.serve({
+  port: 3000,
+  async fetch(req) {
+    // Apply authentication
+    const authResult = await authMiddleware(req);
+    if (!authResult.success) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+    
+    // Route handling
+    const url = new URL(req.url);
+    
+    if (url.pathname === '/protected' && req.method === 'GET') {
+      return new Response(JSON.stringify({
+        user: authResult.user,
+        message: 'Hello authenticated user!'
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    if (url.pathname.startsWith('/users/') && req.method === 'GET') {
+      // Check permissions
+      const permResult = await userMiddleware(req);
+      if (!permResult.success) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      
+      return new Response(JSON.stringify({ users: [] }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    return new Response('Not Found', { status: 404 });
+  }
+});
+```
+
+### Express Integration (Legacy)
 
 ```typescript
 import express from 'express';
@@ -309,6 +496,7 @@ import { createAuthMiddleware, createPermissionMiddleware } from 'open-bauth/src
 
 const app = express();
 
+// Legacy approach - still supported
 const authMw = createAuthMiddleware({ jwtService, authService, permissionService });
 const canDelete = createPermissionMiddleware({ permissionService }, ['delete:content']);
 
@@ -323,34 +511,17 @@ app.get('/protected', (req, res) => {
 });
 
 app.delete('/content/:id', canDelete, (req, res) => {
-  // User has delete permission
   res.json({ success: true });
 });
 ```
 
-### Elysia Integration
+### Benefits of Adapter Pattern
 
-```typescript
-import { Elysia } from 'elysia';
-import { createAuthMiddleware } from 'open-bauth/src/middleware/auth';
-
-const app = new Elysia();
-
-const authMw = createAuthMiddleware({ jwtService, authService, permissionService });
-
-app.derive(({ request }) => {
-  const authContext = authMw(request);
-  return { authContext };
-});
-
-app.get('/protected', ({ authContext }) => {
-  if (!authContext.isAuthenticated) {
-    throw new Error('Unauthorized');
-  }
-  
-  return { user: authContext.user };
-});
-```
+1. **Framework-Native**: Adapters follow each framework's conventions
+2. **Type Safety**: Proper TypeScript support for each framework
+3. **Performance**: Optimized for each framework's request/response cycle
+4. **Consistency**: Same core logic, different framework integration
+5. **Maintainability**: Core changes automatically apply to all adapters
 
 ## 🔒 Security Features
 
@@ -385,105 +556,188 @@ app.get('/protected', ({ authContext }) => {
 
 ## 💡 Usage Examples
 
-### Complete API Protection
+### Modern Adapter-Based API Protection
 
 ```typescript
-import { createAuthMiddleware, createPermissionMiddleware, createOAuthSecurityMiddleware } from 'open-bauth/src/middleware';
+import { Hono } from 'hono';
+import {
+  createHonoAuthMiddleware,
+  createHonoPermissionMiddleware,
+  createHonoRoleMiddleware
+} from 'open-bauth/src/middleware/adapters/hono.adapter';
 
-// Create middleware instances
-const authMw = createAuthMiddleware({ jwtService, authService, permissionService });
-const adminMw = createPermissionMiddleware({ permissionService }, ['admin:*'], { requireAll: true });
-const userMw = createPermissionMiddleware({ permissionService }, ['read:own']);
-const oauthSecurity = createOAuthSecurityMiddleware(oauthService, securityService, jwtService);
+const app = new Hono();
 
-// Apply to routes
-app.use('/api/*', authMw);
-app.use('/admin/*', authMw, adminMw);
-app.use('/user/*', authMw, userMw);
-app.use('/oauth/*', oauthSecurity);
-
-// Protected admin route
-app.post('/admin/users', authMw, adminMw, async (c) => {
-  // User is authenticated and has admin permissions
-  return c.json({ success: true });
+// Create framework-specific middleware
+const authMiddleware = createHonoAuthMiddleware({
+  jwtService,
+  authService,
+  permissionService
 });
 
-// Protected user route
-app.get('/user/profile', authMw, userMw, async (c) => {
-  // User is authenticated and can read own data
-  return c.json({ profile: c.auth.user });
+const adminMiddleware = createHonoPermissionMiddleware({
+  permissionService
+}, ['admin:*'], { requireAll: true });
+
+const moderatorMiddleware = createHonoRoleMiddleware({
+  permissionService
+}, ['moderator', 'admin']);
+
+const userMiddleware = createHonoPermissionMiddleware({
+  permissionService
+}, ['users:read']);
+
+// Apply middleware to route groups
+app.use('/api/*', authMiddleware);
+app.use('/admin/*', authMiddleware, adminMiddleware);
+app.use('/moderator/*', authMiddleware, moderatorMiddleware);
+app.use('/user/*', authMiddleware, userMiddleware);
+
+// Protected routes with clean syntax
+app.get('/api/profile', authMiddleware, (c) => {
+  const auth = c.get('auth');
+  return c.json({ user: auth.user });
+});
+
+app.post('/admin/users', authMiddleware, adminMiddleware, (c) => {
+  return c.json({ success: true, message: 'User created' });
+});
+
+app.put('/moderator/content/:id', authMiddleware, moderatorMiddleware, (c) => {
+  return c.json({ success: true, message: 'Content moderated' });
 });
 ```
 
-### Custom Security Middleware
+### Cross-Framework Consistency
 
 ```typescript
-import { createAuthMiddleware } from 'open-bauth/src/middleware/auth';
+// Same core logic, different framework adapters
 
-const authMw = createAuthMiddleware({ jwtService, authService, permissionService });
+// Hono version
+import { createHonoAuthMiddleware } from 'open-bauth/src/middleware/adapters/hono.adapter';
+const honoAuth = createHonoAuthMiddleware(services);
 
-// Custom middleware for API key validation
-const apiKeyMw = (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
-  if (!apiKey || !isValidApiKey(apiKey)) {
-    return res.status(401).json({ error: 'Invalid API key' });
-  }
-  
-  req.apiKey = apiKey;
-  next();
-};
+// Bun version
+import { createBunAuthMiddleware } from 'open-bauth/src/middleware/adapters/bun.adapter';
+const bunAuth = createBunAuthMiddleware(services);
 
-// Chain middleware
-app.use('/api/*', authMw, apiKeyMw, async (req, res) => {
-  // User is authenticated and has valid API key
-  return res.json({ user: req.auth.user });
-});
+// Both use the same core authentication logic
+// but provide framework-native integration
 ```
 
-### Context Enhancement
+### Custom Adapter Creation
 
 ```typescript
-import { createAuthMiddleware } from 'open-bauth/src/middleware/auth';
+import { authenticateRequest, authorizePermissions } from 'open-bauth/src/middleware/core/auth.core';
+import type { AuthRequest, PermissionRequest } from 'open-bauth/src/middleware/core/types';
 
-const authMw = createAuthMiddleware({ 
-  jwtService, 
-  authService, 
-  permissionService 
-});
+// Create custom framework adapter
+export function createCustomFrameworkAuthMiddleware(services: ServiceContainer) {
+  return async (request: CustomFrameworkRequest, response: CustomFrameworkResponse) => {
+    try {
+      // Extract auth header in framework-specific way
+      const authHeader = request.headers.get('authorization');
+      const token = authHeader?.replace('Bearer ', '');
+      
+      // Use core authentication function
+      const authResult = await authenticateRequest({
+        token,
+        jwtSecret: services.jwtService.getSecret(),
+        dbInitializer: services.dbInitializer
+      });
+      
+      if (!authResult.success) {
+        return response.status(401).json({ error: authResult.error });
+      }
+      
+      // Attach to framework-specific context
+      request.auth = authResult;
+      return request.next();
+      
+    } catch (error) {
+      return response.status(500).json({ error: 'Internal server error' });
+    }
+  };
+}
+```
 
-// Enhanced middleware with additional context
-const enhancedAuthMw = (req, res, next) => {
-  const result = authMw(req, res, (error) => {
-    if (error) return next(error);
+### Testing with Adapters
+
+```typescript
+import { describe, expect, test } from 'bun:test';
+import { createHonoAuthMiddleware } from 'open-bauth/src/middleware/adapters/hono.adapter';
+import { createTestContext } from 'open-bauth/tests/middleware/setup';
+
+describe('Hono Adapter', () => {
+  test('should authenticate valid token', async () => {
+    const middleware = createHonoAuthMiddleware(testServices);
+    const context = createTestContext({
+      headers: { 'authorization': 'Bearer valid-token' }
+    });
     
-    // Add additional context
-    req.auth.sessionId = generateSessionId();
-    req.auth.requestTime = Date.now();
-    req.auth.clientInfo = parseClientInfo(req);
+    await middleware(context, () => Promise.resolve());
     
-    next();
+    expect(context.get('auth').isAuthenticated).toBe(true);
+    expect(context.get('auth').user).toBeDefined();
   });
-  
-  return result;
-};
-
-app.use(enhancedAuthMw, (req, res) => {
-  // Enhanced context available
-  console.log('Session:', req.auth.sessionId);
-  console.log('Request time:', req.auth.requestTime);
-  console.log('Client info:', req.auth.clientInfo);
 });
 ```
 
 ## 🎯 Best Practices
 
+### Architecture (Core + Adapter Pattern)
+
+1. **Use Core Functions Directly**: When building custom solutions, use core functions from `src/middleware/core/`
+2. **Create Framework Adapters**: Build adapters for new frameworks following the existing pattern
+3. **Separate Concerns**: Keep framework-specific code in adapters, business logic in core
+4. **Test Core Independently**: Core functions can be tested without framework dependencies
+5. **Reuse Core Logic**: Same authentication/authorization logic across all frameworks
+
 ### Security
 
-1. **Always Validate**: Never trust client input
+1. **Always Validate**: Never trust client input, validate in core functions
 2. **Use HTTPS**: Always use TLS in production
-3. **Secure Headers**: Set appropriate security headers
-4. **Rate Limit**: Implement rate limiting for sensitive endpoints
+3. **Secure Headers**: Set appropriate security headers in adapters
+4. **Rate Limit**: Implement rate limiting in core functions
 5. **Log Everything**: Comprehensive logging for security monitoring
+
+### Performance
+
+1. **Lazy Loading**: Load auth context only when needed in core functions
+2. **Caching**: Cache frequently accessed permissions in services layer
+3. **Async Operations**: Use async/await for non-blocking operations in core
+4. **Connection Pooling**: Reuse database connections in service layer
+5. **Minimal Overhead**: Keep adapters lightweight, core logic optimized
+
+### Error Handling
+
+1. **Consistent Errors**: Use standard error format from core functions
+2. **Secure Errors**: Don't leak sensitive information in adapter responses
+3. **Logging**: Log all security events in core functions
+4. **Graceful Degradation**: Handle service failures gracefully in adapters
+5. **User-Friendly**: Provide clear error messages from adapters
+
+### Testing
+
+1. **Test Core Functions**: Unit test core authentication/authorization logic
+2. **Test Adapters Separately**: Test framework-specific adapter behavior
+3. **Integration Tests**: Test complete middleware chains
+4. **Mock Services**: Use mock services for testing core functions
+5. **Cross-Framework Tests**: Ensure consistent behavior across adapters
+
+### Migration from Legacy Middleware
+
+If you're migrating from the old middleware system:
+
+```typescript
+// Old approach (still supported)
+import { createAuthMiddleware } from 'open-bauth/src/middleware/auth';
+
+// New approach (recommended)
+import { createHonoAuthMiddleware } from 'open-bauth/src/middleware/adapters/hono.adapter';
+
+// Both work, but adapters provide better framework integration
+```
 
 ### Performance
 

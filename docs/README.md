@@ -1,4 +1,4 @@
-# Framework-Agnostic Authentication Library - Documentation
+# Database ORM with Authentication and more
 
 ## 📚 Overview
 
@@ -11,7 +11,7 @@ See the main [README](../README.md) for basics and quick start.
 ### 🌟 For Beginners
 - [**Main README**](../README.md) - Complete quick start guide
 - [**Services**](./services.md) - Complete API of all services
-- [**Middleware**](./middleware.md) - Framework-agnostic middleware
+- [**Middleware**](./middleware.md) - Core + Adapter Architecture (NEW)
 
 ### 🔧 For Intermediate Developers
 - [**Database Adapters**](./adapter-usage.md) - Custom database adapters
@@ -30,7 +30,7 @@ See the main [README](../README.md) for basics and quick start.
 
 ### 🔐 Authentication & Authorization
 - [**Services**](./services.md) - Complete API of AuthService, JWTService, PermissionService, OAuthService, SecurityService, and EnhancedUserService
-- [**Middleware**](./middleware.md) - Framework-agnostic middleware for authentication, authorization, and OAuth security
+- [**Middleware**](./middleware.md) - **NEW**: Core + Adapter Architecture - Framework-agnostic core logic with framework-specific adapters
 - [**OAuth 2.0**](./oauth-2.0-implementation.md) - Complete OAuth 2.0 and OpenID Connect implementation guide
 - [**MFA Guide**](./mfa-guide.md) - **NEW**: Complete Multi-Factor Authentication implementation guide
 
@@ -73,7 +73,7 @@ See the main [README](../README.md) for basics and quick start.
 | **Runtime** | Bun |
 | **Database** | SQLite + adapters |
 | **Authentication** | JWT + RBAC + OAuth 2.0 |
-| **Middleware** | Framework-agnostic |
+| **Middleware** | Core + Adapter Architecture (NEW) |
 | **TypeScript** | Full type safety |
 | **Testing** | 94% coverage |
 
@@ -83,9 +83,14 @@ See the main [README](../README.md) for basics and quick start.
 ┌─────────────────────────────────────────────────────┐
 │                    Application Layer                      │
 └─────────────────────┬───────────────────────────────────┘
-                      │ Middleware Layer
+                      │ Framework Adapters Layer
 ┌─────────────────────▼───────────────────────────────────┐
-│  Auth Middleware │ Permission │ OAuth Security │ Custom │
+│  Hono Adapter │ Bun Adapter │ Express │ Elysia │ Custom │
+└─────────────────────┬───────────────────────────────────┘
+                      │ Core Middleware Layer
+┌─────────────────────▼───────────────────────────────────┐
+│  authenticateRequest() │ authorizePermissions() │ OAuth │
+│  Core Authentication & Authorization Logic              │
 └─────────────────────┬───────────────────────────────────┘
                       │ Service Layer
 ┌─────────────────────▼───────────────────────────────────┐
@@ -128,15 +133,24 @@ const authService = new AuthService(dbInitializer, jwtService);
 const permissionService = new PermissionService(dbInitializer);
 ```
 
-### 4. Middleware Setup
+### 4. Middleware Setup (New Core + Adapter Architecture)
 
 ```typescript
-import { createAuthMiddleware } from 'open-bauth/src/middleware/auth';
+// Modern approach with framework adapters
+import { createHonoAuthMiddleware } from 'open-bauth/src/middleware/adapters/hono.adapter';
 
-const authMw = createAuthMiddleware({ 
+const authMiddleware = createHonoAuthMiddleware({
   jwtService: services.jwtService,
   authService: services.authService,
-  permissionService: services.permissionService 
+  permissionService: services.permissionService
+});
+
+// Legacy approach (still supported)
+import { createAuthMiddleware } from 'open-bauth/src/middleware/auth';
+const authMw = createAuthMiddleware({
+  jwtService: services.jwtService,
+  authService: services.authService,
+  permissionService: services.permissionService
 });
 ```
 
@@ -178,7 +192,8 @@ const authMw = createAuthMiddleware({
 
 ### 🌐 Framework Integration
 
-- **Framework-agnostic middleware** for Hono, Express, Elysia, Fastify
+- **NEW: Core + Adapter Architecture** - Framework-agnostic core logic with framework-specific adapters
+- **Framework adapters** for Hono, Bun, Express, Elysia, Fastify
 - **Type-safe interfaces** for all framework integrations
 - **Context injection** for request-scoped data
 - **Error handling** with consistent responses

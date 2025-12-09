@@ -1,4 +1,4 @@
-# Framework-Agnostic Authentication & OAuth 2.0 Library
+# Database ORM with Authentication and more
 
 [![Bun](https://img.shields.io/badge/Bun-%23FFEB3A?style=for-the-badge&logo=bun&logoColor=white)](https://bun.sh/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -41,7 +41,8 @@ A comprehensive, framework-agnostic authentication and authorization library wit
 - **Audit logging** for compliance and monitoring
 
 ### 🌐 Framework Integration
-- **Framework-agnostic middleware** for Hono, Express, Elysia, Fastify
+- **Refactored Core + Adapter Architecture** - Framework-agnostic core logic with framework-specific adapters
+- **Framework adapters** for Hono, Bun, Express, Elysia, Fastify
 - **Type-safe interfaces** for all framework integrations
 - **Context injection** for request-scoped data
 - **Error handling** with consistent responses
@@ -163,24 +164,46 @@ const activeNotifications = await notifications.search({
 });
 ```
 
-### 6) Use framework-agnostic middleware (example with Hono):
+### 6) Use framework-agnostic middleware with new Core + Adapter Architecture (example with Hono):
 
 ```typescript
 import { Hono } from 'hono';
-import { createAuthMiddleware, createPermissionMiddleware } from 'open-bauth';
+import {
+  createHonoAuthMiddleware,
+  createHonoPermissionMiddleware
+} from 'open-bauth/src/middleware/adapters/hono.adapter';
 
 const app = new Hono();
 
-// Wire services into middleware
+// Create framework-specific adapters that use core authentication logic
+const authMiddleware = createHonoAuthMiddleware({
+  jwtService,
+  authService,
+  permissionService
+});
+
+const editContentMiddleware = createHonoPermissionMiddleware({
+  permissionService
+}, ['edit:content']);
+
+// Apply middleware to routes
+app.use('/api/*', authMiddleware);
+app.get('/protected', authMiddleware, (c) => {
+  const auth = c.get('auth');
+  return c.json({ success: true, user: auth.user });
+});
+
+app.get('/moderate', authMiddleware, editContentMiddleware, (c) => {
+  return c.json({ success: true, message: 'Content moderation access' });
+});
+```
+
+### Legacy middleware (still supported):
+```typescript
+import { createAuthMiddleware, createPermissionMiddleware } from 'open-bauth';
+
 const authMw = createAuthMiddleware({ jwtService, authService, permissionService }, true);
 const canEditContent = createPermissionMiddleware({ permissionService }, ['edit:content']);
-
-app.use('*', async (c, next) => authMw(c, next));
-app.get('/protected', async (c) => {
-  if (!c.auth?.isAuthenticated) return c.json({ success: false }, 401);
-  return c.json({ success: true, user: c.auth.user });
-});
-app.get('/moderate', async (c) => canEditContent(c));
 ```
 
 ---
@@ -189,11 +212,22 @@ app.get('/moderate', async (c) => canEditContent(c));
 
 This library's public API is re-exported from the entrypoint so you can import from a single place.
 
-### Middleware
-- [`authenticateRequest(request, services)`](docs/middleware.md#basic-authentication)
-- [`createAuthMiddleware(services, required?)`](docs/middleware.md#authentication-middleware)
-- [`createPermissionMiddleware(services, requiredPermissions, options?)`](docs/middleware.md#permission-middleware)
-- [`createRoleMiddleware(requiredRoles)`](docs/middleware.md#role-middleware)
+### Middleware (Core + Adapter Architecture)
+#### Core Functions (Framework-Agnostic)
+- [`authenticateRequest(request, services)`](docs/middleware.md#core-functions) - Core authentication logic
+- [`authorizePermissions(request)`](docs/middleware.md#core-functions) - Core permission authorization
+- [`authorizeRoles(request)`](docs/middleware.md#core-functions) - Core role authorization
+
+#### Framework Adapters
+- [`createHonoAuthMiddleware(services)`](docs/middleware.md#framework-adapters) - Hono-specific auth middleware
+- [`createHonoPermissionMiddleware(services, permissions)`](docs/middleware.md#framework-adapters) - Hono permission middleware
+- [`createHonoRoleMiddleware(services, roles)`](docs/middleware.md#framework-adapters) - Hono role middleware
+- [`createBunAuthMiddleware(services)`](docs/middleware.md#framework-adapters) - Bun-specific auth middleware
+
+#### Legacy Middleware (Still Supported)
+- [`createAuthMiddleware(services, required?)`](docs/middleware.md#core-middleware) - Framework-agnostic auth middleware
+- [`createPermissionMiddleware(services, requiredPermissions, options?)`](docs/middleware.md#core-middleware) - Permission middleware
+- [`createRoleMiddleware(requiredRoles)`](docs/middleware.md#core-middleware) - Role middleware
 
 ### Services
 - [`AuthService`](docs/services.md#authservice) - Registration, login, user management, role assignment
@@ -587,10 +621,23 @@ registry1.registerMany([schema5, schema6]);
 
 ---
 
-## Middleware (Framework-Agnostic)
+## Middleware (Refactored Core + Adapter Architecture)
 
+### Core Functions (Framework-Agnostic)
 - `authenticateRequest(request, { jwtService, authService, permissionService })`
-  - Verifies JWT from Authorization header, loads user and permissions, returns an AuthContext.
+  - Core authentication logic that verifies JWT and returns AuthContext
+- `authorizePermissions(request, { userId, requiredPermissions, requireAll, dbInitializer })`
+  - Core permission authorization logic
+- `authorizeRoles(request, { userId, requiredRoles, requireAll, dbInitializer })`
+  - Core role authorization logic
+
+### Framework Adapters (New Architecture)
+- `createHonoAuthMiddleware(services)` - Hono-specific auth middleware adapter
+- `createHonoPermissionMiddleware(services, permissions, options?)` - Hono permission middleware adapter
+- `createHonoRoleMiddleware(services, roles, options?)` - Hono role middleware adapter
+- `createBunAuthMiddleware(services)` - Bun-specific auth middleware adapter
+
+### Legacy Middleware (Still Supported)
 - `createAuthMiddleware(services, required = true)`
   - Attaches auth context to request. When required is true, rejects if unauthenticated.
 - `createPermissionMiddleware(services, permissions, { requireAll = false })`
