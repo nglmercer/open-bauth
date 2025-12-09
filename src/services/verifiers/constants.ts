@@ -1,14 +1,14 @@
 
 export const VerifierMessages = {
     // TOTP
-    TOTP_REQUIRED: "Token MFA es requerido",
-    TOTP_CONFIG_INVALID: "Configuración MFA inválida",
-    TOTP_INVALID: "Código MFA inválido o expirado",
+    TOTP_REQUIRED: "MFA token is required",
+    TOTP_CONFIG_INVALID: "Invalid MFA configuration",
+    TOTP_INVALID: "Invalid or expired MFA code",
 
     // Code (Email/SMS)
-    CODE_REQUIRED: "Código de verificación requerido",
-    CODE_DATA_INVALID: "Datos del desafío inválidos",
-    CODE_INVALID: "Código inválido",
+    CODE_REQUIRED: "Verification code is required",
+    CODE_DATA_INVALID: "Invalid challenge data",
+    CODE_INVALID: "Invalid code",
 
     // Backup Code
     BACKUP_CODE_REQUIRED: "Recovery code is required",
@@ -21,7 +21,18 @@ export const VerifierMessages = {
     UNKNOWN_TYPE: "Unknown challenge type",
 
     // Placeholders
-    CAPTCHA_NOT_CONFIGURED: "Proveedor de CAPTCHA no configurado",
-    BIOMETRIC_NOT_CONFIGURED: "Proveedor Biométrico no configurado",
-    DEVICE_NOT_CONFIGURED: "Verificación de dispositivo no configurada"
+    CAPTCHA_NOT_CONFIGURED: "CAPTCHA provider not configured",
+    BIOMETRIC_NOT_CONFIGURED: "Biometric provider not configured",
+    DEVICE_NOT_CONFIGURED: "Device verification not configured",
+
+    // DPoP
+    DPOP_INVALID_FORMAT: "Invalid DPoP proof format",
+    DPOP_MISSING_FIELDS: "Missing required DPoP fields",
+    DPOP_METHOD_MISMATCH: "HTTP method mismatch",
+    DPOP_URI_MISMATCH: "HTTP URI mismatch",
+    DPOP_TIMESTAMP_RANGE: "DPoP proof timestamp out of range",
+    DPOP_INVALID_SIGNATURE: "Invalid DPoP signature",
+
+    // Encryption
+    ENCRYPTION_INVALID_FORMAT: "Invalid encrypted data format"
 } as const;

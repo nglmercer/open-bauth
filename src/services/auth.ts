@@ -1,6 +1,7 @@
 import type { DatabaseInitializer } from "../database/database-initializer";
-import type { BaseController,ControllerResponse } from "../database/base-controller";
+import type { BaseController, ControllerResponse } from "../database/base-controller";
 import type { JWTService } from "./jwt";
+import { ServiceErrors } from "./constants";
 import {
   AuthResult,
   LoginData,
@@ -85,7 +86,7 @@ export class AuthService {
         success: false,
         error: {
           type: AuthErrorType.VALIDATION_ERROR,
-          message: "Email is required",
+          message: ServiceErrors.EMAIL_REQUIRED,
         },
       };
     }
@@ -94,7 +95,7 @@ export class AuthService {
         success: false,
         error: {
           type: AuthErrorType.VALIDATION_ERROR,
-          message: "Password is required",
+          message: ServiceErrors.PASSWORD_REQUIRED,
         },
       };
     }
@@ -108,7 +109,7 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.USER_ALREADY_EXISTS,
-            message: "A user with this email already exists",
+            message: ServiceErrors.USER_ALREADY_EXISTS,
           },
         };
       }
@@ -129,7 +130,7 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.DATABASE_ERROR,
-            message: createResult.error || "Failed to create user",
+            message: createResult.error || ServiceErrors.FAILED_TO_CREATE_USER,
           },
         };
       }
@@ -154,7 +155,7 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.USER_ALREADY_EXISTS,
-            message: "A user with this email already exists",
+            message: ServiceErrors.USER_ALREADY_EXISTS,
           },
         };
       }
@@ -174,7 +175,7 @@ export class AuthService {
         success: false,
         error: {
           type: AuthErrorType.VALIDATION_ERROR,
-          message: "Email is required",
+          message: ServiceErrors.EMAIL_REQUIRED,
         },
       };
     }
@@ -183,7 +184,7 @@ export class AuthService {
         success: false,
         error: {
           type: AuthErrorType.VALIDATION_ERROR,
-          message: "Password is required",
+          message: ServiceErrors.PASSWORD_REQUIRED,
         },
       };
     }
@@ -199,7 +200,7 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.INVALID_CREDENTIALS,
-            message: "Invalid credentials",
+            message: ServiceErrors.INVALID_CREDENTIALS,
           },
         };
       }
@@ -209,7 +210,7 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.INVALID_CREDENTIALS, // Cambiar a INVALID_CREDENTIALS como esperan los tests
-            message: "Invalid credentials",
+            message: ServiceErrors.INVALID_CREDENTIALS,
           },
         };
       }
@@ -223,7 +224,7 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.INVALID_CREDENTIALS,
-            message: "Invalid credentials",
+            message: ServiceErrors.INVALID_CREDENTIALS,
           },
         };
       }
@@ -306,7 +307,7 @@ export class AuthService {
         success: false,
         error: {
           type: AuthErrorType.DATABASE_ERROR,
-          message: result.error || "Failed to update user",
+          message: result.error || ServiceErrors.FAILED_TO_UPDATE_USER,
         },
       };
     }
@@ -322,7 +323,7 @@ export class AuthService {
         success: false,
         error: {
           type: AuthErrorType.VALIDATION_ERROR,
-          message: "New password cannot be empty",
+          message: ServiceErrors.NEW_PASSWORD_EMPTY,
         },
       };
     }
@@ -352,7 +353,7 @@ export class AuthService {
         success: false,
         error: {
           type: AuthErrorType.DATABASE_ERROR,
-          message: "Failed to find user",
+          message: ServiceErrors.FAILED_TO_FIND_USER,
         },
       };
     }
@@ -368,7 +369,7 @@ export class AuthService {
         success: false,
         error: {
           type: AuthErrorType.INVALID_CREDENTIALS,
-          message: "Invalid credentials",
+          message: ServiceErrors.INVALID_CREDENTIALS,
         },
       };
     }
@@ -455,7 +456,7 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.NOT_FOUND_ERROR,
-            message: `Role '${roleName}' not found`,
+            message: ServiceErrors.ROLE_NOT_FOUND,
           },
         };
       }
@@ -466,7 +467,7 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.USER_NOT_FOUND,
-            message: "User not found",
+            message: ServiceErrors.USER_NOT_FOUND,
           },
         };
       }
@@ -515,7 +516,8 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.NOT_FOUND_ERROR,
-            message: `Role '${roleName}' not found`,
+            message: ServiceErrors.ROLE_NOT_FOUND,
+            details: roleResult.error,
           },
         };
       }
@@ -529,7 +531,7 @@ export class AuthService {
           success: false,
           error: {
             type: AuthErrorType.NOT_FOUND_ERROR,
-            message: "User does not have this role",
+            message: ServiceErrors.USER_NO_ROLE,
           },
         };
       }

@@ -221,7 +221,7 @@ export class SecurityService {
     try {
       const parts = dpopProof.split(".");
       if (parts.length !== 3) {
-        return { valid: false, error: "Invalid DPoP proof format" };
+        return { valid: false, error: VerifierMessages.DPOP_INVALID_FORMAT };
       }
 
       const [encodedHeader, encodedPayload, signature] = parts;
@@ -232,23 +232,23 @@ export class SecurityService {
 
       // Verify required fields
       if (!payload.htu || !payload.htm || !payload.iat || !payload.jti) {
-        return { valid: false, error: "Missing required DPoP fields" };
+        return { valid: false, error: VerifierMessages.DPOP_MISSING_FIELDS };
       }
 
       // Verify HTTP method and URI match
       if (payload.htm !== httpMethod.toUpperCase()) {
-        return { valid: false, error: "HTTP method mismatch" };
+        return { valid: false, error: VerifierMessages.DPOP_METHOD_MISMATCH };
       }
 
       if (payload.htu !== httpUri) {
-        return { valid: false, error: "HTTP URI mismatch" };
+        return { valid: false, error: VerifierMessages.DPOP_URI_MISMATCH };
       }
 
       // Verify timestamp (should be recent, within 5 minutes)
       const now = Math.floor(Date.now() / 1000);
       const maxAge = 300; // 5 minutes
       if (payload.iat < now - maxAge || payload.iat > now + maxAge) {
-        return { valid: false, error: "DPoP proof timestamp out of range" };
+        return { valid: false, error: VerifierMessages.DPOP_TIMESTAMP_RANGE };
       }
 
       // Verify signature if public key is provided
@@ -260,7 +260,7 @@ export class SecurityService {
         );
 
         if (!isValid) {
-          return { valid: false, error: "Invalid DPoP signature" };
+          return { valid: false, error: VerifierMessages.DPOP_INVALID_SIGNATURE };
         }
       }
 
@@ -396,7 +396,7 @@ export class SecurityService {
         ? Buffer.concat([keyBuffer, Buffer.alloc(32 - keyBuffer.length)])
         : keyBuffer.slice(0, 32);
 
-    const cipher = require("crypto").createCipheriv(
+    const cipher = createCipheriv(
       "aes-256-gcm",
       finalKey,
       iv,
@@ -416,7 +416,7 @@ export class SecurityService {
   async decrypt(encryptedData: string, key: string): Promise<string> {
     const parts = encryptedData.split(":");
     if (parts.length !== 3) {
-      throw new Error("Invalid encrypted data format");
+      throw new Error(VerifierMessages.ENCRYPTION_INVALID_FORMAT);
     }
 
     const iv = Buffer.from(parts[0], "hex");
@@ -430,7 +430,7 @@ export class SecurityService {
         ? Buffer.concat([keyBuffer, Buffer.alloc(32 - keyBuffer.length)])
         : keyBuffer.slice(0, 32);
 
-    const decipher = require("crypto").createDecipheriv(
+    const decipher = createDecipheriv(
       "aes-256-gcm",
       finalKey,
       iv,
@@ -550,7 +550,7 @@ export class SecurityService {
   async decryptWithPassword(encryptedData: string, password: string): Promise<string> {
     const parts = encryptedData.split(":");
     if (parts.length !== 4) {
-      throw new Error("Invalid encrypted data format");
+      throw new Error(VerifierMessages.ENCRYPTION_INVALID_FORMAT);
     }
 
     const [saltHex, ivHex, authTagHex, encryptedHex] = parts;

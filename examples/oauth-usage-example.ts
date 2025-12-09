@@ -104,7 +104,7 @@ async function main() {
   });
 
   if (mfaResult.success) {
-    console.log("✅ MFA TOTP configurado para el usuario");
+    console.log("MFA TOTP configurado para el usuario");
   }
 
   // 7. Registrar dispositivo biométrico
@@ -116,7 +116,7 @@ async function main() {
   );
 
   if (biometricResult.success) {
-    console.log("✅ Credencial biométrica registrada");
+    console.log("Credencial biométrica registrada");
   }
 
   // 8. Registrar dispositivo para SSO

@@ -27,7 +27,7 @@ beforeAll(async () => {
     // Inicializar servicio JWT
     initJWTService(TEST_JWT_SECRET);
 
-    logger.info("✅ Entorno de tests configurado correctamente");
+    logger.info("tests configurado correctamente");
   } catch (error: any) {
     console.error("❌ Error configurando entorno de tests:", error);
     throw error;
@@ -275,7 +275,7 @@ export const mockConfig = {
 
 // Silenciar logs si está activado
 if (mockConfig.silentLogs) {
-  const noop = () => {};
+  const noop = () => { };
   (logger as any).info = noop;
   (logger as any).warn = noop;
   (logger as any).error = noop;

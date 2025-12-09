@@ -1,6 +1,7 @@
 // src/services/jwt.ts
 import type { JWTPayload, User } from "../types/auth";
 import type { OAuthJWTPayload } from "../types/oauth";
+import { ServiceErrors } from "./constants";
 
 /**
  * Servicio para manejar operaciones JWT
@@ -21,7 +22,7 @@ export class JWTService {
     audience: string = "your-api",
   ) {
     if (!secret) {
-      throw new Error("JWT secret is required");
+      throw new Error(ServiceErrors.JWT_SECRET_REQUIRED);
     }
     this.secret = secret;
     this.expiresIn = expiresIn;
@@ -38,7 +39,7 @@ export class JWTService {
     // FIX: Añadir validación de entrada para el objeto de usuario.
     if (!user || !user.id || !user.email) {
       throw new Error(
-        "Invalid user object provided. User must have an id and an email.",
+        ServiceErrors.INVALID_USER_OBJECT,
       );
     }
 
@@ -71,7 +72,7 @@ export class JWTService {
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     } catch (error: any) {
       console.error("Error generating JWT token:", error);
-      throw new Error("Failed to generate token");
+      throw new Error(ServiceErrors.TOKEN_GEN_FAILED);
     }
   }
 
@@ -109,7 +110,7 @@ export class JWTService {
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     } catch (error: any) {
       console.error("Error generating JWT token:", error);
-      throw new Error("Failed to generate token");
+      throw new Error(ServiceErrors.TOKEN_GEN_FAILED);
     }
   }
 
@@ -159,7 +160,7 @@ export class JWTService {
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     } catch (error: any) {
       console.error("Error generating ID token:", error);
-      throw new Error("Failed to generate ID token");
+      throw new Error(ServiceErrors.ID_TOKEN_GEN_FAILED);
     }
   }
 
@@ -183,7 +184,7 @@ export class JWTService {
     try {
       const parts = dpopProof.split(".");
       if (parts.length !== 3) {
-        return { valid: false, error: "Invalid DPoP proof format" };
+        return { valid: false, error: ServiceErrors.DPOP_INVALID_FORMAT };
       }
 
       const [encodedHeader, encodedPayload, signature] = parts;
@@ -192,30 +193,30 @@ export class JWTService {
 
       // Verify required fields
       if (!payload.htu || !payload.htm || !payload.iat || !payload.jti) {
-        return { valid: false, error: "Missing required DPoP fields" };
+        return { valid: false, error: ServiceErrors.DPOP_MISSING_FIELDS };
       }
 
       // Verify HTTP method and URI match
       if (payload.htm !== httpMethod.toUpperCase()) {
-        return { valid: false, error: "HTTP method mismatch" };
+        return { valid: false, error: ServiceErrors.DPOP_METHOD_MISMATCH };
       }
 
       if (payload.htu !== httpUri) {
-        return { valid: false, error: "HTTP URI mismatch" };
+        return { valid: false, error: ServiceErrors.DPOP_URI_MISMATCH };
       }
 
       // Verify timestamp (should be recent, within 5 minutes)
       const now = Math.floor(Date.now() / 1000);
       const maxAge = 300; // 5 minutes
       if (payload.iat < now - maxAge || payload.iat > now + maxAge) {
-        return { valid: false, error: "DPoP proof timestamp out of range" };
+        return { valid: false, error: ServiceErrors.DPOP_TIMESTAMP_RANGE };
       }
 
       // Check for replay attacks using JTI (JWT ID)
       if (this.dpopNonceCache.has(payload.jti)) {
         const cachedTime = this.dpopNonceCache.get(payload.jti)!;
         if (now - cachedTime < maxAge) {
-          return { valid: false, error: "DPoP proof replay detected" };
+          return { valid: false, error: ServiceErrors.DPOP_REPLAY_DETECTED };
         }
       }
 
@@ -234,7 +235,7 @@ export class JWTService {
         `${encodedHeader}.${encodedPayload}`,
       );
       if (signature !== expectedSignature) {
-        return { valid: false, error: "Invalid DPoP signature" };
+        return { valid: false, error: ServiceErrors.DPOP_INVALID_SIGNATURE };
       }
 
       return { valid: true, payload, jti: payload.jti };
@@ -253,12 +254,12 @@ export class JWTService {
     return Promise.resolve()
       .then(async () => {
         if (!token) {
-          throw new Error("Token is required");
+          throw new Error(ServiceErrors.TOKEN_REQUIRED);
         }
 
         const parts = token.split(".");
         if (parts.length !== 3) {
-          throw new Error("Invalid token format");
+          throw new Error(ServiceErrors.INVALID_TOKEN_FORMAT);
         }
 
         const [encodedHeader, encodedPayload, signature] = parts;
@@ -268,7 +269,7 @@ export class JWTService {
           `${encodedHeader}.${encodedPayload}`,
         );
         if (signature !== expectedSignature) {
-          throw new Error("Invalid token signature");
+          throw new Error(ServiceErrors.INVALID_TOKEN_SIGNATURE);
         }
 
         // Decodificar el payload con manejo de errores mejorado
@@ -277,7 +278,7 @@ export class JWTService {
           const decodedPayload = this.base64UrlDecode(encodedPayload);
           payload = JSON.parse(decodedPayload);
         } catch (parseError) {
-          throw new Error("Invalid token: malformed payload");
+          throw new Error(ServiceErrors.INVALID_TOKEN_PAYLOAD);
         }
 
         // Verificar expiración
@@ -289,7 +290,7 @@ export class JWTService {
             timeDiff: now - payload.exp,
             isExpired: payload.exp < now,
           });
-          throw new Error("Token has expired");
+          throw new Error(ServiceErrors.TOKEN_EXPIRED);
         }
 
         return payload;
@@ -432,7 +433,7 @@ export class JWTService {
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     } catch (error: any) {
       console.error("Error rotating refresh token:", error);
-      throw new Error("Failed to rotate refresh token");
+      throw new Error(ServiceErrors.REFRESH_TOKEN_ROTATE_FAILED);
     }
   }
 
@@ -444,12 +445,12 @@ export class JWTService {
   async verifyRefreshTokenWithSecurity(refreshToken: string): Promise<any> {
     try {
       if (!refreshToken) {
-        throw new Error("Refresh token is required");
+        throw new Error(ServiceErrors.REFRESH_TOKEN_REQUIRED);
       }
 
       const parts = refreshToken.split(".");
       if (parts.length !== 3) {
-        throw new Error("Invalid refresh token format");
+        throw new Error(ServiceErrors.INVALID_REFRESH_TOKEN_FORMAT);
       }
 
       const [encodedHeader, encodedPayload, signature] = parts;
@@ -459,7 +460,7 @@ export class JWTService {
         `${encodedHeader}.${encodedPayload}`,
       );
       if (signature !== expectedSignature) {
-        throw new Error("Invalid refresh token signature");
+        throw new Error(ServiceErrors.INVALID_REFRESH_TOKEN_SIGNATURE);
       }
 
       // Decodificar y validar el payload con manejo de errores mejorado
@@ -468,23 +469,23 @@ export class JWTService {
         const decodedPayload = this.base64UrlDecode(encodedPayload);
         payload = JSON.parse(decodedPayload);
       } catch (parseError) {
-        throw new Error("Invalid refresh token: malformed payload");
+        throw new Error(ServiceErrors.INVALID_REFRESH_TOKEN_PAYLOAD);
       }
 
       // Verificar que sea un token de refresh
       if (payload.type !== "refresh") {
-        throw new Error("Invalid token type");
+        throw new Error(ServiceErrors.INVALID_TOKEN_TYPE);
       }
 
       // Verificar expiración
       const now = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < now) {
-        throw new Error("Refresh token has expired");
+        throw new Error(ServiceErrors.REFRESH_TOKEN_EXPIRED);
       }
 
       // Verificar que tenga userId
       if (!payload.userId) {
-        throw new Error("Invalid refresh token: missing userId");
+        throw new Error(ServiceErrors.REFRESH_TOKEN_MISSING_USER);
       }
 
       return payload;
@@ -616,7 +617,7 @@ export class JWTService {
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     } catch (error: any) {
       console.error("Error generating refresh token:", error);
-      throw new Error("Failed to generate refresh token");
+      throw new Error(ServiceErrors.REFRESH_TOKEN_GEN_FAILED);
     }
   }
 
@@ -628,12 +629,12 @@ export class JWTService {
   async verifyRefreshToken(refreshToken: string): Promise<string | number> {
     try {
       if (!refreshToken) {
-        throw new Error("Refresh token is required");
+        throw new Error(ServiceErrors.REFRESH_TOKEN_REQUIRED);
       }
 
       const parts = refreshToken.split(".");
       if (parts.length !== 3) {
-        throw new Error("Invalid refresh token format");
+        throw new Error(ServiceErrors.INVALID_REFRESH_TOKEN_FORMAT);
       }
 
       const [encodedHeader, encodedPayload, signature] = parts;
@@ -643,7 +644,7 @@ export class JWTService {
         `${encodedHeader}.${encodedPayload}`,
       );
       if (signature !== expectedSignature) {
-        throw new Error("Invalid refresh token signature");
+        throw new Error(ServiceErrors.INVALID_REFRESH_TOKEN_SIGNATURE);
       }
 
       // Decodificar y validar el payload con manejo de errores mejorado
@@ -652,12 +653,12 @@ export class JWTService {
         const decodedPayload = this.base64UrlDecode(encodedPayload);
         payload = JSON.parse(decodedPayload);
       } catch (parseError) {
-        throw new Error("Invalid refresh token: malformed payload");
+        throw new Error(ServiceErrors.INVALID_REFRESH_TOKEN_PAYLOAD);
       }
 
       // Verificar que sea un token de refresh
       if (payload.type !== "refresh") {
-        throw new Error("Invalid token type");
+        throw new Error(ServiceErrors.INVALID_TOKEN_TYPE);
       }
 
       // Verificar expiración
@@ -669,12 +670,12 @@ export class JWTService {
           timeDiff: now - payload.exp,
           isExpired: payload.exp < now,
         });
-        throw new Error("Refresh token has expired");
+        throw new Error(ServiceErrors.REFRESH_TOKEN_EXPIRED);
       }
 
       // Verificar que tenga userId
       if (!payload.userId) {
-        throw new Error("Invalid refresh token: missing userId");
+        throw new Error(ServiceErrors.REFRESH_TOKEN_MISSING_USER);
       }
 
       return payload.userId;

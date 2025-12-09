@@ -14,6 +14,7 @@ import type {
 } from "../types/oauth";
 import { DeviceType } from "../types/oauth";
 import { SecurityService } from "./security";
+import { ServiceErrors } from "./constants";
 
 /**
  * Enhanced User Service with support for biometric, anonymous users, and MFA
@@ -66,7 +67,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "USER_ALREADY_EXISTS",
-            message: "A user with this email already exists",
+            message: ServiceErrors.USER_ALREADY_EXISTS,
           },
         };
       }
@@ -89,7 +90,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "DATABASE_ERROR",
-            message: result.error || "Failed to create user",
+            message: result.error || ServiceErrors.FAILED_TO_CREATE_USER,
           },
         };
       }
@@ -116,7 +117,7 @@ export class EnhancedUserService {
         success: false,
         error: {
           type: "DATABASE_ERROR",
-          message: result.error || "Failed to update user",
+          message: result.error || ServiceErrors.FAILED_TO_UPDATE_USER,
         },
       };
     }
@@ -165,7 +166,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "DATABASE_ERROR",
-            message: result.error || "Failed to create anonymous user",
+            message: result.error || ServiceErrors.ANONYMOUS_CREATE_FAILED,
           },
         };
       }
@@ -206,7 +207,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "NOT_FOUND",
-            message: "Anonymous user not found",
+            message: ServiceErrors.ANONYMOUS_NOT_FOUND,
           },
         };
       }
@@ -269,7 +270,7 @@ export class EnhancedUserService {
             success: false,
             error: {
               type: "DATABASE_ERROR",
-              message: result.error || "Failed to update device",
+              message: result.error || ServiceErrors.DEVICE_UPDATE_FAILED,
             },
           };
         }
@@ -294,7 +295,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "DATABASE_ERROR",
-            message: result.error || "Failed to register device",
+            message: result.error || ServiceErrors.DEVICE_REGISTER_FAILED,
           },
         };
       }
@@ -326,7 +327,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "NOT_FOUND",
-            message: "Device not found",
+            message: ServiceErrors.DEVICE_NOT_FOUND,
           },
         };
       }
@@ -340,7 +341,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "DATABASE_ERROR",
-            message: result.error || "Failed to trust device",
+            message: result.error || ServiceErrors.DEVICE_TRUST_FAILED,
           },
         };
       }
@@ -405,7 +406,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "DATABASE_ERROR",
-            message: result.error || "Failed to create device secret",
+            message: result.error || ServiceErrors.DEVICE_SECRET_CREATE_FAILED,
           },
         };
       }
@@ -437,7 +438,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "NOT_FOUND",
-            message: "Device secret not found",
+            message: ServiceErrors.DEVICE_SECRET_NOT_FOUND,
           },
         };
       }
@@ -451,7 +452,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "EXPIRED",
-            message: "Device secret has expired",
+            message: ServiceErrors.DEVICE_SECRET_EXPIRED,
           },
         };
       }
@@ -468,7 +469,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "INVALID_CREDENTIALS",
-            message: "Invalid device secret",
+            message: ServiceErrors.DEVICE_SECRET_INVALID,
           },
         };
       }
@@ -526,7 +527,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "DATABASE_ERROR",
-            message: result.error || "Failed to register biometric credential",
+            message: result.error || ServiceErrors.BIOMETRIC_REGISTER_FAILED,
           },
         };
       }
@@ -566,7 +567,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "NOT_FOUND",
-            message: "No biometric credentials found",
+            message: ServiceErrors.BIOMETRIC_NOT_FOUND,
           },
         };
       }
@@ -602,7 +603,7 @@ export class EnhancedUserService {
         success: false,
         error: {
           type: "INVALID_CREDENTIALS",
-          message: "Biometric verification failed",
+          message: ServiceErrors.BIOMETRIC_VERIFY_FAILED,
         },
       };
     } catch (error: any) {
@@ -641,7 +642,7 @@ export class EnhancedUserService {
         success: false,
         error: {
           type: "DATABASE_ERROR",
-          message: result.error || "Failed to deactivate biometric credential",
+          message: result.error || ServiceErrors.BIOMETRIC_DEACTIVATE_FAILED,
         },
       };
     }
@@ -689,7 +690,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "DATABASE_ERROR",
-            message: result.error || "Failed to setup MFA",
+            message: result.error || ServiceErrors.MFA_SETUP_FAILED,
           },
         };
       }
@@ -718,7 +719,7 @@ export class EnhancedUserService {
         success: false,
         error: {
           type: "DATABASE_ERROR",
-          message: result.error || "Failed to enable MFA",
+          message: result.error || ServiceErrors.MFA_ENABLE_FAILED,
         },
       };
     }
@@ -741,7 +742,7 @@ export class EnhancedUserService {
         success: false,
         error: {
           type: "DATABASE_ERROR",
-          message: result.error || "Failed to disable MFA",
+          message: result.error || ServiceErrors.MFA_DISABLE_FAILED,
         },
       };
     }
@@ -763,7 +764,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "NOT_FOUND",
-            message: "MFA configuration not found",
+            message: ServiceErrors.MFA_CONFIG_NOT_FOUND,
           },
         };
       }
@@ -792,7 +793,7 @@ export class EnhancedUserService {
           success: false,
           error: {
             type: "DATABASE_ERROR",
-            message: result.error || "Failed to set primary MFA",
+            message: result.error || ServiceErrors.MFA_SET_PRIMARY_FAILED,
           },
         };
       }

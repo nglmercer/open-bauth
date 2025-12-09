@@ -29,6 +29,7 @@ import {
 import { SecurityService } from "./security";
 import { JWTService } from "./jwt";
 import { AuthService } from "./auth";
+import { ServiceErrors } from "./constants";
 
 /**
  * OAuth 2.0 Service for handling complete OAuth 2.0 flows
@@ -82,11 +83,11 @@ export class OAuthService {
     // Hash client secret if provided and not already hashed
     let clientSecret = data.client_secret;
     let clientSecretSalt = "";
-    
+
     if (clientSecret) {
       // Check if the secret looks like it's already hashed (bcrypt format)
       const isAlreadyHashed = clientSecret.startsWith('$2') || clientSecret.length > 60;
-      
+
       if (!isAlreadyHashed) {
         // Hash the plain text secret
         const { hash, salt } = await this.securityService.hashPassword(clientSecret);
@@ -118,7 +119,7 @@ export class OAuthService {
 
     if (!result.success || !result.data) {
       const errorMessage = typeof result.error === 'string' ? result.error : (result.error as any)?.message || 'Unknown error';
-      throw new Error(`Failed to create OAuth client: ${errorMessage}`);
+      throw new Error(`${ServiceErrors.CLIENT_CREATE_FAILED}: ${errorMessage}`);
     }
 
     return result.data;
@@ -153,7 +154,7 @@ export class OAuthService {
     const result = await this.clientController.update(id, updateData);
 
     if (!result.success || !result.data) {
-      throw new Error("Failed to update OAuth client");
+      throw new Error(ServiceErrors.CLIENT_UPDATE_FAILED);
     }
 
     return result.data;
@@ -185,7 +186,7 @@ export class OAuthService {
     }
 
     let isValid: boolean;
-    
+
     // Check if the stored secret is already hashed (bcrypt format)
     if (client.client_secret.startsWith('$2')) {
       // Use Bun's built-in password verification only
@@ -254,7 +255,7 @@ export class OAuthService {
     });
 
     if (!result.success || !result.data) {
-      throw new Error("Failed to create authorization code");
+      throw new Error(ServiceErrors.AUTH_CODE_CREATE_FAILED);
     }
 
     return result.data;
@@ -307,7 +308,7 @@ export class OAuthService {
     });
 
     if (!result.success || !result.data) {
-      throw new Error("Failed to create refresh token");
+      throw new Error(ServiceErrors.REFRESH_TOKEN_CREATE_FAILED);
     }
 
     return result.data;
@@ -334,7 +335,7 @@ export class OAuthService {
   ): Promise<RefreshToken> {
     const currentToken = await this.findRefreshTokenById(id);
     if (!currentToken) {
-      throw new Error("Refresh token not found");
+      throw new Error(ServiceErrors.REFRESH_TOKEN_NOT_FOUND);
     }
 
     // Revoke current token
@@ -376,7 +377,7 @@ export class OAuthService {
       if (!client || !client.is_active) {
         return {
           error: OAuthErrorType.UNAUTHORIZED_CLIENT,
-          error_description: "Invalid or inactive client",
+          error_description: ServiceErrors.UNAUTHORIZED_CLIENT,
           state: request.state,
         };
       }
@@ -391,7 +392,7 @@ export class OAuthService {
       ) {
         return {
           error: OAuthErrorType.INVALID_REQUEST,
-          error_description: "Invalid redirect URI",
+          error_description: ServiceErrors.INVALID_REDIRECT_URI,
           state: request.state,
         };
       }
@@ -401,7 +402,7 @@ export class OAuthService {
       if (!responseTypes.includes(request.response_type)) {
         return {
           error: OAuthErrorType.UNSUPPORTED_RESPONSE_TYPE,
-          error_description: "Unsupported response type",
+          error_description: ServiceErrors.UNSUPPORTED_RESPONSE_TYPE,
           state: request.state,
         };
       }
@@ -410,7 +411,7 @@ export class OAuthService {
       if (!user && request.prompt === "none") {
         return {
           error: OAuthErrorType.ACCESS_DENIED,
-          error_description: "User authentication required",
+          error_description: ServiceErrors.USER_AUTH_REQUIRED,
           state: request.state,
         };
       }
@@ -425,7 +426,7 @@ export class OAuthService {
         // This would typically redirect to login/consent page
         // For API usage, we'll create a mock user for testing
         error: OAuthErrorType.TEMPORARILY_UNAVAILABLE,
-        error_description: "User authentication required",
+        error_description: ServiceErrors.USER_AUTH_REQUIRED,
         state: request.state,
       };
     } catch (error: any) {
@@ -506,7 +507,7 @@ export class OAuthService {
         default:
           return {
             error: OAuthErrorType.UNSUPPORTED_GRANT_TYPE,
-            error_description: "Unsupported grant type",
+            error_description: ServiceErrors.UNSUPPORTED_GRANT_TYPE,
             access_token: "",
             token_type: "Bearer",
             expires_in: 0,
@@ -532,7 +533,7 @@ export class OAuthService {
     if (!request.code) {
       return {
         error: OAuthErrorType.INVALID_REQUEST,
-        error_description: "Authorization code is required",
+        error_description: ServiceErrors.AUTH_CODE_REQUIRED,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -541,32 +542,32 @@ export class OAuthService {
 
     // Validate authorization code
     const authCode = await this.findAuthCodeByCode(request.code);
-    
+
     // ✅ VALIDACIÓN MEJORADA: Verificar si el código ya fue usado PRIMERO
     if (!authCode) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
-        error_description: "Invalid authorization code",
+        error_description: ServiceErrors.INVALID_AUTH_CODE,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
       };
     }
-    
+
     if (authCode.is_used) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
-        error_description: "Authorization code has already been used",
+        error_description: ServiceErrors.AUTH_CODE_USED,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
       };
     }
-    
+
     if (new Date() > new Date(authCode.expires_at)) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
-        error_description: "Authorization code has expired",
+        error_description: ServiceErrors.AUTH_CODE_EXPIRED,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -581,7 +582,7 @@ export class OAuthService {
     if (!client) {
       return {
         error: OAuthErrorType.INVALID_CLIENT,
-        error_description: "Invalid client credentials",
+        error_description: ServiceErrors.INVALID_CLIENT,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -595,7 +596,7 @@ export class OAuthService {
     ) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
-        error_description: "Redirect URI mismatch",
+        error_description: ServiceErrors.REDIRECT_URI_MISMATCH,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -613,7 +614,7 @@ export class OAuthService {
       if (!isValid) {
         return {
           error: OAuthErrorType.INVALID_GRANT,
-          error_description: "Invalid PKCE verifier",
+          error_description: ServiceErrors.INVALID_PKCE,
           access_token: "",
           token_type: "Bearer",
           expires_in: 0,
@@ -658,7 +659,7 @@ export class OAuthService {
     if (!request.refresh_token) {
       return {
         error: OAuthErrorType.INVALID_REQUEST,
-        error_description: "Refresh token is required",
+        error_description: ServiceErrors.REFRESH_TOKEN_REQUIRED,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -669,32 +670,32 @@ export class OAuthService {
     const refreshToken = await this.findRefreshTokenByToken(
       request.refresh_token,
     );
-    
+
     // ✅ VALIDACIÓN MEJORADA
     if (!refreshToken) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
-        error_description: "Invalid refresh token",
+        error_description: ServiceErrors.INVALID_REFRESH_TOKEN_FORMAT, // Using generic format or invalid refresh token message
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
       };
     }
-    
+
     if (refreshToken.is_revoked) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
-        error_description: "Refresh token has been revoked",
+        error_description: ServiceErrors.REFRESH_TOKEN_REVOKED,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
       };
     }
-    
+
     if (new Date() > new Date(refreshToken.expires_at)) {
       return {
         error: OAuthErrorType.INVALID_GRANT,
-        error_description: "Refresh token has expired",
+        error_description: ServiceErrors.REFRESH_TOKEN_EXPIRED,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -706,22 +707,22 @@ export class OAuthService {
       request.client_id!,
       request.client_secret,
     );
-    
+
     // ✅ VALIDACIÓN MEJORADA del cliente
     if (!client) {
       return {
         error: OAuthErrorType.INVALID_CLIENT,
-        error_description: "Invalid client credentials",
+        error_description: ServiceErrors.INVALID_CLIENT,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
       };
     }
-    
+
     if (client.client_id !== refreshToken.client_id) {
       return {
         error: OAuthErrorType.INVALID_CLIENT,
-        error_description: "Client mismatch for refresh token",
+        error_description: ServiceErrors.CLIENT_MISMATCH,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -738,7 +739,7 @@ export class OAuthService {
     } catch (error) {
       return {
         error: OAuthErrorType.SERVER_ERROR,
-        error_description: "Failed to rotate refresh token",
+        error_description: ServiceErrors.REFRESH_TOKEN_ROTATE_FAILED,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -781,7 +782,7 @@ export class OAuthService {
     if (!client) {
       return {
         error: OAuthErrorType.INVALID_CLIENT,
-        error_description: "Invalid client credentials",
+        error_description: ServiceErrors.INVALID_CLIENT,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -792,7 +793,7 @@ export class OAuthService {
     if (client.is_public) {
       return {
         error: OAuthErrorType.UNAUTHORIZED_CLIENT,
-        error_description: "Public clients cannot use client credentials grant",
+        error_description: ServiceErrors.PUBLIC_CLIENT_NO_CREDENTIALS,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -840,7 +841,7 @@ export class OAuthService {
       // These are not in the standard TokenRequest type, but are passed in the request
       const username = (request as any).username;
       const password = (request as any).password;
-      
+
       if (!username || !password) {
         return {
           error: OAuthErrorType.INVALID_REQUEST,
@@ -853,7 +854,7 @@ export class OAuthService {
 
       // Validate user credentials using AuthService
       const loginResult = await this.authService.login({ email: username, password });
-      
+
       if (!loginResult.success || !loginResult.user) {
         return {
           error: OAuthErrorType.INVALID_GRANT,

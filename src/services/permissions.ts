@@ -13,6 +13,7 @@ import {
   RoleResult,
   AuthErrorType,
 } from "../types/auth";
+import { ServiceErrors } from "./constants";
 
 /**
  * Service for role and permission management (RBAC).
@@ -55,7 +56,7 @@ export class PermissionService {
         success: false,
         error: {
           type: AuthErrorType.VALIDATION_ERROR,
-          message: "Name, resource, and action are required",
+          message: ServiceErrors.PERMISSION_VALIDATION_ERROR,
         },
       };
     }
@@ -68,7 +69,7 @@ export class PermissionService {
           success: false,
           error: {
             type: AuthErrorType.PERMISSION_ERROR,
-            message: `Permission '${data.name}' already exists`,
+            message: `${ServiceErrors.PERMISSION_EXISTS}: ${data.name}`,
           },
         };
       }
@@ -78,7 +79,7 @@ export class PermissionService {
           success: false,
           error: {
             type: AuthErrorType.DATABASE_ERROR,
-            message: result.error || "Failed to create permission",
+            message: result.error || ServiceErrors.PERMISSION_CREATE_FAILED,
           },
         };
       }
@@ -101,7 +102,7 @@ export class PermissionService {
         success: false,
         error: {
           type: AuthErrorType.DATABASE_ERROR,
-          message: result.error || "Failed to update permission",
+          message: result.error || ServiceErrors.PERMISSION_UPDATE_FAILED,
         },
       };
     }
@@ -125,7 +126,7 @@ export class PermissionService {
           success: false,
           error: {
             type: AuthErrorType.DATABASE_ERROR,
-            message: result.error || "Failed to delete permission",
+            message: result.error || ServiceErrors.PERMISSION_DELETE_FAILED,
           },
         };
       }
@@ -146,7 +147,7 @@ export class PermissionService {
         success: false,
         error: {
           type: AuthErrorType.VALIDATION_ERROR,
-          message: "Role name is required",
+          message: ServiceErrors.ROLE_NAME_REQUIRED,
         },
       };
     }
@@ -157,7 +158,7 @@ export class PermissionService {
           success: false,
           error: {
             type: AuthErrorType.ROLE_ERROR,
-            message: `Role '${data.name}' already exists`,
+            message: `${ServiceErrors.ROLE_EXISTS}: ${data.name}`,
           },
         };
       }
@@ -167,7 +168,7 @@ export class PermissionService {
           success: false,
           error: {
             type: AuthErrorType.DATABASE_ERROR,
-            message: result.error || "Failed to create role",
+            message: result.error || ServiceErrors.ROLE_CREATE_FAILED,
           },
         };
       }
@@ -187,7 +188,7 @@ export class PermissionService {
         success: false,
         error: {
           type: AuthErrorType.DATABASE_ERROR,
-          message: result.error || "Failed to update role",
+          message: result.error || ServiceErrors.ROLE_UPDATE_FAILED,
         },
       };
     }
@@ -224,7 +225,7 @@ export class PermissionService {
           success: false,
           error: {
             type: AuthErrorType.DATABASE_ERROR,
-            message: result.error || "Failed to delete role",
+            message: result.error || ServiceErrors.ROLE_DELETE_FAILED,
           },
         };
       }
@@ -260,7 +261,7 @@ export class PermissionService {
           success: false,
           error: {
             type: AuthErrorType.DATABASE_ERROR,
-            message: result.error || "Failed to assign permission to role",
+            message: result.error || ServiceErrors.ASSIGN_PERMISSION_FAILED,
           },
         };
       }
@@ -287,7 +288,7 @@ export class PermissionService {
           success: false,
           error: {
             type: AuthErrorType.NOT_FOUND_ERROR,
-            message: "Permission is not assigned to this role",
+            message: ServiceErrors.PERMISSION_NOT_ASSIGNED,
           },
         };
       }
@@ -299,7 +300,7 @@ export class PermissionService {
           success: false,
           error: {
             type: AuthErrorType.DATABASE_ERROR,
-            message: result.error || "Failed to remove permission from role",
+            message: result.error || ServiceErrors.REMOVE_PERMISSION_FAILED,
           },
         };
       }
@@ -484,7 +485,7 @@ export class PermissionService {
           success: false,
           error: {
             type: "NOT_FOUND",
-            message: "User not found",
+            message: ServiceErrors.USER_NOT_FOUND,
           },
         };
       }
@@ -496,7 +497,7 @@ export class PermissionService {
           success: false,
           error: {
             type: "NOT_FOUND",
-            message: "Role not found",
+            message: ServiceErrors.ROLE_NOT_FOUND,
           },
         };
       }
@@ -522,7 +523,7 @@ export class PermissionService {
           success: false,
           error: {
             type: "DATABASE_ERROR",
-            message: result.error || "Failed to assign role to user",
+            message: result.error || ServiceErrors.ASSIGN_ROLE_FAILED,
           },
         };
       }
