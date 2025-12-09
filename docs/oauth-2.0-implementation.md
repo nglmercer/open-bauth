@@ -47,7 +47,7 @@ Esta guía documenta la implementación completa de OAuth 2.0 y funcionalidades 
 - **State/Nonce Generation**: Parámetros anti-CSRF y replay
 - **Security Challenges**: Creación y verificación de desafíos
 - **Encryption/Decryption**: Manejo seguro de datos sensibles
-- **Password Hashing**: Hashing seguro con salt
+- **Password Hashing**: Hashing seguro con Bun.password.verify (más ligero que bcrypt)
 
 #### OAuth Service (`src/services/oauth.ts`)
 - **Complete OAuth 2.0 Flows**:
@@ -55,12 +55,17 @@ Esta guía documenta la implementación completa de OAuth 2.0 y funcionalidades 
   - Implicit Flow (no recomendado)
   - Client Credentials Flow
   - Resource Owner Password Credentials Flow ✅ (Completamente implementado)
-  - Refresh Token Flow con rotación
+  - Refresh Token Flow con rotación automática mejorada
   - Device Authorization Flow
 - **Token Management**: Generación, verificación y revocación
-- **Client Management**: Creación, actualización y autenticación
-- **Introspection**: Verificación de tokens
-- **Revocation**: Revocación de tokens
+- **Client Management**: Creación, actualización y autenticación con hashing seguro
+- **Introspection**: Verificación completa de tokens (access y refresh tokens)
+- **Revocation**: Revocación de tokens según RFC 7009
+- **Seguridad Avanzada**:
+  - Validación mejorada de códigos de autorización (prevención de reutilización)
+  - Verificación de PKCE con métodos S256 y PLAIN
+  - Autenticación de clientes con soporte para secretos bcrypt y hash personalizado
+  - Manejo robusto de errores con mensajes descriptivos
 
 #### Enhanced User Service (`src/services/enhanced-user.ts`)
 - **Anonymous User Management**: Creación y promoción
@@ -268,6 +273,8 @@ const activeMFA = await enhancedUserService.getEnabledMFAConfigurations(userId);
 - **Scope Validation**: Validación de scopes solicitados
 - **PKCE Enforcement**: PKCE requerido para clientes públicos
 - **Grant Type Validation**: Validación de tipos de grant soportados
+- **Authorization Code Validation**: Verificación de uso único y expiración
+- **Client Authentication**: Soporte para múltiples métodos de autenticación
 
 ### Prevención de Ataques
 - **CSRF Protection**: Parámetros state obligatorios
@@ -275,6 +282,9 @@ const activeMFA = await enhancedUserService.getEnabledMFAConfigurations(userId);
 - **Token Theft Prevention**: DPoP binding de tokens
 - **Brute Force Protection**: Rate limiting y detección
 - **Session Hijacking**: Binding de tokens a dispositivos
+- **Password Security**: Verificación con Bun.password.verify (sin dependencia de bcrypt)
+- **Authorization Code Replay**: Prevención de reutilización de códigos
+- **Refresh Token Rotation**: Rotación automática para prevenir compromiso
 
 ### Auditoría y Logging
 - **Security Events**: Logging completo de eventos
@@ -332,7 +342,7 @@ DELETE /api/mfa/disable          # Disable MFA
 
 ## 🧪 Ejemplo de Uso Completo
 
-Ver `examples/oauth-usage-example.ts` para un ejemplo completo que demuestra:
+Ver [`examples/oauth-usage-example.ts`](examples/oauth-usage-example.ts) para un ejemplo completo que demuestra:
 
 1. Configuración de servicios OAuth 2.0
 2. Creación de clientes OAuth 2.0
@@ -346,6 +356,9 @@ Ver `examples/oauth-usage-example.ts` para un ejemplo completo que demuestra:
 10. Detección de actividad sospechosa
 11. Rate limiting
 12. Auditoría completa
+
+### Tests de Integración
+Ver [`tests/api/oauth.comprehensive.test.ts`](tests/api/oauth.comprehensive.test.ts) para ver ejemplos completos de testing de todos los flujos OAuth 2.0 con casos de éxito y error.
 
 ## 🔧 Configuración
 
@@ -403,6 +416,67 @@ await dbInitializer.initialize();
 3. **Monitoring**: Métricas y alertas de seguridad
 4. **Compliance**: Validación de cumplimiento normativo
 5. **Performance**: Optimización de consultas y caching
+
+## 🧪 Testing y Validación
+
+### Tests Completos (`tests/api/oauth.comprehensive.test.ts`)
+La implementación incluye una suite completa de tests que cubre todos los flujos OAuth 2.0:
+
+#### Authorization Code Grant Tests
+- ✅ Intercambio exitoso de código de autorización por tokens
+- ✅ Rechazo de códigos de autorización reutilizados
+- ✅ Verificación correcta de PKCE challenge (S256)
+- ✅ Rechazo de PKCE verifier incorrecto
+- ✅ Rechazo de códigos de autorización inválidos
+
+#### Refresh Token Grant Tests
+- ✅ Intercambio exitoso de refresh token por nuevo access token
+- ✅ Rechazo de refresh tokens inválidos
+- ✅ Rotación automática de refresh tokens
+
+#### Client Credentials Grant Tests
+- ✅ Emisión exitosa de tokens para credenciales de cliente
+- ✅ Rechazo de clientes públicos en client credentials flow
+
+#### Password Grant Tests
+- ✅ Emisión exitosa de tokens para password grant
+- ✅ Rechazo de credenciales inválidas en password grant
+
+#### Token Introspection Tests
+- ✅ Introspección exitosa de access tokens válidos
+- ✅ Retorno de inactive para tokens inválidos
+
+#### Token Revocation Tests
+- ✅ Revocación exitosa de refresh tokens
+- ✅ Cumplimiento con RFC 7009 (éxito incluso para tokens inválidos)
+
+### Ejemplo de Test
+```typescript
+// Test de intercambio de código de autorización
+const authRequest = {
+    response_type: OAuthResponseType.CODE,
+    client_id: testClient.client_id,
+    redirect_uri: "https://example.com/callback",
+    scope: "read write",
+    state: "test-state"
+};
+
+const authResponse = await oauthService.handleAuthorizationRequest(authRequest, user);
+expect(authResponse.code).toBeDefined();
+
+// Intercambiar código por token
+const tokenRequest = {
+    grant_type: OAuthGrantType.AUTHORIZATION_CODE,
+    code: authResponse.code!,
+    client_id: testClient.client_id,
+    client_secret: testClient.plainSecret,
+    redirect_uri: "https://example.com/callback"
+};
+
+const tokenResponse = await oauthService.handleTokenRequest(tokenRequest);
+expect(tokenResponse.access_token).toBeDefined();
+expect(tokenResponse.refresh_token).toBeDefined();
+```
 
 ## 🤝 Contribución
 
