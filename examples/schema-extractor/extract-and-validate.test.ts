@@ -119,6 +119,22 @@ describe("extract-and-validate", () => {
       const result = createValidator.safeParse(minimalData);
       expect(result.success).toBe(true);
     });
+
+    it("debería omitir el campo ID con valor por defecto generado automáticamente", () => {
+      const userSchema = schemas.find((s) => s.tableName === "users");
+      if (!userSchema) throw new Error("User schema not found");
+
+      const createValidator =
+        createZodCreateValidatorFromTableSchema(userSchema);
+
+      // Verificar que el campo ID no está presente en el validador de creación
+      const shapeKeys = Object.keys(createValidator._def.shape);
+      expect(shapeKeys.includes("id")).toBe(false);
+
+      // Verificar que los campos generados automáticamente tampoco están presentes
+      expect(shapeKeys.includes("created_at")).toBe(false);
+      expect(shapeKeys.includes("updated_at")).toBe(false);
+    });
   });
 
   describe("createZodUpdateValidatorFromTableSchema", () => {
