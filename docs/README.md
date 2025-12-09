@@ -32,6 +32,7 @@ See the main [README](../README.md) for basics and quick start.
 - [**Services**](./services.md) - Complete API of AuthService, JWTService, PermissionService, OAuthService, SecurityService, and EnhancedUserService
 - [**Middleware**](./middleware.md) - Framework-agnostic middleware for authentication, authorization, and OAuth security
 - [**OAuth 2.0**](./oauth-2.0-implementation.md) - Complete OAuth 2.0 and OpenID Connect implementation guide
+- [**MFA Guide**](./mfa-guide.md) - **NEW**: Complete Multi-Factor Authentication implementation guide
 
 ### 🗄️ Database & Storage
 - [**Database Adapters**](./adapter-usage.md) - Customizable database adapter system
@@ -164,8 +165,15 @@ const authMw = createAuthMiddleware({
 
 - **PKCE support** (RFC 7636) for public clients
 - **DPoP implementation** (RFC 9449) for token binding
+- **Multi-Factor Authentication** with TOTP, Email, and SMS
+  - TOTP/MFA (RFC 6238) for Google Authenticator, Authy
+  - Email/SMS verification codes with SHA-256 hashing
+  - Backup recovery codes for account recovery
+- **Security Challenges** with pluggable verifier system
+  - Built-in verifiers (TOTP, SecureCode, BackupCode)
+  - Custom challenge types supported
+  - Audit trail for all verifications
 - **Rate limiting** with multiple strategies
-- **Security challenges** for additional verification
 - **Audit logging** for compliance and monitoring
 
 ### 🌐 Framework Integration
@@ -376,8 +384,9 @@ docs/
 ├── services.md                  # Complete API documentation
 ├── middleware.md                # Framework-agnostic middleware
 ├── adapter-usage.md             # Database adapter system
-├── database-extension-spec.md     # Schema extension specification
+├── database-extension-spec.md   # Schema extension specification
 ├── oauth-2.0-implementation.md  # OAuth 2.0 implementation guide
+├── mfa-guide.md                 # NEW: MFA implementation guide
 ├── logger.md                    # Logging system documentation
 └── testing.md                   # Testing guide and best practices
 ```
