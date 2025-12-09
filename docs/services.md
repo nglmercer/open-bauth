@@ -298,6 +298,9 @@ const authResponse = await oauthService.handleAuthorizationRequest({
 - `verifyDPoPProof(dpop, method, uri)` → `Result`
   - Verifies DPoP proof
   - With header validation
+- `registerVerifier(type, verifier)` → `void`
+  - Registers a custom challenge verifier
+  - Supports Strategy pattern for extensibility
 - `createChallenge(type, data, expirationMinutes?)` → [`SecurityChallenge`](src/types/oauth.ts:400)
   - Creates security challenge
   - Supports multiple challenge types
@@ -340,6 +343,13 @@ const isValid = securityService.verifyPKCEChallenge(
 const { hash, salt } = await securityService.hashPassword('user-password');
 console.log('Hash:', hash);
 console.log('Salt:', salt);
+
+// Register Custom Verifier
+securityService.registerVerifier('math_puzzle', {
+  verify: (data, solution) => {
+    return { valid: parseInt(solution.answer) === data.expected };
+  }
+});
 ```
 
 ### [`EnhancedUserService`](src/services/enhanced-user.ts:21)

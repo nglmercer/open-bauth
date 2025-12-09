@@ -33,7 +33,11 @@ export interface ChallengeVerifier<T = any, S = any> {
 
 /**
  * Security Service for handling OAuth 2.0 security features
- * PKCE, DPoP, state/nonce management, and security challenges
+ * PKCE, DPoP, state/nonce management, and pluggable security challenges.
+ * 
+ * Supports a flexible challenge-response system using the Strategy pattern.
+ * Default verifiers are provided for common types (MFA, Email, SMS),
+ * and custom verifiers can be registered for other needs (CAPTCHA, Biometric, etc.).
  */
 export class SecurityService {
   private readonly CHALLENGE_EXPIRY_MINUTES = 10;
@@ -49,7 +53,19 @@ export class SecurityService {
   }
 
   /**
-   * Register a custom challenge verifier
+   * Register a custom challenge verifier.
+   * 
+   * @param type - The challenge type identifier (e.g., 'biometric', 'captcha', or a ChallengeType enum value)
+   * @param verifier - The verifier implementation matching the ChallengeVerifier interface
+   * 
+   * @example
+   * ```typescript
+   * securityService.registerVerifier('math_puzzle', {
+   *   verify: (data, solution) => {
+   *     return { valid: parseInt(solution.answer) === data.expected };
+   *   }
+   * });
+   * ```
    */
   registerVerifier(type: ChallengeType | string, verifier: ChallengeVerifier) {
     this.verifiers.set(type.toString(), verifier);
@@ -255,7 +271,12 @@ export class SecurityService {
   }
 
   /**
-   * Create a security challenge
+   * Create a security challenge.
+   * 
+   * @param type - The type of challenge to create (e.g., ChallengeType.MFA)
+   * @param data - The data required for the challenge (e.g., secret for TOTP, expected code for Email)
+   * @param expiresInMinutes - Duration in minutes before the challenge expires (default: 10)
+   * @returns The created challenge object (without ID or timestamps, which are handled by the caller/DB)
    */
   createChallenge(
     type: ChallengeType | string,
@@ -277,7 +298,13 @@ export class SecurityService {
   }
 
   /**
-   * Verify a security challenge solution
+   * Verify a security challenge solution.
+   * 
+   * Delegates the verification logic to the registered verifier for the challenge's type.
+   * 
+   * @param challenge - The challenge object to be verified
+   * @param solution - The user-provided solution (e.g., code, token, answer)
+   * @returns A result object indicating if the solution was valid and any associated data or errors
    */
   async verifyChallenge(
     challenge: SecurityChallenge,
