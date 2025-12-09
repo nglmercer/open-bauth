@@ -151,7 +151,9 @@ export class JWTServiceBun implements IJWTServiceExtended {
       throw new Error(ServiceErrors.ID_TOKEN_GEN_FAILED);
     }
   }
-
+  createSignature(data: string){
+    return this.createSignatureBun(data)
+  }
   /**
    * Verify and decode a JWT token (optimized version)
    */

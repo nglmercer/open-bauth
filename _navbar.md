@@ -13,4 +13,4 @@
   * [<span class="material-symbols-outlined">bug_report</span> GitHub](https://github.com/nglmercer/open-bauth)
   * [<span class="material-symbols-outlined">forum</span> Discussions](https://github.com/nglmercer/open-bauth/discussions)
 
-* <span class="material-symbols-outlined">language</span> **v1.4.0**
+* <span class="material-symbols-outlined">language</span> **v1.4.7**
