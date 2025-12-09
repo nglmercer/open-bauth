@@ -1,12 +1,12 @@
-# Uso de Zod con open-bauth
+# Using Zod with open-bauth
 
 ## Overview
 
-open-bauth ahora reexporta Zod. Esto permite a los usuarios acceder a todas las funcionalidades de Zod sin necesidad de instalarlo por separado.
+open-bauth now re-exports Zod. This allows users to access all Zod functionalities without needing to install it separately.
 
-## Configuración
+## Configuration
 
-### Dependencia actual (package.json)
+### Current Dependency (package.json)
 ```json
 {
   "dependencies": {
@@ -15,9 +15,9 @@ open-bauth ahora reexporta Zod. Esto permite a los usuarios acceder a todas las 
 }
 ```
 
-### Reexport en src/index.ts
+### Re-export in src/index.ts
 ```typescript
-// Reexportar Zod para conveniencia de usuarios y control de versiones
+// Re-export Zod for user convenience and version control
 export * as zod from "zod";
 export { z } from "zod";
 export type { 
@@ -28,20 +28,20 @@ export type {
 } from "zod";
 ```
 
-## Cómo Usar
+## How to Use
 
-### Método 1: Importación desde open-bauth (Recomendado)
+### Method 1: Import from open-bauth (Recommended)
 ```typescript
 import { z, BaseController, SchemaExtractor } from "open-bauth";
 
-// Crear schemas Zod
+// Create Zod schemas
 const userSchema = z.object({
   id: z.number(),
   name: z.string().min(2),
   email: z.string().email(),
 });
 
-// Usar con controladores de open-bauth
+// Use with open-bauth controllers
 const controller = new BaseController('users', {
   database: db,
   schemas: {
@@ -54,58 +54,58 @@ const controller = new BaseController('users', {
 });
 ```
 
-### Método 2: Importación directa (Legacy)
+### Method 2: Direct Import (Legacy)
 ```typescript
 import { z } from "zod";
 import { BaseController } from "open-bauth";
 
-// Mismo funcionamiento pero requiere instalar Zod por separado
+// Same functionality but requires installing Zod separately
 ```
 
-## Ventajas del Reexport
+## Re-export Advantages
 
-### 1. **Una sola dependencia**
-- No necesitas instalar Zod por separado
-- Menos configuración en tus proyectos
+### 1. **Single Dependency**
+- No need to install Zod separately
+- Less configuration in your projects
 
-### 2. **Control de versiones garantizado**
-- Siempre usarás la versión de Zod compatible con open-bauth
-- Evitas conflictos entre versiones
+### 2. **Guaranteed Version Control**
+- You'll always use the Zod version compatible with open-bauth
+- Avoid version conflicts
 
-### 3. **Imports más limpios**
+### 3. **Cleaner Imports**
 ```typescript
-// Antes (2 imports)
+// Before (2 imports)
 import { z } from "zod";
 import { BaseController } from "open-bauth";
 
-// Después (1 import)
+// After (1 import)
 import { z, BaseController } from "open-bauth";
 ```
 
-### 4. **Bundle optimizado**
-- Tree-shaking funciona mejor con imports explícitos
-- No hay duplicación de Zod en el bundle
+### 4. **Optimized Bundle**
+- Tree-shaking works better with explicit imports
+- No Zod duplication in the bundle
 
-### 5. **Compatibilidad garantizada**
-- Todas las funciones de open-bauth que usan Zod funcionan perfectamente
-- Sin problemas de tipos o versiones
+### 5. **Guaranteed Compatibility**
+- All open-bauth functions that use Zod work perfectly
+- No type or version issues
 
-## Ejemplos Prácticos
+## Practical Examples
 
-### Schema Extraction con Zod
+### Schema Extraction with Zod
 ```typescript
 import { z, SchemaExtractor } from "open-bauth";
 
-// Extraer esquema de base de datos y convertir a Zod
+// Extract database schema and convert to Zod
 const extractor = new SchemaExtractor(database);
 const schema = await extractor.extractTableSchema('users');
 
-// Validar datos usando el schema extraído
+// Validate data using the extracted schema
 const userData = { name: 'John', email: 'john@example.com' };
 const validatedUser = schema.schema.parse(userData);
 ```
 
-### Validación en CRUD Operations
+### Validation in CRUD Operations
 ```typescript
 import { z, BaseController } from "open-bauth";
 
@@ -125,7 +125,7 @@ const controller = new BaseController('products', {
   }
 });
 
-// La validación es automática
+// Validation is automatic
 const result = await controller.create({
   name: 'Laptop',
   price: 999.99,
@@ -133,21 +133,21 @@ const result = await controller.create({
 });
 ```
 
-### Schemas Avanzados
+### Advanced Schemas
 ```typescript
 import { z } from "open-bauth";
 
-// Schema con validaciones personalizadas
+// Schema with custom validations
 const registrationSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Las contraseñas no coinciden",
+  message: "Passwords do not match",
   path: ["confirmPassword"],
 });
 
-// Schema con transformaciones
+// Schema with transformations
 const userSchema = z.object({
   name: z.string().transform(val => val.trim()),
   email: z.string().email(),
@@ -155,65 +155,65 @@ const userSchema = z.object({
 });
 ```
 
-## Construcción y Publicación
+## Build and Publishing
 
-### Para el desarrollo
-Durante el desarrollo, los ejemplos usan el import directo:
+### For Development
+During development, examples use direct import:
 ```typescript
-import { z } from "zod"; // Desarrollo
+import { z } from "zod"; // Development
 ```
 
-### Para producción
-Después de construir el proyecto (`bun run build`), los usuarios pueden usar:
+### For Production
+After building the project (`bun run build`), users can use:
 ```typescript
-import { z } from "open-bauth"; // Producción
+import { z } from "open-bauth"; // Production
 ```
 
-### Verificación del reexport
+### Re-export Verification
 ```bash
-# Verificar tipos
+# Verify types
 bun run typecheck
 
-# Construir proyecto
+# Build project
 bun run build
 
-# Probar reexport
+# Test re-export
 node -e "console.log(require('./dist/index.js'))"
 ```
 
-## Impacto en el Bundle Size
+## Bundle Size Impact
 
-### Análisis de tamaño
+### Size Analysis
 - **Zod standalone**: ~50KB gzipped
-- **Con reexport**: ~50KB gzipped (sin duplicación)
-- **Sin reexport**: ~50KB + overhead de múltiples imports
+- **With re-export**: ~50KB gzipped (no duplication)
+- **Without re-export**: ~50KB + overhead from multiple imports
 
-### Tree-shaking efectivo
+### Effective Tree-shaking
 ```typescript
 import { z, BaseController } from "open-bauth";
-// Solo se incluye el código de Zod que realmente usas
+// Only the Zod code you actually use is included
 ```
 
-## Migración desde import directo
+## Migration from Direct Import
 
-### Paso 1: Actualizar imports
+### Step 1: Update Imports
 ```typescript
-// Antes
+// Before
 import { z } from "zod";
 import { BaseController } from "open-bauth";
 
-// Después
+// After
 import { z, BaseController } from "open-bauth";
 ```
 
-### Paso 2: Remover Zod de package.json (opcional)
+### Step 2: Remove Zod from package.json (Optional)
 ```bash
 npm uninstall zod
-# o
+# or
 bun remove zod
 ```
 
-### Paso 3: Verificar funcionamiento
+### Step 3: Verify Functionality
 ```typescript
 import { z } from "open-bauth";
 
@@ -221,52 +221,51 @@ const schema = z.object({
   name: z.string()
 });
 
-console.log('Zod funciona correctamente:', schema);
+console.log('Zod works correctly:', schema);
 ```
 
-## Preguntas Frecuentes
+## Frequently Asked Questions
 
-### ¿Puedo seguir usando Zod directamente?
-Sí, el método antiguo sigue funcionando, pero el reexport es recomendado.
+### Can I still use Zod directly?
+Yes, the old method still works, but the re-export is recommended.
 
-### ¿Qué pasa si quiero una versión diferente de Zod?
-El reexport usa la versión de Zod que probamos con open-bauth. Para usar otra versión, importa directamente.
+### What if I want a different version of Zod?
+The re-export uses the version of Zod we tested with open-bauth. To use another version, import directly.
 
-### ¿Funciona con TypeScript?
-Sí, todos los tipos de Zod están reexportados correctamente.
+### Does it work with TypeScript?
+Yes, all Zod types are correctly re-exported.
 
-### ¿El bundle size será mayor?
-No, el tree-shaking asegura que solo se incluya el código necesario.
+### Will the bundle size be larger?
+No, tree-shaking ensures only necessary code is included.
 
-## Resumen
+## Summary
 
-El reexport de Zod en open-bauth proporciona:
-- ✅ Mejor experiencia de desarrollo
-- ✅ Control de versiones garantizado
-- ✅ Bundle optimizado
-- ✅ Compatibilidad total
-- ✅ Menos configuración
-- ✅ imports más limpios
+The Zod re-export in open-bauth provides:
+- Better development experience
+- Guaranteed version control
+- Optimized bundle
+- Full compatibility
+- Less configuration
+- Cleaner imports
 
+## Automatic Type Mapping
 
-## Mapeo Automático de Tipos
+open-bauth uses a centralized utility to map SQL types and JavaScript constructors to Zod validators. This ensures consistency throughout the application.
 
-open-bauth utiliza una utilidad centralizada para mapear tipos de SQL y constructores de JavaScript a validadores Zod. Esto asegura consistencia en toda la aplicación.
+### Supported Types
 
-### Tipos Soportados
-
-| SQL Type / Constructor | Zod Validator | Notas |
+| SQL Type / Constructor | Zod Validator | Notes |
 |------------------------|---------------|-------|
 | `TEXT`, `VARCHAR`, `String` | `z.string()` | |
-| `INTEGER`, `INT`, `Number` | `z.number()` | Validado como entero en algunos contextos |
+| `INTEGER`, `INT`, `Number` | `z.number()` | Validated as integer in some contexts |
 | `REAL`, `FLOAT` | `z.number()` | |
-| `DATE`, `DATETIME`, `Date` | `z.date().or(z.string())` | Acepta objetos Date o strings ISO |
-| `BLOB`, `BINARY`, `Buffer` | `z.any()` | Flexible para Buffer, Uint8Array, etc. |
+| `DATE`, `DATETIME`, `Date` | `z.date().or(z.string())` | Accepts Date objects or ISO strings |
+| `BLOB`, `BINARY`, `Buffer` | `z.any()` | Flexible for Buffer, Uint8Array, etc. |
 | `JSON` | `z.record(z.string(), z.any())` | |
 
-### Manejo Flexible de Booleanos (BIT/BOOLEAN)
+### Flexible Boolean Handling (BIT/BOOLEAN)
 
-Para mejorar la compatibilidad con diferentes drivers de base de datos (especialmente SQLite y SQL Server) y formas de transmisión de datos, los tipos `BIT` y `BOOLEAN` utilizan un validador flexible:
+To improve compatibility with different database drivers (especially SQLite and SQL Server) and data transmission methods, `BIT` and `BOOLEAN` types use a flexible validator:
 
 ```typescript
 const flexibleBoolean = z.union([
@@ -277,14 +276,13 @@ const flexibleBoolean = z.union([
 ]);
 ```
 
-Esto significa que tus campos booleanos aceptarán:
-- `true` / `false` (Booleans nativos)
-- `1` / `0` (Enteros usados por SQLite/MySQL)
-- `Uint8Array([1])` / `Buffer.from([0])` (Representaciones binarias)
+This means your boolean fields will accept:
+- `true` / `false` (Native booleans)
+- `1` / `0` (Integers used by SQLite/MySQL)
+- `Uint8Array([1])` / `Buffer.from([0])` (Binary representations)
 
-Esto es transparente para el usuario final y evita errores de validación comunes en integraciones complejas.
+This is transparent to the end user and avoids common validation errors in complex integrations.
 
-## Soporte para Cascade Delete
+## Cascade Delete Support
 
-Los esquemas generados y las definiciones de tabla ahora soportan `ON DELETE CASCADE`. Esto se refleja en los tipos Zod generados implícitamente al manejar relaciones, asegurando que la validación lógica coincida con el comportamiento de la base de datos.
-
+Generated schemas and table definitions now support `ON DELETE CASCADE`. This is reflected in the Zod types generated implicitly when handling relationships, ensuring that logical validation matches database behavior.

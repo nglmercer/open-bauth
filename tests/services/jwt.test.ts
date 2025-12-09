@@ -143,7 +143,7 @@ describe("JWTService", () => {
     });
 
     test("should handle malformed JSON in payload", async () => {
-      // Crear un token con payload malformado manualmente
+      // create token malformed
       const header = jwtService["base64UrlEncode"](
         JSON.stringify({ alg: "HS256", typ: "JWT" }),
       );
@@ -170,7 +170,7 @@ describe("JWTService", () => {
 
       expect(refreshToken).toBeDefined();
       expect(typeof refreshToken).toBe("string");
-      expect(refreshToken.split(".")).toHaveLength(3); // Ahora usa estructura JWT estándar (header.payload.signature)
+      expect(refreshToken.split(".")).toHaveLength(3); // standard (header.payload.signature)
     });
 
     test("should generate refresh token with longer expiration", async () => {

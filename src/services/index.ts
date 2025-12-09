@@ -1,5 +1,6 @@
 export * from "./auth";
 export * from "./jwt";
+export * from "./jwt-bun";
 export * from "./permissions";
 
 // OAuth 2.0 and Enhanced Security Services

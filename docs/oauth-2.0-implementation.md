@@ -1,102 +1,102 @@
 # OAuth 2.0 Implementation Guide
 
-Esta guía documenta la implementación completa de OAuth 2.0 y funcionalidades de seguridad avanzada añadidas al sistema de autenticación existente.
+This guide documents the complete implementation of OAuth 2.0 and advanced security features added to the existing authentication system.
 
-## 🎯 Objetivos
+## Objectives
 
-- Implementar compatibilidad total con OAuth 2.0 y OpenID Connect
-- Soportar PKCE (RFC 7636) para seguridad mejorada
-- Implementar DPoP (RFC 9449) para prevención de tokens robados
-- Añadir autenticación biométrica
-- Soportar usuarios anónimos con promoción
-- Implementar SSO nativo con device secrets
-- Sistema MFA completo
-- Migración gradual sin romper cambios existentes
+- Implement full OAuth 2.0 and OpenID Connect compatibility
+- Support PKCE (RFC 7636) for enhanced security
+- Implement DPoP (RFC 9449) for stolen token prevention
+- Add biometric authentication
+- Support anonymous users with promotion
+- Implement native SSO with device secrets
+- Complete MFA system
+- Gradual migration without breaking existing changes
 
-## 📁 Estructura de Archivos
+## File Structure
 
-### Tipos (`src/types/oauth.ts`)
+### Types (`src/types/oauth.ts`)
 - **OAuth 2.0 Client Types**: `OAuthClient`, `CreateOAuthClientData`, `UpdateOAuthClientData`
-- **Authorization Codes**: `AuthorizationCode` con soporte PKCE
-- **Refresh Tokens**: `RefreshToken` con rotación automática
-- **Device Secrets**: `DeviceSecret` para SSO
-- **Biometric Credentials**: `BiometricCredential` para autenticación biométrica
-- **Anonymous Users**: `AnonymousUser` con capacidad de promoción
-- **User Devices**: `UserDevice` para gestión de dispositivos
-- **MFA Configurations**: `MFAConfiguration` para múltiples factores
-- **Security Challenges**: `SecurityChallenge` para validaciones adicionales
-- **OAuth 2.0 Requests/Responses**: Tipos completos para todos los flujos
+- **Authorization Codes**: `AuthorizationCode` with PKCE support
+- **Refresh Tokens**: `RefreshToken` with automatic rotation
+- **Device Secrets**: `DeviceSecret` for SSO
+- **Biometric Credentials**: `BiometricCredential` for biometric authentication
+- **Anonymous Users**: `AnonymousUser` with promotion capability
+- **User Devices**: `UserDevice` for device management
+- **MFA Configurations**: `MFAConfiguration` for multiple factors
+- **Security Challenges**: `SecurityChallenge` for additional validations
+- **OAuth 2.0 Requests/Responses**: Complete types for all flows
 
-### Base de Datos (`src/database/schema/oauth-schema-extensions.ts`)
-- **oauth_clients**: Clientes OAuth 2.0 con configuración completa
-- **authorization_codes**: Códigos de autorización con PKCE
-- **refresh_tokens**: Tokens de refresco con rotación
-- **device_secrets**: Secretos de dispositivo para SSO
-- **biometric_credentials**: Credenciales biométricas encriptadas
-- **anonymous_users**: Usuarios anónimos con datos de sesión
-- **user_devices**: Dispositivos registrados por usuario
-- **mfa_configurations**: Configuraciones MFA por usuario
-- **security_challenges**: Desafíos de seguridad
-- **oauth_sessions**: Sesiones OAuth 2.0
+### Database (`src/database/schema/oauth-schema-extensions.ts`)
+- **oauth_clients**: OAuth 2.0 clients with complete configuration
+- **authorization_codes**: Authorization codes with PKCE
+- **refresh_tokens**: Refresh tokens with rotation
+- **device_secrets**: Device secrets for SSO
+- **biometric_credentials**: Encrypted biometric credentials
+- **anonymous_users**: Anonymous users with session data
+- **user_devices**: Registered devices per user
+- **mfa_configurations**: MFA configurations per user
+- **security_challenges**: Security challenges
+- **oauth_sessions**: OAuth 2.0 sessions
 
-### Servicios
+### Services
 
 #### Security Service (`src/services/security.ts`)
-- **PKCE Implementation**: Generación y verificación de challenges
-- **DPoP Support**: Creación y verificación de proofs
-- **State/Nonce Generation**: Parámetros anti-CSRF y replay
-- **Security Challenges**: Creación y verificación de desafíos
-- **Encryption/Decryption**: Manejo seguro de datos sensibles
-- **Password Hashing**: Hashing seguro con Bun.password.verify (más ligero que bcrypt)
+- **PKCE Implementation**: Generation and verification of challenges
+- **DPoP Support**: Creation and verification of proofs
+- **State/Nonce Generation**: Anti-CSRF and replay parameters
+- **Security Challenges**: Creation and verification of challenges
+- **Encryption/Decryption**: Secure handling of sensitive data
+- **Password Hashing**: Secure hashing with Bun.password.verify (lighter than bcrypt)
 
 #### OAuth Service (`src/services/oauth.ts`)
 - **Complete OAuth 2.0 Flows**:
-  - Authorization Code Flow con PKCE
-  - Implicit Flow (no recomendado)
+  - Authorization Code Flow with PKCE
+  - Implicit Flow (not recommended)
   - Client Credentials Flow
-  - Resource Owner Password Credentials Flow ✅ (Completamente implementado)
-  - Refresh Token Flow con rotación automática mejorada
+  - Resource Owner Password Credentials Flow (Fully implemented)
+  - Refresh Token Flow with improved automatic rotation
   - Device Authorization Flow
-- **Token Management**: Generación, verificación y revocación
-- **Client Management**: Creación, actualización y autenticación con hashing seguro
-- **Introspection**: Verificación completa de tokens (access y refresh tokens)
-- **Revocation**: Revocación de tokens según RFC 7009
-- **Seguridad Avanzada**:
-  - Validación mejorada de códigos de autorización (prevención de reutilización)
-  - Verificación de PKCE con métodos S256 y PLAIN
-  - Autenticación de clientes con soporte para secretos bcrypt y hash personalizado
-  - Manejo robusto de errores con mensajes descriptivos
+- **Token Management**: Generation, verification, and revocation
+- **Client Management**: Creation, update, and authentication with secure hashing
+- **Introspection**: Complete token verification (access and refresh tokens)
+- **Revocation**: Token revocation according to RFC 7009
+- **Advanced Security**:
+  - Enhanced authorization code validation (reuse prevention)
+  - PKCE verification with S256 and PLAIN methods
+  - Client authentication with support for bcrypt secrets and custom hash
+  - Robust error handling with descriptive messages
 
 #### Enhanced User Service (`src/services/enhanced-user.ts`)
-- **Anonymous User Management**: Creación y promoción
-- **Device Management**: Registro y confianza de dispositivos
-- **Biometric Authentication**: Registro y verificación biométrica
-- **MFA Management**: Configuración y validación MFA
-- **Device Secrets**: SSO con secretos de dispositivo
+- **Anonymous User Management**: Creation and promotion
+- **Device Management**: Device registration and trust
+- **Biometric Authentication**: Biometric registration and verification
+- **MFA Management**: MFA configuration and validation
+- **Device Secrets**: SSO with device secrets
 
-#### JWT Service (Mejorado)
-- **DPoP Support**: Verificación de proofs DPoP
-- **OIDC Claims**: Tokens con claims estándar
-- **Refresh Token Rotation**: Rotación automática y segura
-- **Token Introspection**: Verificación completa de tokens
+#### JWT Service (Enhanced)
+- **DPoP Support**: DPoP proof verification
+- **OIDC Claims**: Tokens with standard claims
+- **Refresh Token Rotation**: Automatic and secure rotation
+- **Token Introspection**: Complete token verification
 
 ### Middleware (`src/middleware/oauth-security.ts`)
-- **OAuth 2.0 Validation**: Validación completa de requests
+- **OAuth 2.0 Validation**: Complete request validation
 - **Security Verification**: State, nonce, DPoP
-- **Auditoría**: Logging de eventos de seguridad
-- **Rate Limiting**: Límite de solicitudes
-- **Suspicious Activity Detection**: Detección de patrones anómalos
+- **Auditing**: Security event logging
+- **Rate Limiting**: Request limiting
+- **Suspicious Activity Detection**: Anomalous pattern detection
 
-## 🚀 Funcionalidades Implementadas
+## Implemented Features
 
-### 1. Fundamentos OAuth 2.0 (Alta Prioridad)
+### 1. OAuth 2.0 Fundamentals (High Priority)
 
-#### ✅ Authorization Code Flow con PKCE
+#### Authorization Code Flow with PKCE
 ```typescript
-// Generar PKCE challenge
+// Generate PKCE challenge
 const pkceChallenge = securityService.generatePKCEChallenge(PKCEMethod.S256);
 
-// Crear solicitud de autorización
+// Create authorization request
 const authRequest = {
   response_type: OAuthResponseType.CODE,
   client_id: "your-client-id",
@@ -107,13 +107,13 @@ const authRequest = {
   code_challenge_method: pkceChallenge.code_challenge_method,
 };
 
-// Manejar solicitud
+// Handle request
 const authResponse = await oauthService.handleAuthorizationRequest(authRequest, user);
 ```
 
-#### ✅ Token Management con Rotación
+#### Token Management with Rotation
 ```typescript
-// Generar access token
+// Generate access token
 const tokenResponse = await oauthService.handleTokenRequest({
   grant_type: OAuthGrantType.AUTHORIZATION_CODE,
   code: authorizationCode,
@@ -122,13 +122,13 @@ const tokenResponse = await oauthService.handleTokenRequest({
   code_verifier: pkceChallenge.code_verifier,
 });
 
-// Rotación automática de refresh tokens
+// Automatic refresh token rotation
 const newRefreshToken = await oauthService.rotateRefreshToken(oldRefreshTokenId, newToken);
 ```
 
-#### ✅ Client Management
+#### Client Management
 ```typescript
-// Crear cliente OAuth 2.0
+// Create OAuth 2.0 client
 const client = await oauthService.createClient({
   client_id: "your-client-id",
   client_secret: "your-client-secret",
@@ -139,23 +139,23 @@ const client = await oauthService.createClient({
   scope: "read write profile",
 });
 
-// Autenticar cliente
+// Authenticate client
 const authenticatedClient = await oauthService.authenticateClient(
   "your-client-id", 
   "your-client-secret"
 );
 ```
 
-### 2. Seguridad Mejorada (Media Prioridad)
+### 2. Enhanced Security (Medium Priority)
 
-#### ✅ PKCE (RFC 7636)
-- **S256 Method**: SHA256 con base64url encoding
-- **Plain Method**: Para compatibilidad con clientes legacy
-- **Automatic Verification**: Validación transparente en token exchange
+#### PKCE (RFC 7636)
+- **S256 Method**: SHA256 with base64url encoding
+- **Plain Method**: For legacy client compatibility
+- **Automatic Verification**: Transparent validation in token exchange
 
-#### ✅ DPoP (RFC 9449)
+#### DPoP (RFC 9449)
 ```typescript
-// Generar DPoP proof
+// Generate DPoP proof
 const dpopProof = await securityService.generateDPoPProof(
   "POST",
   "https://api.example.com/protected",
@@ -163,7 +163,7 @@ const dpopProof = await securityService.generateDPoPProof(
   "jwk-thumbprint"
 );
 
-// Verificar DPoP en middleware
+// Verify DPoP in middleware
 const dpopResult = await jwtService.verifyDPoPProof(
   dpopHeader,
   "POST",
@@ -171,31 +171,31 @@ const dpopResult = await jwtService.verifyDPoPProof(
 );
 ```
 
-#### ✅ State/Nonce Management
-- **State Generation**: Strings criptográficamente seguras
-- **Nonce Generation**: Para prevención de replay attacks
-- **Automatic Validation**: Verificación en middleware
+#### State/Nonce Management
+- **State Generation**: Cryptographically secure strings
+- **Nonce Generation**: For replay attack prevention
+- **Automatic Validation**: Verification in middleware
 
-#### ✅ Security Challenges
+#### Security Challenges
 ```typescript
-// Crear desafío CAPTCHA
+// Create CAPTCHA challenge
 const challenge = await securityService.createChallenge(
   ChallengeType.CAPTCHA,
   { expectedCode: "123456" },
-  10 // expira en 10 minutos
+  10 // expires in 10 minutes
 );
 
-// Verificar solución
+// Verify solution
 const result = await securityService.verifyChallenge(challenge, {
   code: "123456"
 });
 ```
 
-### 3. Funcionalidades Avanzadas (Baja Prioridad)
+### 3. Advanced Features (Low Priority)
 
-#### ✅ Autenticación Biométrica
+#### Biometric Authentication
 ```typescript
-// Registrar credencial biométrica
+// Register biometric credential
 const biometricResult = await enhancedUserService.registerBiometricCredential(
   userId,
   BiometricType.FINGERPRINT,
@@ -203,7 +203,7 @@ const biometricResult = await enhancedUserService.registerBiometricCredential(
   "device-123"
 );
 
-// Verificar autenticación biométrica
+// Verify biometric authentication
 const authResult = await enhancedUserService.verifyBiometricCredential(
   userId,
   BiometricType.FINGERPRINT,
@@ -211,15 +211,15 @@ const authResult = await enhancedUserService.verifyBiometricCredential(
 );
 ```
 
-#### ✅ Usuarios Anónimos con Promoción
+#### Anonymous Users with Promotion
 ```typescript
-// Crear usuario anónimo
+// Create anonymous user
 const anonymousUser = await enhancedUserService.createAnonymousUser({
   sessionId: "session-123",
   preferences: { theme: "dark" }
 });
 
-// Promocionar a usuario completo
+// Promote to full user
 const promotedUser = await enhancedUserService.promoteAnonymousUser(
   anonymousUser.anonymous_id,
   {
@@ -229,9 +229,9 @@ const promotedUser = await enhancedUserService.promoteAnonymousUser(
 );
 ```
 
-#### ✅ SSO Nativo con Device Secrets
+#### Native SSO with Device Secrets
 ```typescript
-// Registrar dispositivo para SSO
+// Register device for SSO
 const deviceResult = await enhancedUserService.registerDevice(
   userId,
   "device-unique-id",
@@ -239,60 +239,60 @@ const deviceResult = await enhancedUserService.registerDevice(
   DeviceType.MOBILE
 );
 
-// Marcar como confiable para SSO
+// Mark as trusted for SSO
 await enhancedUserService.trustDevice(userId, "device-unique-id");
 
-// Verificar SSO con device secret
+// Verify SSO with device secret
 const ssoResult = await enhancedUserService.verifyDeviceSecret(
   "device-unique-id",
   "device-secret-stored-securely"
 );
 ```
 
-#### ✅ Sistema MFA Completo
+#### Complete MFA System
 ```typescript
-// Configurar MFA TOTP
+// Configure TOTP MFA
 const mfaResult = await enhancedUserService.setupMFA(
   userId,
   MFAType.TOTP,
   {
-    secret: "JBSWY3DPEHPK3PXP", // Secreto TOTP
+    secret: "JBSWY3DPEHPK3PXP", // TOTP secret
     is_primary: true
   }
 );
 
-// Obtener configuraciones MFA activas
+// Get active MFA configurations
 const activeMFA = await enhancedUserService.getEnabledMFAConfigurations(userId);
 ```
 
-## 🔐 Características de Seguridad
+## 🔐 Security Features
 
-### Validación OAuth 2.0
-- **Request Validation**: Validación completa de parámetros
-- **Redirect URI Validation**: Verificación estricta de URIs
-- **Scope Validation**: Validación de scopes solicitados
-- **PKCE Enforcement**: PKCE requerido para clientes públicos
-- **Grant Type Validation**: Validación de tipos de grant soportados
-- **Authorization Code Validation**: Verificación de uso único y expiración
-- **Client Authentication**: Soporte para múltiples métodos de autenticación
+### OAuth 2.0 Validation
+- **Request Validation**: Complete parameter validation
+- **Redirect URI Validation**: Strict URI verification
+- **Scope Validation**: Validation of requested scopes
+- **PKCE Enforcement**: PKCE required for public clients
+- **Grant Type Validation**: Validation of supported grant types
+- **Authorization Code Validation**: Verification of single use and expiration
+- **Client Authentication**: Support for multiple authentication methods
 
-### Prevención de Ataques
-- **CSRF Protection**: Parámetros state obligatorios
-- **Replay Protection**: Nonces y validación temporal
-- **Token Theft Prevention**: DPoP binding de tokens
-- **Brute Force Protection**: Rate limiting y detección
-- **Session Hijacking**: Binding de tokens a dispositivos
-- **Password Security**: Verificación con Bun.password.verify (sin dependencia de bcrypt)
-- **Authorization Code Replay**: Prevención de reutilización de códigos
-- **Refresh Token Rotation**: Rotación automática para prevenir compromiso
+### Attack Prevention
+- **CSRF Protection**: Mandatory state parameters
+- **Replay Protection**: Nonces and temporal validation
+- **Token Theft Prevention**: DPoP token binding
+- **Brute Force Protection**: Rate limiting and detection
+- **Session Hijacking**: Token binding to devices
+- **Password Security**: Verification with Bun.password.verify (no bcrypt dependency)
+- **Authorization Code Replay**: Prevention of code reuse
+- **Refresh Token Rotation**: Automatic rotation to prevent compromise
 
-### Auditoría y Logging
-- **Security Events**: Logging completo de eventos
-- **Access Patterns**: Detección de patrones anómalos
-- **Risk Scoring**: Evaluación automática de riesgo
-- **Compliance Logging**: Logs para auditoría
+### Auditing and Logging
+- **Security Events**: Complete event logging
+- **Access Patterns**: Anomalous pattern detection
+- **Risk Scoring**: Automatic risk assessment
+- **Compliance Logging**: Audit logs
 
-## 📊 Endpoints HTTP
+## 📊 HTTP Endpoints
 
 ### OAuth 2.0 Endpoints
 ```
@@ -320,49 +320,49 @@ POST   /api/mfa/verify           # Verify MFA
 DELETE /api/mfa/disable          # Disable MFA
 ```
 
-## 🔄 Migración Gradual
+## 🔄 Gradual Migration
 
-### Fase 1: Fundamentos OAuth 2.0
-1. **Tipos y Interfaces**: Definir tipos OAuth 2.0
-2. **Base de Datos**: Extensiones para tablas OAuth
-3. **Servicios**: Implementar OAuthService básico
-4. **Middleware**: Validación OAuth 2.0
+### Phase 1: OAuth 2.0 Fundamentals
+1. **Types and Interfaces**: Define OAuth 2.0 types
+2. **Database**: Extensions for OAuth tables
+3. **Services**: Implement basic OAuthService
+4. **Middleware**: OAuth 2.0 validation
 
-### Fase 2: Seguridad Mejorada
-1. **PKCE**: Implementar completo soporte PKCE
-2. **DPoP**: Añadir soporte para DPoP proofs
-3. **Challenges**: Sistema de desafíos de seguridad
-4. **Auditoría**: Logging y detección
+### Phase 2: Enhanced Security
+1. **PKCE**: Implement complete PKCE support
+2. **DPoP**: Add support for DPoP proofs
+3. **Challenges**: Security challenge system
+4. **Auditing**: Logging and detection
 
-### Fase 3: Funcionalidades Avanzadas
-1. **Biométrica**: Autenticación biométrica completa
-2. **SSO**: Device secrets y confianza
-3. **MFA**: Sistema multi-factor completo
-4. **Anónimos**: Usuarios anónimos con promoción
+### Phase 3: Advanced Features
+1. **Biometric**: Complete biometric authentication
+2. **SSO**: Device secrets and trust
+3. **MFA**: Complete multi-factor system
+4. **Anonymous**: Anonymous users with promotion
 
-## 🧪 Ejemplo de Uso Completo
+## 🧪 Complete Usage Example
 
-Ver [`examples/oauth-usage-example.ts`](examples/oauth-usage-example.ts) para un ejemplo completo que demuestra:
+See [`examples/oauth-usage-example.ts`](examples/oauth-usage-example.ts) for a complete example demonstrating:
 
-1. Configuración de servicios OAuth 2.0
-2. Creación de clientes OAuth 2.0
-3. Flujo completo de Authorization Code con PKCE
-4. Intercambio de código por token
-5. Refresh token con rotación
+1. OAuth 2.0 service configuration
+2. OAuth 2.0 client creation
+3. Complete Authorization Code flow with PKCE
+4. Code exchange for token
+5. Refresh token with rotation
 6. Device Authorization Flow
-7. Autenticación biométrica
-8. SSO con device secrets
-9. MFA TOTP
-10. Detección de actividad sospechosa
+7. Biometric authentication
+8. SSO with device secrets
+9. TOTP MFA
+10. Suspicious activity detection
 11. Rate limiting
-12. Auditoría completa
+12. Complete auditing
 
-### Tests de Integración
-Ver [`tests/api/oauth.comprehensive.test.ts`](tests/api/oauth.comprehensive.test.ts) para ver ejemplos completos de testing de todos los flujos OAuth 2.0 con casos de éxito y error.
+### Integration Tests
+See [`tests/api/oauth.comprehensive.test.ts`](tests/api/oauth.comprehensive.test.ts) for complete examples testing all OAuth 2.0 flows with success and error cases.
 
-## 🔧 Configuración
+## 🔧 Configuration
 
-### Variables de Entorno
+### Environment Variables
 ```bash
 # JWT Configuration
 JWT_SECRET=your-super-secret-jwt-key
@@ -381,21 +381,21 @@ RATE_LIMIT_WINDOW=900
 RATE_LIMIT_MAX=100
 ```
 
-### Configuración de Base de Datos
+### Database Configuration
 ```typescript
-// Registrar extensiones OAuth
+// Register OAuth extensions
 import { registerOAuthSchemaExtensions } from "./src/database/schema/oauth-schema-extensions";
 
-// Aplicar a configuración existente
+// Apply to existing configuration
 registerOAuthSchemaExtensions();
 
-// Inicializar con esquemas extendidos
+// Initialize with extended schemas
 await dbInitializer.initialize();
 ```
 
-## 📚 Referencias y Estándares
+## 📚 References and Standards
 
-### RFCs Implementadas
+### Implemented RFCs
 - **RFC 6749**: OAuth 2.0 Authorization Framework
 - **RFC 7636**: PKCE (Proof Key for Code Exchange)
 - **RFC 7009**: OAuth 2.0 Token Revocation
@@ -404,55 +404,55 @@ await dbInitializer.initialize();
 - **RFC 9449**: DPoP (Demonstrating Proof of Possession)
 - **OpenID Connect**: Core 1.0 Specification
 
-### Estándares de Seguridad
+### Security Standards
 - **OWASP OAuth 2.0 Security Cheat Sheet**
 - **NIST SP 800-63B**: Digital Identity Guidelines
 - **ISO/IEC 30107-3**: Biometric Performance Testing
 
-## 🚀 Próximos Pasos
+## 🚀 Next Steps
 
-1. **Testing Suite**: Tests unitarios y de integración completos
-2. **Documentation**: API docs con OpenAPI/Swagger
-3. **Monitoring**: Métricas y alertas de seguridad
-4. **Compliance**: Validación de cumplimiento normativo
-5. **Performance**: Optimización de consultas y caching
+1. **Testing Suite**: Complete unit and integration tests
+2. **Documentation**: API docs with OpenAPI/Swagger
+3. **Monitoring**: Security metrics and alerts
+4. **Compliance**: Regulatory compliance validation
+5. **Performance**: Query optimization and caching
 
-## 🧪 Testing y Validación
+## 🧪 Testing and Validation
 
-### Tests Completos (`tests/api/oauth.comprehensive.test.ts`)
-La implementación incluye una suite completa de tests que cubre todos los flujos OAuth 2.0:
+### Complete Tests (`tests/api/oauth.comprehensive.test.ts`)
+The implementation includes a complete test suite covering all OAuth 2.0 flows:
 
 #### Authorization Code Grant Tests
-- ✅ Intercambio exitoso de código de autorización por tokens
-- ✅ Rechazo de códigos de autorización reutilizados
-- ✅ Verificación correcta de PKCE challenge (S256)
-- ✅ Rechazo de PKCE verifier incorrecto
-- ✅ Rechazo de códigos de autorización inválidos
+- Successful exchange of authorization code for tokens
+- Rejection of reused authorization codes
+- Correct verification of PKCE challenge (S256)
+- Rejection of incorrect PKCE verifier
+- Rejection of invalid authorization codes
 
 #### Refresh Token Grant Tests
-- ✅ Intercambio exitoso de refresh token por nuevo access token
-- ✅ Rechazo de refresh tokens inválidos
-- ✅ Rotación automática de refresh tokens
+- Successful exchange of refresh token for new access token
+- Rejection of invalid refresh tokens
+- Automatic refresh token rotation
 
 #### Client Credentials Grant Tests
-- ✅ Emisión exitosa de tokens para credenciales de cliente
-- ✅ Rechazo de clientes públicos en client credentials flow
+- Successful token issuance for client credentials
+- Rejection of public clients in client credentials flow
 
 #### Password Grant Tests
-- ✅ Emisión exitosa de tokens para password grant
-- ✅ Rechazo de credenciales inválidas en password grant
+- Successful token issuance for password grant
+- Rejection of invalid credentials in password grant
 
 #### Token Introspection Tests
-- ✅ Introspección exitosa de access tokens válidos
-- ✅ Retorno de inactive para tokens inválidos
+- Successful introspection of valid access tokens
+- Return of inactive for invalid tokens
 
 #### Token Revocation Tests
-- ✅ Revocación exitosa de refresh tokens
-- ✅ Cumplimiento con RFC 7009 (éxito incluso para tokens inválidos)
+- Successful revocation of refresh tokens
+- RFC 7009 compliance (success even for invalid tokens)
 
-### Ejemplo de Test
+### Test Example
 ```typescript
-// Test de intercambio de código de autorización
+// Authorization code exchange test
 const authRequest = {
     response_type: OAuthResponseType.CODE,
     client_id: testClient.client_id,
@@ -464,7 +464,7 @@ const authRequest = {
 const authResponse = await oauthService.handleAuthorizationRequest(authRequest, user);
 expect(authResponse.code).toBeDefined();
 
-// Intercambiar código por token
+// Exchange code for token
 const tokenRequest = {
     grant_type: OAuthGrantType.AUTHORIZATION_CODE,
     code: authResponse.code!,
@@ -478,16 +478,16 @@ expect(tokenResponse.access_token).toBeDefined();
 expect(tokenResponse.refresh_token).toBeDefined();
 ```
 
-## 🤝 Contribución
+## 🤝 Contributing
 
-Para contribuir a esta implementación:
+To contribute to this implementation:
 
-1. **Code Style**: Seguir las convenciones establecidas
-2. **Testing**: Incluir tests con buena cobertura
-3. **Documentation**: Documentar cambios y nuevas funcionalidades
-4. **Security**: Reportar vulnerabilidades responsablemente
-5. **Reviews**: Solicitar code review para cambios críticos
+1. **Code Style**: Follow established conventions
+2. **Testing**: Include tests with good coverage
+3. **Documentation**: Document changes and new features
+4. **Security**: Report vulnerabilities responsibly
+5. **Reviews**: Request code review for critical changes
 
 ---
 
-Esta implementación proporciona una base sólida y segura para sistemas OAuth 2.0 modernos, con todas las funcionalidades de seguridad recomendadas por los estándares actuales.
+This implementation provides a solid and secure foundation for modern OAuth 2.0 systems, with all security features recommended by current standards.

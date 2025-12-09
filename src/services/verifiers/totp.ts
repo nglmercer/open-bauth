@@ -1,4 +1,3 @@
-import { createHmac } from "crypto";
 import type { ChallengeVerifier, ChallengeVerificationResult } from "../security";
 import { base32Decode } from "../../utils/base32";
 import { VerifierMessages } from "./constants";
@@ -82,9 +81,9 @@ export class TOTPVerifier implements ChallengeVerifier<TOTPChallengeData, TOTPSo
             counter = counter >> 8;
         }
 
-        const hmac = createHmac("sha1", key);
-        hmac.update(buffer);
-        const digest = hmac.digest();
+        const hasher = new Bun.CryptoHasher("sha1", key);
+        hasher.update(buffer);
+        const digest = hasher.digest();
 
         const offset = digest[digest.length - 1] & 0xf;
         const code =

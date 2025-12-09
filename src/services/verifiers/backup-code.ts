@@ -1,5 +1,4 @@
 import type { ChallengeVerifier, ChallengeVerificationResult } from "../security";
-import { createHash } from "crypto";
 import { VerifierMessages } from "./constants";
 
 interface BackupChallengeData {
@@ -59,6 +58,8 @@ export class BackupCodeVerifier implements ChallengeVerifier<BackupChallengeData
     }
 
     private hashString(val: string, salt: string): string {
-        return createHash("sha256").update(val + salt).digest("hex");
+        const hasher = new Bun.CryptoHasher("sha256");
+        hasher.update(val + salt);
+        return hasher.digest("hex");
     }
 }

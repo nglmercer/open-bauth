@@ -216,7 +216,7 @@ export class OAuthService {
         return null;
       }
     } else {
-      // Use the security service for other hashing methods
+      // Use the security service for other hashing methods (now optimized with Bun.CryptoHasher)
       isValid = await this.securityService.verifyPassword(
         clientSecret,
         client.client_secret,

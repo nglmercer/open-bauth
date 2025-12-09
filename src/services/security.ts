@@ -1,6 +1,6 @@
 // src/services/security.ts
 
-import { createHash, randomBytes, createHmac, scrypt, createCipheriv, createDecipheriv } from "crypto";
+import { randomBytes, scrypt, createCipheriv, createDecipheriv } from "crypto";
 import type {
   PKCEChallenge,
   DPoPProof,
@@ -109,9 +109,9 @@ export class SecurityService {
     let codeChallenge: string;
 
     if (method === PKCEMethod.S256) {
-      codeChallenge = this.base64UrlEncode(
-        createHash("sha256").update(codeVerifier).digest(),
-      );
+      const hasher = new Bun.CryptoHasher("sha256");
+      hasher.update(codeVerifier);
+      codeChallenge = this.base64UrlEncode(hasher.digest());
     } else {
       codeChallenge = codeVerifier;
     }
@@ -134,9 +134,9 @@ export class SecurityService {
     let expectedChallenge: string;
 
     if (method === PKCEMethod.S256) {
-      expectedChallenge = this.base64UrlEncode(
-        createHash("sha256").update(codeVerifier).digest(),
-      );
+      const hasher = new Bun.CryptoHasher("sha256");
+      hasher.update(codeVerifier);
+      expectedChallenge = this.base64UrlEncode(hasher.digest());
     } else {
       expectedChallenge = codeVerifier;
     }
@@ -377,9 +377,9 @@ export class SecurityService {
     // Legacy fallback for HMAC-SHA512 hashes
     // This allows existing hashes to still work while new ones use Argon2
     const passwordSalt = salt;
-    const computedHash = createHmac("sha512", passwordSalt)
-      .update(password)
-      .digest("hex");
+    const hasher = new Bun.CryptoHasher("sha512", passwordSalt);
+    hasher.update(password);
+    const computedHash = hasher.digest("hex");
 
     return computedHash === hash;
   }
