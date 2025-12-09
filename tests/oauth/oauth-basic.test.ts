@@ -6,7 +6,6 @@ import { AuthService } from "../../src/services/auth";
 import { PermissionService } from "../../src/services/permissions";
 import { SecurityService } from "../../src/services/security";
 import { EnhancedUserService } from "../../src/services/enhanced-user";
-import { OAuthSecurityMiddleware } from "../../src/middleware/oauth-security";
 import {
   OAuthGrantType,
   OAuthResponseType,
@@ -28,7 +27,6 @@ describe("OAuth 2.0 Basic Service Tests", () => {
   let permissionService: PermissionService;
   let securityService: SecurityService;
   let enhancedUserService: EnhancedUserService;
-  let oauthMiddleware: OAuthSecurityMiddleware;
 
   beforeAll(async () => {
     // Register OAuth schema extensions first
@@ -53,36 +51,6 @@ describe("OAuth 2.0 Basic Service Tests", () => {
     enhancedUserService = new EnhancedUserService(
       dbInitializer,
       securityService,
-    );
-    oauthMiddleware = new OAuthSecurityMiddleware(
-      // Create mock OAuthService for middleware testing
-      {
-        findClientById: async () => null,
-        findClientByClientId: async () => null,
-        createClient: async () => ({ id: "test", client_id: "test" }) as any,
-        updateClient: async () => ({ id: "test", client_id: "test" }) as any,
-        deleteClient: async () => true,
-        authenticateClient: async () => null,
-        validateRedirectUri: async () => true,
-        findAuthCodeByCode: async () => null,
-        createAuthCode: async () => ({ id: "test", code: "test" }) as any,
-        markAuthCodeAsUsed: async () => true,
-        deleteAuthCode: async () => true,
-        findRefreshTokenByToken: async () => null,
-        createRefreshToken: async () => ({ id: "test", token: "test" }) as any,
-        revokeRefreshToken: async () => true,
-        rotateRefreshToken: async () => ({ id: "test", token: "test" }) as any,
-        handleAuthorizationRequest: async () =>
-          ({ error: "unauthorized_client" }) as any,
-        handleTokenRequest: async () =>
-          ({ error: "unauthorized_client" }) as any,
-        handleDeviceAuthorizationRequest: async () =>
-          ({ error: "unauthorized_client" }) as any,
-        handleIntrospectionRequest: async () => ({ active: false }),
-        handleRevocationRequest: async () => ({ success: true }),
-      } as any,
-      securityService,
-      jwtService,
     );
   });
 
@@ -179,93 +147,4 @@ describe("OAuth 2.0 Basic Service Tests", () => {
     });
   });
 
-  describe("Security Features", () => {
-    test("should create and verify security challenge", async () => {
-      const challengeData = { question: "What is your favorite color?" };
-
-      const createResult = await oauthMiddleware.createChallenge(
-        "captcha" as any,
-        challengeData,
-      );
-      expect(createResult.success).toBe(true);
-      expect(createResult.challenge).toBeDefined();
-
-      const verifyResult = await oauthMiddleware.verifyChallenge(
-        createResult.challenge!.challenge_id,
-        { answer: "blue" },
-      );
-
-      // Note: This is a simplified verification - in real implementation,
-      // you would verify the actual challenge solution
-      expect(verifyResult.success).toBeDefined();
-    });
-
-    test("should detect suspicious activity patterns", async () => {
-      const detection = await oauthMiddleware.detectSuspiciousActivity(
-        "user-123",
-        "192.168.1.1",
-        "Mozilla/5.0...",
-      );
-
-      expect(detection.suspicious).toBeDefined();
-      // Note: riskScore might be undefined if no suspicious activity is detected
-      if (detection.riskScore !== undefined) {
-        expect(typeof detection.riskScore).toBe("number");
-      }
-    });
-
-    test("should enforce rate limiting", async () => {
-      const rateLimit = await oauthMiddleware.checkRateLimit(
-        "client-123",
-        "user-456",
-        "192.168.1.1",
-      );
-
-      expect(rateLimit.allowed).toBeDefined();
-      expect(typeof rateLimit.remainingRequests).toBe("number");
-    });
-  });
-
-  describe("OAuth Security Middleware", () => {
-    test("should verify state parameter", async () => {
-      const state = "random-state-123";
-      const storedState = "random-state-123";
-
-      const verification = await oauthMiddleware.verifyState(
-        state,
-        storedState,
-      );
-      expect(verification.valid).toBe(true);
-    });
-
-    test("should reject mismatched state parameter", async () => {
-      const state = "random-state-123";
-      const storedState = "different-state-456";
-
-      const verification = await oauthMiddleware.verifyState(
-        state,
-        storedState,
-      );
-      expect(verification.valid).toBe(false);
-      expect(verification.error).toContain("CSRF");
-    });
-
-    test("should verify nonce parameter", async () => {
-      const nonce = "random-nonce-123";
-      const usedNonces = new Set<string>();
-
-      const verification = await oauthMiddleware.verifyNonce(nonce, usedNonces);
-      expect(verification.valid).toBe(true);
-      expect(usedNonces.has(nonce)).toBe(true);
-    });
-
-    test("should reject reused nonce parameter", async () => {
-      const nonce = "reused-nonce-123";
-      const usedNonces = new Set<string>([nonce]);
-
-      const verification = await oauthMiddleware.verifyNonce(nonce, usedNonces);
-      expect(verification.valid).toBe(false);
-      expect(verification.error).toContain("replay");
-    });
-  });
 });

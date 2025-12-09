@@ -386,8 +386,6 @@ async verifyChallenge(challenge, solution) {
 - Challenges are **never deleted immediately** - marked as `is_solved: true` for audit
 
 
-```
-
 ### [`EnhancedUserService`](src/services/enhanced-user.ts:21)
 
 **Purpose**: Advanced user features (MFA, biometrics, device management).

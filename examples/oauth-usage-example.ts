@@ -21,7 +21,6 @@ import {
   BiometricType,
   DeviceType,
 } from "../src/types/oauth";
-import { createOAuthSecurityMiddleware } from "../src/middleware/oauth-security";
 
 async function main() {
   console.log("🚀 Iniciando ejemplo de OAuth 2.0 extendido...");
@@ -50,11 +49,7 @@ async function main() {
     dbInitializer,
     securityService,
   );
-  const oauthSecurityMiddleware = createOAuthSecurityMiddleware(
-    oauthService,
-    securityService,
-    jwtService,
-  );
+
 
   // 3. Inicializar base de datos con esquemas OAuth
   await dbInitializer.initialize();
@@ -158,20 +153,6 @@ async function main() {
     code_challenge: pkceChallenge.code_challenge,
     code_challenge_method: pkceChallenge.code_challenge_method,
   };
-
-  // Validar solicitud de autorización
-  const validationResult =
-    await oauthSecurityMiddleware.validateAuthorizationRequest(
-      authRequest,
-      oauthClient,
-    );
-
-  if (!validationResult.valid) {
-    console.error("❌ Validación fallida:", validationResult.errorDescription);
-    return;
-  }
-
-  console.log("✅ Solicitud de autorización validada");
 
   // Simular usuario autenticado y consentimiento dado
   const authResponse = await oauthService.handleAuthorizationRequest(
@@ -337,51 +318,6 @@ async function main() {
   } else {
     console.error("❌ SSO fallido:", deviceSecretResult.error);
   }
-
-  // 19. Demostrar detección de actividad sospechosa
-  console.log("\n🚨 Demostrando detección de actividad sospechosa...");
-
-  const suspiciousActivityResult =
-    await oauthSecurityMiddleware.detectSuspiciousActivity(
-      user.id,
-      "192.168.1.100", // IP de ejemplo
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    );
-
-  console.log("🔍 Análisis de seguridad:", {
-    suspicious: suspiciousActivityResult.suspicious,
-    reasons: suspiciousActivityResult.reasons,
-    riskScore: suspiciousActivityResult.riskScore,
-  });
-
-  // 20. Demostrar rate limiting
-  console.log("\n⏱️ Demostrando rate limiting...");
-
-  const rateLimitResult = await oauthSecurityMiddleware.checkRateLimit(
-    oauthClient.client_id,
-    user.id,
-    "192.168.1.100",
-  );
-
-  console.log("📊 Rate limiting:", {
-    allowed: rateLimitResult.allowed,
-    remainingRequests: rateLimitResult.remainingRequests,
-    resetTime: rateLimitResult.resetTime,
-  });
-
-  console.log("\n🎉 Ejemplo de OAuth 2.0 extendido completado!");
-  console.log("\n📚 Funcionalidades demostradas:");
-  console.log("  ✅ OAuth 2.0 Authorization Code Flow con PKCE");
-  console.log("  ✅ Refresh Token con rotación");
-  console.log("  ✅ Device Authorization Flow");
-  console.log("  ✅ Token Introspection y Revocation");
-  console.log("  ✅ MFA (TOTP)");
-  console.log("  ✅ Autenticación Biométrica");
-  console.log("  ✅ SSO con Device Secrets");
-  console.log("  ✅ Detección de Actividad Sospechosa");
-  console.log("  ✅ Rate Limiting");
-  console.log("  ✅ Validación de Seguridad (State, Nonce, DPoP)");
-  console.log("  ✅ Auditoría y Logging");
 
   // Cerrar conexión de base de datos
   db.close();

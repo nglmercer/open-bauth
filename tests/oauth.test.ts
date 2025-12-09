@@ -7,7 +7,6 @@ import { PermissionService } from "../src/services/permissions";
 import { OAuthService } from "../src/services/oauth";
 import { SecurityService } from "../src/services/security";
 import { EnhancedUserService } from "../src/services/enhanced-user";
-import { OAuthSecurityMiddleware } from "../src/middleware/oauth-security";
 import {
   OAuthGrantType,
   OAuthResponseType,
@@ -27,7 +26,6 @@ describe("OAuth 2.0 Service Tests", () => {
   let securityService: SecurityService;
   let oauthService: OAuthService;
   let enhancedUserService: EnhancedUserService;
-  let oauthMiddleware: OAuthSecurityMiddleware;
 
   beforeAll(async () => {
     // Register OAuth schema extensions first
@@ -52,16 +50,12 @@ describe("OAuth 2.0 Service Tests", () => {
     authService = new AuthService(dbInitializer, jwtService);
     permissionService = new PermissionService(dbInitializer);
     securityService = new SecurityService();
-    oauthService = new OAuthService(dbInitializer, securityService, jwtService);
+    oauthService = new OAuthService(dbInitializer, securityService, jwtService, authService);
     enhancedUserService = new EnhancedUserService(
       dbInitializer,
       securityService,
     );
-    oauthMiddleware = new OAuthSecurityMiddleware(
-      oauthService,
-      securityService,
-      jwtService,
-    );
+
   });
 
   afterAll(() => {
@@ -405,130 +399,6 @@ describe("OAuth 2.0 Service Tests", () => {
       expect(mfaResult.success).toBe(true);
       expect(mfaResult.mfaConfig).toBeDefined();
       expect(mfaResult.mfaConfig!.mfa_type).toBe(MFAType.TOTP);
-    });
-  });
-
-  describe("Security Features", () => {
-    test("should create and verify security challenge", async () => {
-      const challengeData = { question: "What is your favorite color?" };
-
-      const createResult = await oauthMiddleware.createChallenge(
-        "captcha" as any,
-        challengeData,
-      );
-      expect(createResult.success).toBe(true);
-      expect(createResult.challenge).toBeDefined();
-
-      const verifyResult = await oauthMiddleware.verifyChallenge(
-        createResult.challenge!.challenge_id,
-        { answer: "blue" },
-      );
-
-      // Note: This is a simplified verification - in real implementation,
-      // you would verify the actual challenge solution
-      expect(verifyResult.success).toBeDefined();
-    });
-
-    test("should detect suspicious activity patterns", async () => {
-      const detection = await oauthMiddleware.detectSuspiciousActivity(
-        "user-123",
-        "192.168.1.1",
-        "Mozilla/5.0...",
-      );
-
-      expect(detection.suspicious).toBeDefined();
-      expect(typeof detection.riskScore).toBe("number");
-    });
-
-    test("should enforce rate limiting", async () => {
-      const rateLimit = await oauthMiddleware.checkRateLimit(
-        "client-123",
-        "user-456",
-        "192.168.1.1",
-      );
-
-      expect(rateLimit.allowed).toBeDefined();
-      expect(typeof rateLimit.remainingRequests).toBe("number");
-    });
-  });
-
-  describe("OAuth Security Middleware", () => {
-    test("should validate authorization request", async () => {
-      const request = {
-        response_type: OAuthResponseType.CODE,
-        client_id: "test-client-id",
-        redirect_uri: "https://example.com/callback",
-        scope: "read write",
-        state: "test-state",
-      };
-
-      const client = await oauthService.findClientByClientId("test-client-id");
-      const validation = await oauthMiddleware.validateAuthorizationRequest(
-        request,
-        client || undefined,
-      );
-
-      expect(validation.valid).toBe(true);
-      expect(validation.oauthContext).toBeDefined();
-    });
-
-    test("should reject invalid authorization request", async () => {
-      const request = {
-        response_type: "invalid-response-type" as OAuthResponseType,
-        client_id: "test-client-id",
-        redirect_uri: "https://example.com/callback",
-        scope: "read write",
-      };
-
-      const client = await oauthService.findClientByClientId("test-client-id");
-      const validation = await oauthMiddleware.validateAuthorizationRequest(
-        request,
-        client || undefined,
-      );
-
-      expect(validation.valid).toBe(false);
-      expect(validation.error).toBeDefined();
-    });
-
-    test("should verify state parameter", async () => {
-      const state = "random-state-123";
-      const storedState = "random-state-123";
-
-      const verification = await oauthMiddleware.verifyState(
-        state,
-        storedState,
-      );
-      expect(verification.valid).toBe(true);
-    });
-
-    test("should reject mismatched state parameter", async () => {
-      const state = "random-state-123";
-      const storedState = "different-state-456";
-
-      const verification = await oauthMiddleware.verifyState(
-        state,
-        storedState,
-      );
-      expect(verification.valid).toBe(false);
-      expect(verification.error).toContain("CSRF");
-    });
-
-    test("should verify nonce parameter", async () => {
-      const nonce = "random-nonce-123";
-      const usedNonces = new Set<string>();
-
-      const verification = await oauthMiddleware.verifyNonce(nonce, usedNonces);
-      expect(verification.valid).toBe(true);
-      expect(usedNonces.has(nonce)).toBe(true);
-    });
-
-    test("should reject reused nonce parameter", async () => {
-      const nonce = "reused-nonce-123";
-      const usedNonces = new Set<string>([nonce]);
-
-      const verification = await oauthMiddleware.verifyNonce(nonce, usedNonces);
-      expect(verification.valid).toBe(false);
-      expect(verification.error).toContain("replay");
     });
   });
 });

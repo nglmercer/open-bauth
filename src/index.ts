@@ -1,5 +1,4 @@
 // src/index.ts
-export * from "./middleware/auth";
 export * from "./logger";
 export * from "./services";
 export * from "./database";
@@ -13,9 +12,9 @@ export * as zod from "zod";
 export { z as z } from "zod";
 
 // Reexportar tipos más comunes de forma explícita
-export type { 
-  ZodSchema, 
-  ZodType, 
-  ZodObject, 
-  ZodTypeAny 
+export type {
+  ZodSchema,
+  ZodType,
+  ZodObject,
+  ZodTypeAny
 } from "zod";
