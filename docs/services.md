@@ -348,8 +348,44 @@ console.log('Salt:', salt);
 securityService.registerVerifier('math_puzzle', {
   verify: (data, solution) => {
     return { valid: parseInt(solution.answer) === data.expected };
-  }
 });
+```
+
+#### 🔐 **MFA and Security Challenges**
+
+The SecurityService provides a **pluggable** architecture for security challenges using the **Strategy pattern**. This enables flexible MFA implementations:
+
+**Built-in Verifiers**:
+- `TOTPVerifier` - TOTP/MFA (RFC 6238) for Google Authenticator, Authy
+- `SecureCodeVerifier` - Email/SMS verification codes (SHA-256 hashed)
+- `BackupCodeVerifier` - Backup recovery codes
+
+**Custom Verifiers** (placeholders for implementation):
+- `CAPTCHAVerifier` - reCAPTCHA, hCaptcha integration
+- `BiometricVerifier` - Fingerprint, Face ID verification
+- `DeviceVerifier` - Device-based authentication
+
+**How it Works**:
+```typescript
+// SecurityService internally:
+// 1. Registers default verifiers
+this.registerVerifier(ChallengeType.MFA, new TOTPVerifier());
+this.registerVerifier(ChallengeType.EMAIL_VERIFICATION, new SecureCodeVerifier());
+
+// 2. Verifies challenges by delegating to the appropriate verifier
+async verifyChallenge(challenge, solution) {
+  const verifier = this.verifiers.get(challenge.challenge_type);
+  return await verifier.verify(challengeData, solution);
+}
+```
+
+**Integration with EnhancedUserService**:
+- `verifyMFA()` uses SecurityService for TOTP verification (stateless)
+- `generateMFAChallenge()` creates and persists Email/SMS challenges
+- `verifyMFACode()` uses SecurityService to verify and marks challenges as solved
+- Challenges are **never deleted immediately** - marked as `is_solved: true` for audit
+
+
 ```
 
 ### [`EnhancedUserService`](src/services/enhanced-user.ts:21)
@@ -393,15 +429,42 @@ securityService.registerVerifier('math_puzzle', {
 - `setupMFA(userId, mfaType, config)` → `Result`
   - Sets up MFA for user
   - Supports TOTP, SMS, email
-- `verifyMFA(userId, mfaType, code)` → `Result`
-  - Verifies MFA code
-  - With attempt tracking
+- `enableMFA(mfaConfigId)` → `Result`
+  - Enables MFA configuration
+  - Updates enabled status
+- `disableMFA(mfaConfigId)` → `Result`
+  - Disables MFA configuration
+  - Requires re-authentication
+- `setPrimaryMFA(mfaConfigId)` → `Result`
+  - Sets MFA as primary method
+  - Unsets other primary configurations
+- `verifyMFA(userId, code, mfaType?)` → `Result`
+  - **NEW**: Verifies TOTP-based MFA (Google Authenticator, Authy)
+  - Stateless verification using SecurityService
+  - No database persistence (TOTP is time-based)
+  - Default mfaType: `MFAType.TOTP`
+- `generateMFAChallenge(userId, mfaType, codeLength?)` → `Result`
+  - **NEW**: Generates MFA challenge for Email/SMS
+  - Creates 6-digit verification code
+  - Hashes code with SHA-256 + salt
+  - Stores challenge in database with 10-minute expiry
+  - Returns plain text code (only once)
+- `verifyMFACode(userId, code, challengeId)` → `Result`
+  - **NEW**: Verifies Email/SMS MFA code
+  - Validates against stored challenge
+  - Marks challenge as solved (maintains audit trail)
+  - Uses SecurityService for verification
+- `cleanupExpiredChallenges(retentionDays?)` → `number`
+  - **NEW**: Cleans up old security challenges
+  - Only removes solved challenges older than retention period
+  - Default retention: 7 days
+  - Returns count of cleaned challenges
 - `getEnabledMFAConfigurations(userId)` → `MFAConfiguration[]`
   - Gets user's active MFA configurations
   - With backup methods
-- `disableMFA(userId, mfaType)` → `Result`
-  - Disables MFA method
-  - Requires re-authentication
+- `getPrimaryMFAConfiguration(userId)` → `MFAConfiguration | null`
+  - Gets user's primary MFA configuration
+  - For default authentication
 
 **Usage Example**:
 ```typescript
@@ -425,16 +488,55 @@ const promoteResult = await enhancedUserService.promoteAnonymousUser(
   }
 );
 
-// Setup MFA
+// Setup TOTP MFA (Google Authenticator)
 const mfaResult = await enhancedUserService.setupMFA(
   promoteResult.user!.id,
   MFAType.TOTP,
   {
     secret: 'JBSWY3DPEHPK3PXP',
-    is_primary: true,
-    backup_codes: ['123456', '789012']
+    is_primary: true
   }
 );
+
+// Verify TOTP code
+const verifyResult = await enhancedUserService.verifyMFA(
+  promoteResult.user!.id,
+  '123456' // 6-digit code from authenticator app
+);
+
+if (verifyResult.success) {
+  console.log('✅ MFA verified successfully');
+}
+
+// Setup Email MFA and send code
+const emailMFA = await enhancedUserService.setupMFA(
+  promoteResult.user!.id,
+  MFAType.EMAIL,
+  { email: 'user@example.com' }
+);
+
+// Generate and send email verification code
+const challengeResult = await enhancedUserService.generateMFAChallenge(
+  promoteResult.user!.id,
+  MFAType.EMAIL
+);
+
+if (challengeResult.success) {
+  // Send email with challengeResult.code
+  console.log('Send this code by email:', challengeResult.code);
+  
+  // Later, when user enters the code
+  const emailVerifyResult = await enhancedUserService.verifyMFACode(
+    promoteResult.user!.id,
+    '123456', // Code entered by user
+    challengeResult.challenge!.challenge_id
+  );
+  
+  if (emailVerifyResult.success) {
+    console.log('✅ Email code verified');
+    // Challenge is now marked as is_solved: true (not deleted)
+  }
+}
 ```
 
 ## 🏭 Service Factory
@@ -643,10 +745,43 @@ const authResponse = await oauthService.handleAuthorizationRequest({
 ### Security Considerations
 
 1. **JWT Security**: Use strong secrets and appropriate expiration
-2. **Password Security**: Always hash passwords with salt
+2. **Password Security**: Always hash passwords with salt (use Bun.password or Argon2)
 3. **OAuth Security**: Implement PKCE for public clients
 4. **Rate Limiting**: Implement rate limiting for sensitive operations
 5. **Audit Logging**: Log all security-relevant events
+
+### MFA and Challenge Management
+
+1. **Challenge Lifecycle**:
+   - ❌ **DON'T**: Delete challenges immediately with `db.run("DELETE...")`
+   - ✅ **DO**: Mark as `is_solved: true` for audit trail
+   ```typescript
+   // Correct approach
+   await challengeController.update(challenge.id, {
+     is_solved: true,
+     solved_at: new Date().toISOString()
+   });
+   ```
+
+2. **TOTP vs Email/SMS**:
+   - **TOTP**: Use `verifyMFA()` - stateless, no DB persistence needed
+   - **Email/SMS**: Use `generateMFAChallenge()` + `verifyMFACode()` - requires DB
+
+3. **Challenge Cleanup**:
+   - Run periodic cleanup with `cleanupExpiredChallenges()`
+   - Recommend 7-day retention for compliance
+   - Schedule as daily cron job
+
+4. **Security Service Integration**:
+   - Always use `SecurityService.verifyChallenge()` for verification
+   - Never implement verification logic from scratch
+   - Leverage existing verifiers (TOTP, SecureCode, BackupCode)
+
+5. **Code Generation**:
+   - Use cryptographically secure random generation
+   - Hash codes before storage (SHA-256 + salt)
+   - Never store plain text codes in database
+
 
 ### Performance Optimization
 

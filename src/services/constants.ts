@@ -40,6 +40,18 @@ export const ServiceErrors = {
     MFA_CONFIG_NOT_FOUND: "MFA configuration not found",
     MFA_SET_PRIMARY_FAILED: "Failed to set primary MFA",
 
+    // MFA Verification
+    MFA_NOT_CONFIGURED: "MFA is not configured for this user",
+    MFA_CONFIG_INVALID: "MFA configuration is invalid",
+    MFA_SECRET_MISSING: "MFA secret is missing",
+    MFA_INVALID_CODE: "Invalid MFA code",
+    MFA_TYPE_NOT_SUPPORTED: "MFA type is not supported",
+
+    // Challenge Management
+    CHALLENGE_NOT_FOUND: "Security challenge not found or expired",
+    CHALLENGE_CREATE_FAILED: "Failed to create security challenge",
+    CHALLENGE_ALREADY_SOLVED: "Security challenge has already been solved",
+
     // JWT Service
     JWT_SECRET_REQUIRED: "JWT secret is required",
     INVALID_USER_OBJECT: "Invalid user object provided. User must have an id and an email.",

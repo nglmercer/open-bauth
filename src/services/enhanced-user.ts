@@ -9,10 +9,10 @@ import type {
   AnonymousUser,
   UserDevice,
   MFAConfiguration,
-  MFAType,
   BiometricType,
+  SecurityChallenge,
 } from "../types/oauth";
-import { DeviceType } from "../types/oauth";
+import { DeviceType, ChallengeType, MFAType } from "../types/oauth";
 import { SecurityService } from "./security";
 import { ServiceErrors } from "./constants";
 
@@ -26,6 +26,7 @@ export class EnhancedUserService {
   private anonymousUserController: BaseController<AnonymousUser>;
   private userDeviceController: BaseController<UserDevice>;
   private mfaController: BaseController<MFAConfiguration>;
+  private challengeController: BaseController<SecurityChallenge>;
   private securityService: SecurityService;
 
   constructor(
@@ -45,6 +46,8 @@ export class EnhancedUserService {
       dbInitializer.createController<UserDevice>("user_devices");
     this.mfaController =
       dbInitializer.createController<MFAConfiguration>("mfa_configurations");
+    this.challengeController =
+      dbInitializer.createController<SecurityChallenge>("security_challenges");
     this.securityService = securityService;
   }
 
@@ -841,6 +844,345 @@ export class EnhancedUserService {
       is_primary: true,
     });
     return result.data || null;
+  }
+
+  // --- MFA Verification ---
+
+  /**
+   * Verify MFA code for TOTP-based authentication (Google Authenticator, Authy, etc.)
+   * 
+   * This method uses SecurityService.verifyChallenge() with a temporary challenge.
+   * The challenge is not persisted in the database since TOTP is stateless.
+   * 
+   * @param userId - User ID to verify MFA for
+   * @param code - 6-digit TOTP code provided by the user
+   * @param mfaType - Type of MFA (defaults to 'totp')
+   * @returns Success/error result
+   * 
+   * @example
+   * ```typescript
+   * const result = await enhancedUserService.verifyMFA(userId, '123456');
+   * if (result.success) {
+   *   // MFA verified successfully
+   * }
+   * ```
+   */
+  async verifyMFA(
+    userId: string,
+    code: string,
+    mfaType: MFAType = MFAType.TOTP,
+  ): Promise<{ success: boolean; error?: any }> {
+    try {
+      // 1. Get the user's enabled MFA configuration
+      const mfaConfig = await this.mfaController.findFirst({
+        user_id: userId,
+        mfa_type: mfaType,
+        is_enabled: true,
+      });
+
+      if (!mfaConfig.data) {
+        return {
+          success: false,
+          error: {
+            type: "MFA_NOT_CONFIGURED",
+            message: ServiceErrors.MFA_NOT_CONFIGURED,
+          },
+        };
+      }
+
+      const config = mfaConfig.data;
+
+      // 2. Validate MFA configuration has required secret
+      if (!config.secret) {
+        return {
+          success: false,
+          error: {
+            type: "MFA_SECRET_MISSING",
+            message: ServiceErrors.MFA_SECRET_MISSING,
+          },
+        };
+      }
+
+      // 3. Create a temporary challenge (in memory, not persisted)
+      // TOTP is stateless - we only need the secret to verify the current code
+      const tempChallenge: SecurityChallenge = {
+        id: this.securityService.generateSecureToken(16),
+        challenge_id: this.securityService.generateSecureToken(32),
+        challenge_type: ChallengeType.MFA,
+        challenge_data: JSON.stringify({ secret: config.secret }),
+        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 min
+        is_solved: false,
+        created_at: new Date().toISOString(),
+      };
+
+      // 4. Verify using SecurityService
+      // Internally calls TOTPVerifier.verify()
+      const result = await this.securityService.verifyChallenge(
+        tempChallenge,
+        { token: code }, // TOTPSolution format
+      );
+
+      if (!result.valid) {
+        return {
+          success: false,
+          error: {
+            type: "MFA_INVALID_CODE",
+            message: result.error || ServiceErrors.MFA_INVALID_CODE,
+          },
+        };
+      }
+
+      // ✅ Code verified successfully
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: { type: "DATABASE_ERROR", message: error.message },
+      };
+    }
+  }
+
+  /**
+   * Generate MFA challenge for Email/SMS verification
+   * 
+   * Creates a security challenge with a hashed code and stores it in the database.
+   * Use this when SENDING the verification code to the user.
+   * 
+   * @param userId - User ID to generate challenge for
+   * @param mfaType - Type of MFA ('email' or 'sms')
+   * @param codeLength - Length of the verification code (default: 6)
+   * @returns Challenge with plain text code to send to user
+   * 
+   * @example
+   * ```typescript
+   * const result = await enhancedUserService.generateMFAChallenge(userId, 'email');
+   * if (result.success) {
+   *   await sendEmail(user.email, `Your code is: ${result.code}`);
+   *   // Store result.challenge.challenge_id for later verification
+   * }
+   * ```
+   */
+  async generateMFAChallenge(
+    userId: string,
+    mfaType: MFAType.EMAIL | MFAType.SMS,
+    codeLength: number = 6,
+  ): Promise<{
+    success: boolean;
+    challenge?: SecurityChallenge;
+    code?: string;
+    error?: any;
+  }> {
+    try {
+      // 1. Verify user has this MFA type configured
+      const mfaConfig = await this.mfaController.findFirst({
+        user_id: userId,
+        mfa_type: mfaType,
+        is_enabled: true,
+      });
+
+      if (!mfaConfig.data) {
+        return {
+          success: false,
+          error: {
+            type: "MFA_NOT_CONFIGURED",
+            message: ServiceErrors.MFA_NOT_CONFIGURED,
+          },
+        };
+      }
+
+      // 2. Generate random verification code
+      const min = Math.pow(10, codeLength - 1);
+      const max = Math.pow(10, codeLength) - 1;
+      const code = Math.floor(min + Math.random() * (max - min + 1)).toString();
+
+      // 3. Hash the code for secure storage
+      const { createHash } = await import("crypto");
+      const salt = this.securityService.generateSecureToken(16);
+      const codeHash = createHash("sha256")
+        .update(code + salt)
+        .digest("hex");
+
+      // 4. Create challenge using SecurityService
+      const challengeType =
+        mfaType === MFAType.EMAIL
+          ? ChallengeType.EMAIL_VERIFICATION
+          : ChallengeType.SMS_VERIFICATION;
+
+      const challengeData = this.securityService.createChallenge(
+        challengeType,
+        {
+          expectedHash: codeHash,
+          salt: salt,
+          userId: userId, // Metadata for searching
+          mfaType: mfaType,
+        },
+        10, // 10 minutes validity
+      );
+
+      // 5. Persist challenge to database
+      const result = await this.challengeController.create({
+        ...challengeData,
+        created_at: new Date().toISOString(),
+      });
+
+      if (!result.success || !result.data) {
+        return {
+          success: false,
+          error: {
+            type: "CHALLENGE_CREATE_FAILED",
+            message:
+              result.error || ServiceErrors.CHALLENGE_CREATE_FAILED,
+          },
+        };
+      }
+
+      // 6. Return success with PLAIN TEXT code (only returned here, never stored)
+      return {
+        success: true,
+        challenge: result.data,
+        code: code, // ⭐ Send this to the user via email/sms
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: { type: "DATABASE_ERROR", message: error.message },
+      };
+    }
+  }
+
+  /**
+   * Verify MFA code for Email/SMS verification
+   * 
+   * Verifies a code against a previously generated challenge.
+   * Use this when the user SUBMITS the verification code.
+   * 
+   * @param userId - User ID to verify for
+   * @param code - The verification code entered by the user
+   * @param challengeId - The challenge_id from generateMFAChallenge
+   * @returns Success/error result
+   * 
+   * @example
+   * ```typescript
+   * const result = await enhancedUserService.verifyMFACode(
+   *   userId,
+   *   '123456',
+   *   storedChallengeId
+   * );
+   * if (result.success) {
+   *   // Code verified, challenge marked as solved
+   * }
+   * ```
+   */
+  async verifyMFACode(
+    userId: string,
+    code: string,
+    challengeId: string,
+  ): Promise<{ success: boolean; error?: any }> {
+    try {
+      // 1. Find the challenge in database
+      const challengeResult = await this.challengeController.findFirst({
+        challenge_id: challengeId,
+        is_solved: false, // Only unsolved challenges
+      });
+
+      if (!challengeResult.data) {
+        return {
+          success: false,
+          error: {
+            type: "CHALLENGE_NOT_FOUND",
+            message: ServiceErrors.CHALLENGE_NOT_FOUND,
+          },
+        };
+      }
+
+      const challenge = challengeResult.data;
+
+      // 2. Verify the code using SecurityService
+      // Internally calls SecureCodeVerifier.verify()
+      const result = await this.securityService.verifyChallenge(challenge, {
+        code: code, // CodeSolution format
+      });
+
+      if (!result.valid) {
+        return {
+          success: false,
+          error: {
+            type: "MFA_INVALID_CODE",
+            message: result.error || ServiceErrors.MFA_INVALID_CODE,
+          },
+        };
+      }
+
+      // 3. ✅ Mark challenge as solved (DO NOT DELETE)
+      // This prevents reuse and maintains audit trail
+      await this.challengeController.update(challenge.id, {
+        is_solved: true,
+        solved_at: new Date().toISOString(),
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: { type: "DATABASE_ERROR", message: error.message },
+      };
+    }
+  }
+
+  /**
+   * Clean up expired and solved challenges
+   * 
+   * Should be called periodically (e.g., daily cron job) to remove old challenges.
+   * Only removes challenges that are both solved AND older than the retention period.
+   * 
+   * @param retentionDays - Number of days to keep solved challenges (default: 7)
+   * @returns Number of challenges cleaned up
+   * 
+   * @example
+   * ```typescript
+   * // In a cron job
+   * const cleaned = await enhancedUserService.cleanupExpiredChallenges(7);
+   * console.log(`Cleaned up ${cleaned} old challenges`);
+   * ```
+   */
+  async cleanupExpiredChallenges(retentionDays: number = 7): Promise<number> {
+    try {
+      const cutoffDate = new Date(
+        Date.now() - retentionDays * 24 * 60 * 60 * 1000,
+      );
+
+      // Find expired challenges that are solved
+      const expiredChallenges = await this.challengeController.search({
+        is_solved: true,
+      });
+
+      if (!expiredChallenges.data) {
+        return 0;
+      }
+
+      let cleanedCount = 0;
+
+      // Delete challenges that are old enough
+      for (const challenge of expiredChallenges.data) {
+        const solvedAt = challenge.solved_at
+          ? new Date(challenge.solved_at)
+          : new Date(challenge.created_at!);
+
+        if (solvedAt < cutoffDate) {
+          const deleteResult = await this.challengeController.delete(
+            challenge.id,
+          );
+          if (deleteResult.success) {
+            cleanedCount++;
+          }
+        }
+      }
+
+      return cleanedCount;
+    } catch (error: any) {
+      console.error("Error cleaning up challenges:", error);
+      return 0;
+    }
   }
 
   // --- Helper Methods ---
