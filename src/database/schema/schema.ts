@@ -3,17 +3,51 @@ import type {
   ColumnType,
   TableSchema,
 } from "../base-controller.ts";
-
-type ConstructorType =
-  | StringConstructor
-  | NumberConstructor
-  | BooleanConstructor
-  | DateConstructor
-  | ObjectConstructor
-  | ArrayConstructor
-  | BufferConstructor;
 import { z } from "zod";
-import { mapSqlTypeToZodType, mapConstructorToZodType } from "./zod-mapping";
+import { mapSqlTypeToZodType, mapConstructorToZodType, ConstructorType } from "./zod-mapping";
+
+// Tipos para tipado dinámico
+export type ConstructorToZodType<T> =
+  T extends StringConstructor ? z.ZodString :
+  T extends NumberConstructor ? z.ZodNumber :
+  T extends BooleanConstructor ? z.ZodBoolean :
+  T extends DateConstructor ? z.ZodDate :
+  T extends ObjectConstructor ? z.ZodRecord<z.ZodString, z.ZodAny> :
+  T extends ArrayConstructor ? z.ZodArray<z.ZodAny> :
+  T extends BufferConstructor ? z.ZodAny :
+  z.ZodAny;
+
+export type SchemaOptionsToZodType<T> =
+  T extends { type: infer Type; notNull: true } ? ConstructorToZodType<Type> :
+  T extends { type: infer Type; required: true } ? ConstructorToZodType<Type> :
+  T extends { type: infer Type; primaryKey: true } ? ConstructorToZodType<Type> :
+  T extends { type: infer Type } ? z.ZodOptional<ConstructorToZodType<Type>> :
+  T extends ConstructorType ? z.ZodOptional<ConstructorToZodType<T>> :
+  z.ZodOptional<z.ZodAny>;
+
+// Inferir la forma completa del schema
+type InferSchemaShape<T extends SchemaDefinition> = {
+  [K in keyof T]: SchemaOptionsToZodType<T[K]>;
+};
+
+// Tipos para create, update y read
+type InferCreateShape<T extends SchemaDefinition> = {
+  [K in keyof T]:
+    T[K] extends { primaryKey: true } ? z.ZodOptional<SchemaOptionsToZodType<T[K]>> :
+    T[K] extends { default: any } ? z.ZodOptional<SchemaOptionsToZodType<T[K]>> :
+    SchemaOptionsToZodType<T[K]>;
+};
+
+type InferUpdateShape<T extends SchemaDefinition> = {
+  [K in keyof T]: z.ZodOptional<SchemaOptionsToZodType<T[K]>>;
+};
+
+// Interface para schemas Zod tipados
+export interface TypedModelZodSchemas<T extends SchemaDefinition> {
+  create: z.ZodObject<InferCreateShape<T>>;
+  update: z.ZodObject<InferUpdateShape<T>>;
+  read: z.ZodObject<InferSchemaShape<T>>;
+}
 
 export interface ModelZodSchemas {
   create: z.ZodObject<any>;
@@ -130,6 +164,20 @@ export class Schema {
       create: z.object(createShape),
       update: z.object(updateShape),
       read: baseSchema,
+    };
+  }
+
+  /**
+   * Generates typed Zod schemas with strong type inference
+   */
+  public toZodTyped<T extends SchemaDefinition = SchemaDefinition>(): TypedModelZodSchemas<T> {
+    const baseSchemas = this.toZod();
+    
+    // Type assertion to preserve type information
+    return {
+      create: baseSchemas.create as TypedModelZodSchemas<T>['create'],
+      update: baseSchemas.update as TypedModelZodSchemas<T>['update'],
+      read: baseSchemas.read as TypedModelZodSchemas<T>['read'],
     };
   }
 
@@ -496,4 +544,43 @@ export class Schema {
         return "TEXT";
     }
   }
+}
+
+/**
+ * Helper function para crear schemas con tipado fuerte de forma más concisa
+ */
+export function createTypedSchema<T extends SchemaDefinition>(
+  definition: T,
+  options: SchemaOptions = {}
+): Schema {
+  return new Schema(definition, options);
+}
+
+/**
+ * Type helpers para usar directamente en el código
+ * Estos helpers extraen los tipos correctamente de los schemas Zod
+ */
+export type InferTypedSchemaRead<T extends Schema> =
+  T extends Schema ? z.infer<ReturnType<T['toZodTyped']>['read']> : never;
+
+export type InferTypedSchemaCreate<T extends Schema> =
+  T extends Schema ? z.infer<ReturnType<T['toZodTyped']>['create']> : never;
+
+export type InferTypedSchemaUpdate<T extends Schema> =
+  T extends Schema ? z.infer<ReturnType<T['toZodTyped']>['update']> : never;
+
+/**
+ * Helper para crear type assertions cuando se necesita más control
+ */
+export function asTypedSchema<T extends SchemaDefinition>(
+  schema: Schema,
+  definition: T
+): TypedModelZodSchemas<T> {
+  const zodSchemas = schema.toZodTyped<T>();
+  
+  return {
+    create: zodSchemas.create as TypedModelZodSchemas<T>['create'],
+    update: zodSchemas.update as TypedModelZodSchemas<T>['update'],
+    read: zodSchemas.read as TypedModelZodSchemas<T>['read'],
+  };
 }
