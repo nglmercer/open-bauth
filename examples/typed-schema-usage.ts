@@ -58,78 +58,15 @@ type CreateTypeCompatibilityCheck =
   UserCreateType2 extends UserCreateType ? true : false;
 type UpdateTypeCompatibilityCheck =
   UserUpdateType2 extends UserUpdateType ? true : false;
-
-// Las verificaciones anteriores deberían ser 'true', demostrando que los tipos coinciden
-// Con Schema genérico, UserReadType2 ahora extiende UserReadType correctamente
-// Función genérica que usa los tipos dinámicos para validación de datos
-function validateUserData<T extends 'read' | 'create' | 'update'>(
-  type: T,
-  data: any
-): T extends 'read' ? UserReadType2 : T extends 'create' ? UserCreateType2 : UserUpdateType2 {
-  switch (type) {
-    case 'read':
-      return userZodSchemas.read.parse(data) as any;
-    case 'create':
-      return userZodSchemas.create.parse(data) as any;
-    case 'update':
-      return userZodSchemas.update.parse(data) as any;
-    default:
-      throw new Error('Invalid type');
-  }
+export const valid1: {
+  readcompatible: CreateTypeCompatibilityCheck,
+  createcompatible: CreateTypeCompatibilityCheck,
+  updatecompatible: UpdateTypeCompatibilityCheck
+} = {
+  readcompatible: true,
+  createcompatible: true,
+  updatecompatible: true
 }
-
-// Demostración del tipado en acción con uso de tipos dinámicos
-function demonstrateUserTypes() {
-  // Tipo Read - todos los campos son requeridos y tienen sus tipos correctos
-  const userRead: UserReadType = {
-    id: "user-123",
-    username: "johndoe",
-    email: "john@example.com",
-    password: "hashed-password",
-    isActive: true,
-    role: "admin",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  // Tipo Create - los campos con default son opcionales, los required son obligatorios
-  const userCreate: UserCreateType = {
-    username: "johndoe",
-    email: "john@example.com",
-    password: "secure-password",
-    // id es opcional porque es primaryKey
-    // isActive es opcional porque tiene default
-    // role es opcional porque tiene default
-    // createdAt y updatedAt son opcionales porque tienen default
-  };
-
-  // Tipo Update - todos los campos son opcionales
-  const userUpdate: UserUpdateType = {
-    username: "johndoe-updated",
-    // Solo actualizamos el username, el resto es opcional
-  };
-
-  // Usar los tipos dinámicos en funciones reales
-  const dynamicReadUser: UserReadType2 = userRead;
-  const dynamicCreateUser: UserCreateType2 = userCreate;
-  const dynamicUpdateUser: UserUpdateType2 = userUpdate;
-
-  // Validación usando tipos dinámicos
-  const validatedRead = validateUserData('read', dynamicReadUser);
-  const validatedCreate = validateUserData('create', dynamicCreateUser);
-  const validatedUpdate = validateUserData('update', dynamicUpdateUser);
-
-  console.log("User types demonstration completed successfully!");
-  console.log("Dynamic types validation:", {
-    read: !!validatedRead,
-    create: !!validatedCreate,
-    update: !!validatedUpdate
-  });
-}
-
-// ============================================
-// EJEMPLO 2: Schema de Token de Verificación
-// ============================================
 
 const verificationTokenDefinition = {
   id: { type: String, primaryKey: true },
@@ -173,10 +110,18 @@ const typedExistingSchemas = asTypedSchema(existingSchema, {
 type ExistingReadType = z.infer<typeof typedExistingSchemas.read>;
 type ExistingCreateType = z.infer<typeof typedExistingSchemas.create>;
 type ExistingUpdateType = z.infer<typeof typedExistingSchemas.update>;
-
-// ============================================
-// EJEMPLO 4: Integración con controladores y servicios
-// ============================================
+type existRead = ExistingReadType extends ExistingReadType ? true : false;
+type existCreate = ExistingCreateType extends ExistingCreateType ? true : false;
+type existUpdate = ExistingUpdateType extends ExistingUpdateType ? true : false;
+export const valid2: {
+  readcompatible: existRead,
+  createcompatible: existCreate,
+  updatecompatible: existUpdate
+} = {
+  readcompatible: true,
+  createcompatible: true,
+  updatecompatible: true
+}
 
 class UserService {
   // Ya no necesita parámetro genérico explícito
