@@ -1,12 +1,12 @@
 {
   "name": "open-bauth",
-  "version": "1.5.2",
+  "version": "1.5.0",
   "description": "Framework-agnostic authentication with OAuth 2.0, advanced schema management, and security features built with Bun, TypeScript, and SQLite",
   "main": "dist/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
     "dev": "bun run --hot ./examples/hono.ts",
-    "build": "tsc && bun build src/index.ts --outdir dist --target bun --format esm --sourcemap",
+    "build": "tsc && bun build src/index.ts --outdir dist --target bun --format esm",
     "test": "bun test --preload ./tests/setup.ts",
     "typecheck": "tsc --noEmit",
     "test:watch": "bun test --watch --preload ./tests/setup.ts",
