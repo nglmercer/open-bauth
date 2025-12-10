@@ -9,7 +9,7 @@ import { Database } from "bun:sqlite";
 
 // Core Application Imports
 import { DatabaseInitializer } from "../src/index";
-import { JWTService } from "../src/index";
+import { JWTServiceBun } from "../src/index";
 import { AuthService } from "../src/index";
 import { PermissionService } from "../src/index";
 import { registerOAuthSchemaExtensions } from "../src/database/schema/oauth-schema-extensions";
@@ -50,7 +50,7 @@ registerOAuthSchemaExtensions();
 await dbInitializer.initialize();
 await dbInitializer.seedDefaults();
 
-const jwtService = new JWTService(
+const jwtService = new JWTServiceBun(
   process.env.JWT_SECRET || "a-very-secret-key-for-hono",
   process.env.JWT_EXPIRATION || "7d",
 );

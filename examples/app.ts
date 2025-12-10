@@ -8,6 +8,7 @@ import { PermissionService } from "../src/index";
 import { registerOAuthSchemaExtensions } from "../src/database/schema/oauth-schema-extensions";
 import { OAuthService } from "../src/services/oauth";
 import { SecurityService } from "../src/services/security";
+import { IJWTServiceExtended } from "../src/types/jwt-service";
 // Hono's context typing for this specific application
 export type AppContext = {
   Variables: {
@@ -17,7 +18,7 @@ export type AppContext = {
 
 // A clear, explicit type for all application services
 export type Services = {
-  jwtService: JWTService;
+  jwtService: IJWTServiceExtended;
   authService: AuthService;
   permissionService: PermissionService;
   oauthService: OAuthService;

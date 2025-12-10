@@ -100,6 +100,19 @@ export const createSuperuserAuthMethodsRouter = (
     }
 
     // Generate refresh token using jwtService
+    if (!services.jwtService.generateRefreshToken) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            message: "Refresh token generation not available",
+            type: AuthErrorType.SERVER_ERROR,
+            timestamp: new Date().toISOString(),
+          },
+        },
+        500,
+      );
+    }
     const refreshToken = await services.jwtService.generateRefreshToken(
       result.user?.id || "",
     );

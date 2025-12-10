@@ -1,6 +1,6 @@
 import type { DatabaseInitializer } from "../database/database-initializer";
 import type { BaseController, ControllerResponse } from "../database/base-controller";
-import type { JWTService } from "./jwt";
+import type { IJWTServiceExtended } from "../types/jwt-service";
 import { ServiceErrors } from "./constants";
 import {
   AuthResult,
@@ -23,9 +23,9 @@ export class AuthService {
     user_id: string;
     role_id: string;
   }>;
-  private jwtService: JWTService;
+  private jwtService: IJWTServiceExtended;
 
-  constructor(dbInitializer: DatabaseInitializer, jwtService: JWTService) {
+  constructor(dbInitializer: DatabaseInitializer, jwtService: IJWTServiceExtended) {
     // Use configured table names instead of hardcoded ones
     this.userController = dbInitializer.createControllerByKey<User>("users");
     this.roleController = dbInitializer.createControllerByKey<Role>("roles");

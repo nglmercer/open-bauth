@@ -27,7 +27,7 @@ import {
   PKCEMethod,
 } from "../types/oauth";
 import { SecurityService } from "./security";
-import { JWTService } from "./jwt";
+import type { IJWTServiceExtended } from "../types/jwt-service";
 import { AuthService } from "./auth";
 import { ServiceErrors } from "./constants";
 
@@ -47,14 +47,14 @@ export class OAuthService {
   private authCodeController: BaseController<AuthorizationCode>;
   private refreshTokenController: BaseController<RefreshToken>;
   private securityService: SecurityService;
-  private jwtService: JWTService;
+  private jwtService: IJWTServiceExtended;
   private authService: AuthService;
   private config: OAuthConfig;
 
   constructor(
     dbInitializer: DatabaseInitializer,
     securityService: SecurityService,
-    jwtService: JWTService,
+    jwtService: IJWTServiceExtended,
     authService: AuthService,
     config?: Partial<OAuthConfig>,
   ) {

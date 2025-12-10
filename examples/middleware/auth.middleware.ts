@@ -1,6 +1,6 @@
 // src/middleware/auth.ts (FUNCIONES DE MIDDLEWARE CORREGIDAS PARA HONO)
 
-import { JWTService } from "../../src/index";
+import type { IJWTServiceExtended } from "../../src/types/jwt-service";
 import { AuthService } from "../../src/index";
 import { PermissionService } from "../../src/index";
 import type {
@@ -14,7 +14,7 @@ import type { Context, Next } from "hono"; // <-- Importar tipos de Hono
 async function authenticateRequest(
   request: AuthRequest,
   services: {
-    jwtService: JWTService;
+    jwtService: IJWTServiceExtended;
     authService: AuthService;
     permissionService: PermissionService;
   },
@@ -83,7 +83,7 @@ async function authenticateRequest(
  */
 export function createAuthMiddlewareForHono(
   services: {
-    jwtService: JWTService;
+    jwtService: IJWTServiceExtended;
     authService: AuthService;
     permissionService: PermissionService;
   },
