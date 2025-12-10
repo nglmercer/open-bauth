@@ -740,7 +740,6 @@ For in-depth guides and specifications, see the [docs/](./docs/) directory:
 - [**Testing**](./docs/testing.md) - Running and writing tests
 
 ### 📋 Reference
-- [**Docs Index**](./docs/README.md) - Complete documentation navigation
 - [**Zod Usage**](./docs/zod-usage.md) - Zod integration and type mapping guide
 
 ---
