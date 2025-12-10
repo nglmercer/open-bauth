@@ -3,13 +3,14 @@
  */
 
 import { z } from "zod";
-import { 
-  createTypedSchema, 
+import {
+  createTypedSchema,
   InferTypedSchemaRead,
   InferTypedSchemaCreate,
   InferTypedSchemaUpdate,
   asTypedSchema,
-    Schema } from "../src/database/schema/schema";
+  Schema
+} from "../src/database/schema/schema";
 
 // ============================================
 // EJEMPLO 1: Schema de Usuario con tipado fuerte
@@ -26,7 +27,7 @@ const userSchemaDefinition = {
   updatedAt: { type: Date, default: Date.now }
 } as const;
 
-// Usando Schema con tipado fuerte
+// Usando Schema con tipado fuerte - ahora Schema es genérico y preserva el tipo
 const userSchema = new Schema(userSchemaDefinition, {
   indexes: [
     { name: "idx_username", columns: ["username"], unique: true },
@@ -34,16 +35,17 @@ const userSchema = new Schema(userSchemaDefinition, {
   ]
 });
 
-// Obtener los schemas Zod con tipado completo
-const userZodSchemas = userSchema.toZodTyped<typeof userSchemaDefinition>();
+// Obtener los schemas Zod con tipado completo - ya no necesita parámetro genérico
+const userZodSchemas = userSchema.toZodTyped();
 
 // Inferir tipos automáticamente - ¡AHORA SÍ FUNCIONA!
 type UserReadType = z.infer<typeof userZodSchemas.read>;
 type UserCreateType = z.infer<typeof userZodSchemas.create>;
 type UserUpdateType = z.infer<typeof userZodSchemas.update>;
 
-// También podemos usar los helpers de tipo - ¡Funcionan dinámicamente!
+// También podemos usar los helpers de tipo - ¡AHORA FUNCIONAN CORRECTAMENTE!
 // Estos tipos se infieren correctamente en tiempo de compilación
+// porque Schema<T> preserva la información del tipo de definición
 type UserReadType2 = InferTypedSchemaRead<typeof userSchema>;
 type UserCreateType2 = InferTypedSchemaCreate<typeof userSchema>;
 type UserUpdateType2 = InferTypedSchemaUpdate<typeof userSchema>;
@@ -58,6 +60,7 @@ type UpdateTypeCompatibilityCheck =
   UserUpdateType2 extends UserUpdateType ? true : false;
 
 // Las verificaciones anteriores deberían ser 'true', demostrando que los tipos coinciden
+// Con Schema genérico, UserReadType2 ahora extiende UserReadType correctamente
 // Función genérica que usa los tipos dinámicos para validación de datos
 function validateUserData<T extends 'read' | 'create' | 'update'>(
   type: T,
@@ -143,8 +146,8 @@ const tokenSchema = createTypedSchema(verificationTokenDefinition, {
     { name: "idx_verification_user", columns: ["userId"], unique: false }
   ]
 });
-
-const tokenZodSchemas = tokenSchema.toZodTyped<typeof verificationTokenDefinition>();
+// Ya no necesita parámetro genérico explícito - el Schema ya tiene la información
+const tokenZodSchemas = tokenSchema.toZodTyped();
 
 type TokenReadType = z.infer<typeof tokenZodSchemas.read>;
 type TokenCreateType = z.infer<typeof tokenZodSchemas.create>;
@@ -176,12 +179,13 @@ type ExistingUpdateType = z.infer<typeof typedExistingSchemas.update>;
 // ============================================
 
 class UserService {
-  private schemas = userSchema.toZodTyped<typeof userSchemaDefinition>();
+  // Ya no necesita parámetro genérico explícito
+  private schemas = userSchema.toZodTyped();
 
   async createUser(data: UserCreateType): Promise<UserReadType> {
     // Validación con Zod
     const validatedData = this.schemas.create.parse(data);
-    
+
     // Simular creación en base de datos
     const createdUser: UserReadType = {
       ...validatedData,
@@ -198,7 +202,7 @@ class UserService {
   async updateUser(id: string, data: UserUpdateType): Promise<UserReadType> {
     // Validación con Zod
     const validatedData = this.schemas.update.parse(data);
-    
+
     // Simular actualización en base de datos
     const updatedUser: UserReadType = {
       id,
