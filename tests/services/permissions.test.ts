@@ -138,4 +138,67 @@ describe("PermissionService", () => {
     );
     expect(hasRole).toBe(false);
   });
+  test("should get unique permissions for multiple roles using getRolesPermissions", async () => {
+    // 1. Setup Roles
+    const role1 = (await permissionService.createRole({ name: "role1" })).data!;
+    const role2 = (await permissionService.createRole({ name: "role2" })).data!;
+
+    // 2. Setup Permissions
+    const permA = (
+      await permissionService.createPermission({
+        name: "permA",
+        resource: "resA",
+        action: "read",
+      })
+    ).data!;
+    const permB = (
+      await permissionService.createPermission({
+        name: "permB",
+        resource: "resB",
+        action: "write",
+      })
+    ).data!;
+    // permC will be shared
+    const permC = (
+      await permissionService.createPermission({
+        name: "permC",
+        resource: "resC",
+        action: "delete",
+      })
+    ).data!;
+
+    // 3. Assign Permissions
+    // role1 gets permA and permC
+    await permissionService.assignPermissionToRole(role1.id, permA.id);
+    await permissionService.assignPermissionToRole(role1.id, permC.id);
+
+    // role2 gets permB and permC
+    await permissionService.assignPermissionToRole(role2.id, permB.id);
+    await permissionService.assignPermissionToRole(role2.id, permC.id);
+
+    // 4. Test getRolesPermissions with both roles
+    const permissions = await permissionService.getRolesPermissions([
+      role1.id,
+      role2.id,
+    ]);
+
+    // 5. Verify results
+    expect(permissions.length).toBe(3); // Should be unique (A, B, C)
+    const permissionNames = permissions.map((p) => p.name).sort();
+    expect(permissionNames).toEqual(["permA", "permB", "permC"]);
+
+    // 6. Test with single role
+    const role1Permissions = await permissionService.getRolesPermissions([
+      role1.id,
+    ]);
+    expect(role1Permissions.length).toBe(2);
+    expect(role1Permissions.map((p) => p.name).sort()).toEqual([
+      "permA",
+      "permC",
+    ]);
+
+    // 7. Test with empty array
+    const emptyPermissions = await permissionService.getRolesPermissions([]);
+    expect(emptyPermissions).toEqual([]);
+  });
 });

@@ -383,12 +383,18 @@ export class PermissionService {
   }
 
   async getRolePermissions(roleId: string): Promise<Permission[]> {
+    return this.getRolesPermissions([roleId]);
+  }
+
+  async getRolesPermissions(roleIds: string[]): Promise<Permission[]> {
+    if (roleIds.length === 0) return [];
+
     const assignments = await this.rolePermissionController.search({
-      role_id: roleId,
+      role_id: roleIds,
     });
     if (!assignments.data || assignments.data.length === 0) return [];
 
-    const permissionIds = assignments.data.map((a) => a.permission_id);
+    const permissionIds = [...new Set(assignments.data.map((a) => a.permission_id))];
     const result = await this.permissionController.search({
       id: permissionIds,
     });

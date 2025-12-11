@@ -74,12 +74,12 @@ export async function authenticateRequest(
         const userRoles = await services.authService.getUserRoles(user.id);
 
         // Aggregate permissions from all roles
-        let userPermissions: string[] = [];
-        for (const role of userRoles) {
-            const rolePermissions =
-                await services.permissionService.getRolePermissions(role.id);
-            userPermissions.push(...rolePermissions.map((p) => p.name));
-        }
+        // Aggregate permissions from all roles
+        const roleIds = userRoles.map((role) => role.id);
+        const permissions = await services.permissionService.getRolesPermissions(
+            roleIds
+        );
+        let userPermissions = permissions.map((p) => p.name);
 
         // Remove duplicates
         userPermissions = [...new Set(userPermissions)];
