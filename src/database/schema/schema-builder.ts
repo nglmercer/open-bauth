@@ -6,25 +6,10 @@ import {
   getTableName,
   type DatabaseTableConfig,
 } from "../config";
-
-// Utils
-
-const StandardFields = {
-  UUID: {
-    type: String,
-    primaryKey: true,
-    default: "(lower(hex(randomblob(16))))",
-  },
-  Timestamps: {
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now },
-  },
-  Active: { type: Boolean, default: true },
-};
-
+import { StandardFields } from "./constants";
 // Schema base
-
-const BASE_SCHEMAS: Record<string, Schema> = {
+export * from "./constants";
+export const BASE_SCHEMAS: Record<string, Schema> = {
   users: new Schema(
     {
       id: StandardFields.UUID,
@@ -80,8 +65,18 @@ const BASE_SCHEMAS: Record<string, Schema> = {
   userRoles: new Schema(
     {
       id: StandardFields.UUID,
-      user_id: { type: "TEXT", required: true, ref: "users", onDelete: "CASCADE" },
-      role_id: { type: "TEXT", required: true, ref: "roles", onDelete: "CASCADE" },
+      user_id: {
+        type: "TEXT",
+        required: true,
+        ref: "users",
+        onDelete: "CASCADE",
+      },
+      role_id: {
+        type: "TEXT",
+        required: true,
+        ref: "roles",
+        onDelete: "CASCADE",
+      },
       ...StandardFields.Timestamps,
     },
     {
@@ -100,8 +95,18 @@ const BASE_SCHEMAS: Record<string, Schema> = {
   rolePermissions: new Schema(
     {
       id: StandardFields.UUID,
-      role_id: { type: "TEXT", required: true, ref: "roles", onDelete: "CASCADE" },
-      permission_id: { type: "TEXT", required: true, ref: "permissions", onDelete: "CASCADE" },
+      role_id: {
+        type: "TEXT",
+        required: true,
+        ref: "roles",
+        onDelete: "CASCADE",
+      },
+      permission_id: {
+        type: "TEXT",
+        required: true,
+        ref: "permissions",
+        onDelete: "CASCADE",
+      },
       ...StandardFields.Timestamps,
     },
     {
@@ -123,7 +128,12 @@ const BASE_SCHEMAS: Record<string, Schema> = {
   sessions: new Schema(
     {
       id: StandardFields.UUID,
-      user_id: { type: "TEXT", required: true, ref: "users", onDelete: "CASCADE" },
+      user_id: {
+        type: "TEXT",
+        required: true,
+        ref: "users",
+        onDelete: "CASCADE",
+      },
       token: { type: String, required: true, unique: true },
       created_at: { type: Date, default: Date.now },
       expires_at: { type: Date, required: true },

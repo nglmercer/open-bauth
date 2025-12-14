@@ -13,7 +13,7 @@ import { testUtils } from "./setup";
 import { SecurityService } from "../src/services/security";
 import { OAuthService } from "../src/services/oauth";
 import { OAuthGrantType, OAuthResponseType } from "../src/types/oauth";
-
+import { AuthService } from "../src";
 // Función para generar emails únicos
 function generateUniqueEmail(base: string): string {
   return `${base}_${Date.now()}@example.com`;
@@ -44,11 +44,17 @@ beforeEach(async () => {
     "7d",
   );
   const securityService = new SecurityServiceType();
+  const authService = new AuthService(
+    dbInitializer, // Cast to any to bypass type checking
+    jwtService,
+  );
+
   // Import OAuthService dynamically to avoid type conflicts
   const oauthService = new OAuthServiceType(
-    dbInitializer as any, // Cast to any to bypass type checking
+    dbInitializer, // Cast to any to bypass type checking
     securityService,
     jwtService,
+    authService,
   );
 
   // Create a global context for tests

@@ -1,22 +1,7 @@
 import { Schema } from "./schema";
 import type { TableSchema } from "../base-controller";
 import { setDatabaseConfig, createSchemaExtension } from "../config";
-
-// Constants
-
-const StandardFields = {
-  UUID: {
-    type: String,
-    primaryKey: true,
-    default: "(lower(hex(randomblob(16))))",
-  },
-  Timestamps: {
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now },
-  },
-  CreatedAt: { type: Date, default: Date.now },
-  Active: { type: Boolean, default: true },
-};
+import { StandardFields } from "./constants";
 
 // Schemas
 
