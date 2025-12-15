@@ -12,6 +12,8 @@ import {
   SchemaDefinition,
   SchemaOptions,
   SchemaIndex,
+  SchemaTypeOptions,
+  SchemaField,
 } from "../../../src/database/schema/schema";
 
 let db: Database;
@@ -585,7 +587,7 @@ describe("sqlite Schema Extractor", () => {
       const extractedColumns = extracted!.tableSchema.columns;
 
       // Validar mappings de tipos
-      const typeMappings = [
+      const typeMappings: { field: string; expectedType: string }[] = [
         { field: "text_field", expectedType: "TEXT" },
         { field: "number_field", expectedType: "INTEGER" },
         { field: "float_field", expectedType: "INTEGER" }, // Schema class mapea Number a INTEGER
@@ -599,7 +601,7 @@ describe("sqlite Schema Extractor", () => {
       typeMappings.forEach(({ field, expectedType }) => {
         const col = extractedColumns.find((c) => c.name === field);
         expect(col).toBeDefined();
-        expect(col!.type).toBe(expectedType as any);
+        expect(col!.type as string).toBe(expectedType);
       });
 
       // Validar constraints específicas
@@ -756,48 +758,65 @@ describe("sqlite Schema Extractor", () => {
       expect(extractedSchema).toBeDefined();
 
       // Comparar definiciones originales vs extraídas
-      const originalDef = originalSchema.getDefinition();
-      const extractedDef = extractedSchema!.getDefinition();
+      const originalDef = originalSchema.getDefinition() as SchemaDefinition;
+      const extractedDef = extractedSchema!.getDefinition() as SchemaDefinition;
 
       // Validar que todos los campos originales existen en el extraído
-      Object.keys(originalDef).forEach((fieldName) => {
-        expect(extractedDef[fieldName]).toBeDefined();
+      (Object.keys(originalDef) as Array<keyof typeof originalDef>).forEach(
+        (fieldName) => {
+          expect(extractedDef[fieldName as string]).toBeDefined();
 
-        const originalField = originalDef[fieldName] as any;
-        const extractedField = extractedDef[fieldName] as any;
+          const originalField = originalDef[fieldName];
+          const extractedField = extractedDef[fieldName as string];
 
-        // Validar tipo (considerando mapeos)
-        if (typeof originalField.type === "function") {
-          const expectedType =
-            originalField.type === String
-              ? "TEXT"
-              : originalField.type === Number
-                ? "INTEGER"
-                : originalField.type === Boolean
-                  ? "BOOLEAN"
-                  : originalField.type === Date
-                    ? "DATETIME"
-                    : "TEXT";
-          expect(extractedField.type).toBe(expectedType);
-        }
-
-        // Validar constraints
-        if (originalField.primaryKey)
-          expect(extractedField.primaryKey).toBe(true);
-        if (originalField.required || originalField.notNull)
-          expect(extractedField.notNull).toBe(true);
-        if (originalField.unique) {
-          // Unique puede estar en el campo o en índices
-          const hasUnique =
-            extractedField.unique ||
-            extracted!.tableSchema.indexes?.some(
-              (idx) => idx.unique && idx.columns.includes(fieldName),
+          // Helper type guard
+          const isSchemaTypeOptions = (
+            field: SchemaField,
+          ): field is SchemaTypeOptions => {
+            return (
+              typeof field === "object" && field !== null && "type" in field
             );
-          expect(hasUnique).toBeTruthy();
-        }
-        if (originalField.check)
-          expect(extractedField.check).toBe(originalField.check);
-      });
+          };
+
+          // Validar solo si ambos son opciones de esquema completas
+          if (
+            isSchemaTypeOptions(originalField) &&
+            isSchemaTypeOptions(extractedField)
+          ) {
+            // Validar tipo (considerando mapeos)
+            if (typeof originalField.type === "function") {
+              const expectedType =
+                originalField.type === String
+                  ? "TEXT"
+                  : originalField.type === Number
+                    ? "INTEGER"
+                    : originalField.type === Boolean
+                      ? "BOOLEAN"
+                      : originalField.type === Date
+                        ? "DATETIME"
+                        : "TEXT";
+              expect(extractedField.type).toBe(expectedType);
+            }
+
+            // Validar constraints
+            if (originalField.primaryKey)
+              expect(extractedField.primaryKey).toBe(true);
+            if (originalField.required || originalField.notNull)
+              expect(extractedField.notNull).toBe(true);
+            if (originalField.unique) {
+              // Unique puede estar en el campo o en índices
+              const hasUnique =
+                extractedField.unique ||
+                extracted!.tableSchema.indexes?.some(
+                  (idx) => idx.unique && idx.columns.includes(fieldName as string),
+                );
+              expect(hasUnique).toBeTruthy();
+            }
+            if (originalField.check)
+              expect(extractedField.check).toBe(originalField.check);
+          }
+        },
+      );
 
       // Validar número de columnas
       expect(extracted!.tableSchema.columns.length).toBe(

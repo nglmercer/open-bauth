@@ -81,7 +81,7 @@ export interface SchemaTypeOptions {
   onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
 }
 
-type SchemaField =
+export type SchemaField =
   | ConstructorType
   | SchemaTypeOptions
   | { [key: string]: SchemaField }
@@ -207,7 +207,7 @@ export class Schema<T extends SchemaDefinition = SchemaDefinition> {
     }
 
     if (typeof field === "object" && field !== null) {
-      if ((field as any).type && (this.isConstructor((field as any).type) || typeof (field as any).type === 'string')) {
+      if ((field).type && (this.isConstructor((field).type) || typeof (field).type === 'string')) {
         const options = field as SchemaTypeOptions;
         let zodType = this.mapConstructorToZod(options.type);
 

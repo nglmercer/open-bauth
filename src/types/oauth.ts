@@ -26,6 +26,12 @@ export interface OAuthClient extends BaseEntity {
   is_active: boolean;
 }
 
+export interface OAuthClientRow extends Omit<OAuthClient, "redirect_uris" | "grant_types" | "response_types"> {
+  redirect_uris: string;
+  grant_types: string;
+  response_types: string;
+}
+
 export interface CreateOAuthClientData {
   client_id: string;
   client_secret?: string;
@@ -46,6 +52,7 @@ export interface CreateOAuthClientData {
 
 export interface UpdateOAuthClientData {
   client_name?: string;
+  client_secret?: string;
   redirect_uris?: string[];
   grant_types?: OAuthGrantType[];
   response_types?: OAuthResponseType[];
@@ -278,6 +285,8 @@ export interface TokenRequest {
   code_verifier?: string;
   device_code?: string;
   assertion?: string;
+  username?: string;
+  password?: string;
 }
 
 export interface TokenResponse {

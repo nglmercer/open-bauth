@@ -5,6 +5,7 @@ import type { BaseController } from "../database/base-controller";
 import type { User } from "../types/auth";
 import {
   OAuthClient,
+  OAuthClientRow,
   CreateOAuthClientData,
   UpdateOAuthClientData,
   AuthorizationCode,
@@ -43,7 +44,7 @@ export interface OAuthConfig {
  * OAuth 2.0 Service for handling complete OAuth 2.0 flows
  */
 export class OAuthService {
-  private clientController: BaseController<OAuthClient>;
+  private clientController: BaseController<OAuthClientRow>;
   private authCodeController: BaseController<AuthorizationCode>;
   private refreshTokenController: BaseController<RefreshToken>;
   private securityService: SecurityService;
@@ -59,7 +60,7 @@ export class OAuthService {
     config?: Partial<OAuthConfig>,
   ) {
     this.clientController =
-      dbInitializer.createController<OAuthClient>("oauth_clients");
+      dbInitializer.createController<OAuthClientRow>("oauth_clients");
     this.authCodeController = dbInitializer.createController<AuthorizationCode>(
       "authorization_codes",
     );
@@ -81,21 +82,30 @@ export class OAuthService {
 
   // --- OAuth Client Management ---
 
+  private mapClientFromDB(row: OAuthClientRow): OAuthClient {
+    return {
+      ...row,
+      redirect_uris: JSON.parse(row.redirect_uris || "[]"),
+      grant_types: JSON.parse(row.grant_types || "[]"),
+      response_types: JSON.parse(row.response_types || "[]"),
+    };
+  }
+
   async findAllClients(): Promise<OAuthClient[]> {
     const result = await this.clientController.findAll();
-    return result.data || [];
+    return (result.data || []).map(this.mapClientFromDB);
   }
 
   async findClientById(id: string): Promise<OAuthClient | null> {
     const result = await this.clientController.findById(id);
-    return result.data || null;
+    return result.data ? this.mapClientFromDB(result.data) : null;
   }
 
   async findClientByClientId(clientId: string): Promise<OAuthClient | null> {
     const result = await this.clientController.findFirst({
       client_id: clientId,
     });
-    return result.data || null;
+    return result.data ? this.mapClientFromDB(result.data) : null;
   }
 
   async createClient(data: CreateOAuthClientData): Promise<OAuthClient> {
@@ -141,7 +151,7 @@ export class OAuthService {
       throw new Error(`${ServiceErrors.CLIENT_CREATE_FAILED}: ${errorMessage}`);
     }
 
-    return result.data;
+    return this.mapClientFromDB(result.data);
   }
 
   async updateClient(
@@ -150,24 +160,24 @@ export class OAuthService {
   ): Promise<OAuthClient> {
     // Hash client secret if provided
     let updateData: any = { ...data };
-    if ((data as any).client_secret) {
+    if ((data).client_secret) {
       const { hash, salt } = await this.securityService.hashPassword(
-        (data as any).client_secret,
+        (data).client_secret,
       );
       updateData.client_secret = hash;
       updateData.client_secret_salt = salt;
     }
 
     if (data.grant_types) {
-      updateData.grant_types = JSON.stringify(data.grant_types);
+      updateData.grant_types = JSON.stringify(data.grant_types) as any;
     }
 
     if (data.response_types) {
-      updateData.response_types = JSON.stringify(data.response_types);
+      updateData.response_types = JSON.stringify(data.response_types) as any;
     }
 
     if (data.redirect_uris) {
-      updateData.redirect_uris = JSON.stringify(data.redirect_uris);
+      updateData.redirect_uris = JSON.stringify(data.redirect_uris) as any;
     }
 
     const result = await this.clientController.update(id, updateData);
@@ -176,7 +186,7 @@ export class OAuthService {
       throw new Error(ServiceErrors.CLIENT_UPDATE_FAILED);
     }
 
-    return result.data;
+    return this.mapClientFromDB(result.data);
   }
 
   async deleteClient(id: string): Promise<boolean> {
@@ -220,7 +230,7 @@ export class OAuthService {
       isValid = await this.securityService.verifyPassword(
         clientSecret,
         client.client_secret,
-        (client as any).client_secret_salt || "",
+        (client).client_secret_salt || "",
       );
     }
 
@@ -237,7 +247,7 @@ export class OAuthService {
       return false;
     }
 
-    const redirectUris = JSON.parse((client as any).redirect_uris || "[]");
+    const redirectUris = client.redirect_uris || [];
     return redirectUris.includes(redirectUri);
   }
 
@@ -417,7 +427,7 @@ export class OAuthService {
       }
 
       // Validate response type
-      const responseTypes = JSON.parse((client as any).response_types || "[]");
+      const responseTypes = client.response_types || [];
       if (!responseTypes.includes(request.response_type)) {
         return {
           error: OAuthErrorType.UNSUPPORTED_RESPONSE_TYPE,
@@ -472,7 +482,7 @@ export class OAuthService {
         user_id: user.id,
         redirect_uri:
           request.redirect_uri ||
-          (JSON.parse((client as any).redirect_uris || "[]") as string[])[0] ||
+          (client.redirect_uris || [])[0] ||
           "",
         scope: request.scope || client.scope,
         state: request.state,
@@ -857,9 +867,8 @@ export class OAuthService {
       }
 
       // For password grant, we need username and password from the request
-      // These are not in the standard TokenRequest type, but are passed in the request
-      const username = (request as any).username;
-      const password = (request as any).password;
+      const username = request.username;
+      const password = request.password;
 
       if (!username || !password) {
         return {
