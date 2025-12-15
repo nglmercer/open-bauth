@@ -267,7 +267,7 @@ export class BaseController<T = Record<string, unknown>> {
     const adapter = new DatabaseAdapter(database, isSQLite);
 
     // For SQLite, wrap initialization in a transaction for performance and safety
-    if (isSQLite) (database as Database).exec("BEGIN TRANSACTION;");
+    if (isSQLite) (database as Database).run("BEGIN TRANSACTION;");
 
     try {
       for (const schema of schemas) {
@@ -290,14 +290,14 @@ export class BaseController<T = Record<string, unknown>> {
         }
       }
 
-      if (isSQLite) (database as Database).exec("COMMIT;");
+      if (isSQLite) (database as Database).run("COMMIT;");
 
       return {
         success: true,
         message: `Successfully created ${schemas.length} tables`,
       };
     } catch (error: any) {
-      if (isSQLite) (database as Database).exec("ROLLBACK;");
+      if (isSQLite) (database as Database).run("ROLLBACK;");
       return {
         success: false,
         error: error.message,

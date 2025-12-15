@@ -61,7 +61,7 @@ function renameTableIfExists(
   newName: string,
 ): boolean {
   try {
-    db.exec(`ALTER TABLE "${oldName}" RENAME TO "${newName}"`);
+    db.run(`ALTER TABLE "${oldName}" RENAME TO "${newName}"`);
     console.log(`   -> Tabla legacy '${oldName}' renombrada a '${newName}'.`);
     return true;
   } catch (e) {

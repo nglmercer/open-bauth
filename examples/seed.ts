@@ -406,7 +406,7 @@ async function cleanDatabase(dbPath?: string): Promise<void> {
   ];
   for (const table of tables) {
     try {
-      db.exec(`DROP TABLE IF EXISTS ${table}`);
+      db.run(`DROP TABLE IF EXISTS ${table}`);
       console.log(`✅ Tabla ${table} eliminada`);
     } catch (error) {
       console.log(`⚠️  Error eliminando tabla ${table}:`, error);

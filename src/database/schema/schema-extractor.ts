@@ -491,6 +491,7 @@ export class SQLiteSchemaExtractor {
     sql?: string,
     inspectedType?: string | null,
     foreignKeys?: { table: string; from: string; to: string }[],
+    indexes?: { name: string; columns: string[]; unique?: boolean }[],
   ): ColumnDefinition {
     // Check for manual override
     const override = this.columnOverrides[tableName]?.[column.name] || {};
@@ -522,20 +523,41 @@ export class SQLiteSchemaExtractor {
       definition.defaultValue = column.dflt_value;
     }
 
-    // Check for UNIQUE constraints if not primary key
-    // Check for UNIQUE constraints if not primary key
-    if (!definition.primaryKey && sql) {
-      const patterns = [
-        // `"email" TEXT UNIQUE NOT NULL` - inline UNIQUE with quotes support
-        new RegExp(
-          `"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+UNIQUE`,
-          "i",
-        ),
-        // Line containing UNIQUE and column name at the beginning
-        new RegExp(`^\\s*"?${column.name}"?\\s+.*UNIQUE`, "mi"),
-      ];
+    // Check for UNIQUE constraints via indexes (more robust than parsing SQL)
+    if (!definition.primaryKey) {
+      if (indexes) {
+        const uniqueIndex = indexes.find(
+          (idx) =>
+            idx.unique &&
+            idx.columns.length === 1 &&
+            idx.columns[0] === column.name,
+        );
+        if (uniqueIndex) {
+          definition.unique = true;
+        }
+      }
 
-      definition.unique = patterns.some((pattern) => pattern.test(sql));
+      // Fallback to SQL regex if available and still not unique
+      // This is helpful for inline UNIQUE constraints that might not immediately show up in PRAGMA index_list
+      // depending on SQLite version or how it was defined
+      if (!definition.unique && sql) {
+        const patterns = [
+          // `"email" TEXT UNIQUE NOT NULL` - inline UNIQUE with quotes support
+          new RegExp(
+            `"?${column.name}"?\\s+\\w+(?:\\s*\\([^)]*\\))?\\s+UNIQUE`,
+            "i",
+          ),
+          // Line containing UNIQUE and column name at the beginning
+          new RegExp(`^\\s*"?${column.name}"?\\s+.*UNIQUE`, "mi"),
+        ];
+
+        definition.unique = patterns.some((pattern) => pattern.test(sql));
+      }
+
+      // Ensure it defaults to false if not found
+      if (definition.unique === undefined) {
+        definition.unique = false;
+      }
     }
 
     // Extract foreign key references from SQL - improved regex
@@ -603,6 +625,7 @@ export class SQLiteSchemaExtractor {
         tableInfo.sql,
         tableInfo.inspectedTypes?.[col.name],
         tableInfo.foreignKeys,
+        tableInfo.indexes, // Pass indexes derived from PRAGMA
       ),
     );
 

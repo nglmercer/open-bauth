@@ -248,8 +248,8 @@ export class BunSQLiteAdapter implements IDatabaseAdapter {
   async initialize(): Promise<void> {
     // SQLite initialization
     if (this.isSQLiteDatabase(this.config.database)) {
-      if (this.config.database.exec) {
-        this.config.database.exec("PRAGMA foreign_keys = ON");
+      if (this.config.database.run) {
+        this.config.database.run("PRAGMA foreign_keys = ON");
       }
     }
   }

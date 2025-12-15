@@ -435,7 +435,7 @@ export class DatabaseInitializer {
     const effectiveSchemas = schemas ?? buildDatabaseSchemas();
     try {
       for (const schema of effectiveSchemas) {
-        this.database.exec(`DROP TABLE IF EXISTS ${schema.tableName}`);
+        this.database.run(`DROP TABLE IF EXISTS ${schema.tableName}`);
       }
       return await this.initialize(effectiveSchemas);
     } catch (error: any) {
@@ -485,18 +485,18 @@ export class DatabaseInitializer {
     try {
       // Enable WAL mode for better performance
       if (this.enableWAL) {
-        this.database.exec("PRAGMA journal_mode = WAL");
+        this.database.run("PRAGMA journal_mode = WAL");
       }
 
       // Enable foreign key constraints
       if (this.enableForeignKeys) {
-        this.database.exec("PRAGMA foreign_keys = ON");
+        this.database.run("PRAGMA foreign_keys = ON");
       }
 
       // Other performance settings
-      this.database.exec("PRAGMA synchronous = NORMAL");
-      this.database.exec("PRAGMA cache_size = 1000");
-      this.database.exec("PRAGMA temp_store = memory");
+      this.database.run("PRAGMA synchronous = NORMAL");
+      this.database.run("PRAGMA cache_size = 1000");
+      this.database.run("PRAGMA temp_store = memory");
     } catch (error: any) {
       this.logger.warn("Error configuring database settings:", error);
     }

@@ -155,7 +155,7 @@ export class DatabaseMigrationManager {
 
     try {
       // Begin transaction for safety
-      this.database.exec("BEGIN TRANSACTION;");
+      this.database.run("BEGIN TRANSACTION;");
 
       for (const migration of migrations) {
         try {
@@ -186,19 +186,19 @@ export class DatabaseMigrationManager {
 
       // Commit transaction if all migrations succeeded
       if (result.errors.length === 0) {
-        this.database.exec("COMMIT;");
+        this.database.run("COMMIT;");
         result.success = true;
         this.logger.info(
           `Migration completed successfully. Migrated ${result.totalRecordsMigrated} records across ${result.migratedTables.length} tables.`,
         );
       } else {
-        this.database.exec("ROLLBACK;");
+        this.database.run("ROLLBACK;");
         this.logger.error(
           `Migration failed with ${result.errors.length} errors. Transaction rolled back.`,
         );
       }
     } catch (error: any) {
-      this.database.exec("ROLLBACK;");
+      this.database.run("ROLLBACK;");
       result.errors.push(`Transaction error: ${error.message}`);
       this.logger.error("Migration transaction failed:", error);
     }
@@ -299,7 +299,7 @@ export class DatabaseMigrationManager {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "_");
     const backupTableName = `${originalTableName}_backup_${timestamp}`;
 
-    this.database.exec(
+    this.database.run(
       `CREATE TABLE "${backupTableName}" AS SELECT * FROM "${originalTableName}"`,
     );
     return backupTableName;
@@ -528,7 +528,7 @@ export class DatabaseMigrationManager {
         const tableDate = new Date(timestamp.replace(/_/g, "."));
 
         if (tableDate < cutoffDate) {
-          this.database.exec(`DROP TABLE "${tableName}"`);
+          this.database.run(`DROP TABLE "${tableName}"`);
           deletedTables.push(tableName);
           this.logger.info(`Deleted old backup table: ${tableName}`);
         }
