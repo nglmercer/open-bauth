@@ -3,12 +3,70 @@ import type { ColumnDefinition, TriggerSchema } from "../base-controller";
 import { BaseController } from "../base-controller";
 
 export class SQLiteMigrationGenerator {
-  static generateMigrationSQL(diff: SchemaDiff, targetTriggers: TriggerSchema[] = []): string[] {
+  static generateMigrationSQL(diff: SchemaDiff, targetTriggers: TriggerSchema[] = [], targetViews: import("../base-controller").ViewSchema[] = []): string[] {
     const statements: string[] = [];
     const rebuiltTables = new Set<string>();
+    const modifiedTables = new Set<string>();
+
+    // Identify ALL modified tables (to detect stale views)
+    for (const tableDiff of diff.tableDiffs) {
+        modifiedTables.add(tableDiff.tableName);
+        if (tableDiff.newName) modifiedTables.add(tableDiff.newName);
+    }
+
+    // Identify Stale View Logic (Existing code 23-44) ...
+    // Identify Stale Views: Views not in diff, but depend on modified tables
+    const staleViews: ViewDiff[] = [];
+    const handledViewNames = new Set(diff.viewDiffs.map(v => v.viewName));
+
+    for (const view of targetViews) {
+        if (!handledViewNames.has(view.name)) {
+            // Check dependency
+            const referencesModifiedTable = Array.from(modifiedTables).some(tableName => {
+                const regex = new RegExp(`\\b${tableName}\\b|"${tableName}"`, 'i');
+                return regex.test(view.sql);
+            });
+
+            if (referencesModifiedTable) {
+                staleViews.push({
+                    viewName: view.name,
+                    changeType: "ALTER", // Treat as ALTER to force Drop + Create
+                    oldView: view, // Assuming it existed
+                    newView: view
+                });
+            }
+        }
+    }
+
+    // Identify Stale Triggers: Triggers not in diff, but depend on modified tables
+    // This catches cases where a trigger references a table that was renamed/altered, even if the trigger's own table wasn't rebuilt.
+    const staleTriggers: any[] = []; // TriggerDiff
+    const handledTriggerNames = new Set(diff.triggerDiffs.map(t => t.triggerName));
+
+    for (const trigger of targetTriggers) {
+        if (!handledTriggerNames.has(trigger.name)) {
+             const referencesModifiedTable = Array.from(modifiedTables).some(tableName => {
+                const regex = new RegExp(`\\b${tableName}\\b|"${tableName}"`, 'i');
+                return regex.test(trigger.sql);
+            });
+            
+            if (referencesModifiedTable) {
+                staleTriggers.push({
+                   triggerName: trigger.name,
+                   changeType: "ALTER",
+                   oldTrigger: trigger,
+                   newTrigger: trigger
+                });
+            }
+        }
+    }
+
+    // Merge explicitly changed views with stale views
+    const allViewDiffs = [...diff.viewDiffs, ...staleViews];
+    const allTriggerDiffs = [...diff.triggerDiffs, ...staleTriggers];
 
     // 0. Views to DROP (Do this first to avoid dependency issues when dropping/altering tables)
-    for (const viewDiff of diff.viewDiffs) {
+    for (const viewDiff of allViewDiffs) {
         if (viewDiff.changeType === "DROP" || viewDiff.changeType === "ALTER") {
             statements.push(`DROP VIEW IF EXISTS "${viewDiff.viewName}";`);
         }
@@ -61,7 +119,7 @@ export class SQLiteMigrationGenerator {
 
     // 6. Views to CREATE (After tables are ready)
     // Sort views by dependency to avoid creation errors
-    const viewsToCreate = diff.viewDiffs.filter(v => v.changeType === "CREATE" || v.changeType === "ALTER");
+    const viewsToCreate = allViewDiffs.filter(v => v.changeType === "CREATE" || v.changeType === "ALTER");
     const sortedViews = this.sortViewsByDependency(viewsToCreate);
 
     for (const viewDiff of sortedViews) {
@@ -70,8 +128,8 @@ export class SQLiteMigrationGenerator {
         }
     }
 
-    // 7. Triggers (Explicit Changes)
-    for (const triggerDiff of diff.triggerDiffs) {
+    // 7. Triggers (Explicit Changes + Stale)
+    for (const triggerDiff of allTriggerDiffs) {
         if (triggerDiff.changeType === "DROP" || triggerDiff.changeType === "ALTER") {
             statements.push(`DROP TRIGGER IF EXISTS "${triggerDiff.triggerName}";`);
         }
@@ -89,8 +147,9 @@ export class SQLiteMigrationGenerator {
         for (const trigger of targetTriggers) {
             // Check if this trigger belongs to a rebuilt table
             if (rebuiltTables.has(trigger.tableName)) {
-                // Check if this trigger was already handled in the diff (e.g. it was modified or explicitly dropped)
-                const isHandledInDiff = diff.triggerDiffs.some(td => td.triggerName === trigger.name);
+                // Check if this trigger was already handled in the diff (e.g. it was modified or explicitly dropped or STALE RECREATED)
+                // Note: allTriggerDiffs contains stale triggers, so they are "handled" in step 7.
+                const isHandledInDiff = allTriggerDiffs.some(td => td.triggerName === trigger.name);
                 
                 if (!isHandledInDiff) {
                     // It was NOT in the diff, meaning it should be preserved.

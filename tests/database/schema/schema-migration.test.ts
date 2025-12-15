@@ -1008,6 +1008,122 @@ describe("Schema Migration System", () => {
           
           expect(await extractor.extractTriggers()).toHaveLength(0);
       });
+      it("should recreate stale views when dependent table changes", async () => {
+          // 0. Cleanup
+          db.run("DROP VIEW IF EXISTS user_view;");
+          db.run("DROP TABLE IF EXISTS users;");
+
+          // 1. Setup Initial State
+          db.run("CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT);");
+          db.run("CREATE VIEW user_view AS SELECT name FROM users;");
+          
+          const currentSchemas = await extractor.extractAsTableSchemas();
+          const currentViews = await extractor.extractViews(); // Should get user_view
+
+          // 2. Target: Modify Table (Add column) -> Trigger View Recreation
+          const targetSchema = new Schema({
+              id: { type: String, primaryKey: true },
+              name: { type: String },
+              age: { type: Number } // Added
+          }).toTableSchema("users");
+
+          const targetView: ViewSchema = {
+              name: "user_view",
+              sql: "CREATE VIEW user_view AS SELECT name FROM users" // Unchanged SQL
+          };
+
+          // 3. Compare
+          // Note: We only pass target schema for table. View is unchanged, so not passed or passed as same.
+          // SchemaComparator usually returns empty viewDiffs if they are same.
+          const diff = SchemaComparator.compareSchemas(
+              currentSchemas, 
+              [targetSchema], 
+              {}, 
+              currentViews, 
+              [targetView]
+          );
+
+          expect(diff.viewDiffs).toHaveLength(0); // View didn't change
+          const userDiff = diff.tableDiffs.find(t => t.tableName === "users");
+          expect(userDiff).toBeDefined(); // Users table changed (ALTER)
+          expect(userDiff!.changeType).toBe("ALTER");
+
+          // 4. Generate SQL (Passing targetViews to detect staleness)
+          const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff, [], [targetView]);
+
+          // 5. Verify SQL contains Drop/Create View
+          const dropViewRaw = sql.find(s => s.includes("DROP VIEW IF EXISTS \"user_view\""));
+          const createViewRaw = sql.find(s => s.includes(targetView.sql));
+
+          expect(dropViewRaw).toBeDefined();
+          expect(createViewRaw).toBeDefined();
+          
+          // Verify Order: Drop View -> Alter Table -> Create View
+          const dropIdx = sql.indexOf(dropViewRaw!);
+          const alterIdx = sql.findIndex(s => s.includes("ALTER TABLE")); // Or rebuild
+          const createIdx = sql.indexOf(createViewRaw!);
+          
+          expect(dropIdx).toBeLessThan(alterIdx);
+          expect(alterIdx).toBeLessThan(createIdx);
+
+          // 6. Execute
+          for (const stmt of sql) db.run(stmt);
+          
+          // Verify validity
+          const checks = db.query("SELECT * FROM user_view").all();
+          expect(checks).toBeDefined();
+      });
+
+      it("should recreate stale triggers when referenced table changes", async () => {
+          // 0. Cleanup
+          db.run("DROP TRIGGER IF EXISTS audit_users;");
+          db.run("DROP TABLE IF EXISTS audit;");
+          db.run("DROP TABLE IF EXISTS users;");
+
+          // 1. Setup
+          db.run("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);");
+          db.run("CREATE TABLE audit (log TEXT);");
+          const triggerSQL = `CREATE TRIGGER audit_users AFTER INSERT ON users BEGIN INSERT INTO audit (log) VALUES ('new user'); END`;
+          db.run(triggerSQL);
+
+          const currentSchemas = await extractor.extractAsTableSchemas();
+          const currentTriggers = await extractor.extractTriggers();
+
+          // 2. Target: Modify Audit table
+          const targetUserSchema = new Schema({ id: { type: Number, primaryKey: true }, name: String }).toTableSchema("users");
+          const targetAuditSchema = new Schema({ log: String, timestamp: Date }).toTableSchema("audit"); // Added timestamp
+
+          const targetTrigger: TriggerSchema = {
+              name: "audit_users",
+              tableName: "users",
+              sql: triggerSQL
+          };
+
+          // 3. Compare (Note: Trigger is unchanged)
+          const diff = SchemaComparator.compareSchemas(
+              currentSchemas, 
+              [targetUserSchema, targetAuditSchema], 
+              {}, 
+              [], [],
+              currentTriggers,
+              [targetTrigger]
+          );
+          
+          expect(diff.triggerDiffs).toHaveLength(0);
+          const auditDiff = diff.tableDiffs.find(t => t.tableName === "audit");
+          expect(auditDiff).toBeDefined();
+          
+          // 4. Generate SQL
+          // Pass targetTrigger (2nd arg)
+          const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff, [targetTrigger]);
+          
+          // 5. Verify Stale Trigger Recreation
+          const dropTrigger = sql.find(s => s.includes("DROP TRIGGER IF EXISTS \"audit_users\""));
+          const createTrigger = sql.find(s => s.includes("CREATE TRIGGER audit_users"));
+          
+          expect(dropTrigger).toBeDefined();
+          expect(createTrigger).toBeDefined();
+      });
   });
 
   it("should preserve sqlite_sequence when rebuilding table with AUTOINCREMENT", async () => {
