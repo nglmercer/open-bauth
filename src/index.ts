@@ -18,3 +18,10 @@ export type {
   ZodObject,
   ZodTypeAny
 } from "zod";
+export * from "./database/config";
+export * from "./database/schema/schema-builder";
+export * from "./database/schema/oauth-schema-extensions";
+export * from "./database/schema/schema";
+export * from "./database/schema/schema-extractor";
+export * from "./database/schema/migration-generator";
+export * from "./database/schema/schema-comparison";

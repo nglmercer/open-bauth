@@ -1,7 +1,5 @@
 import { SchemaDiff, TableDiff, ColumnDiff, IndexDiff, ViewDiff } from "./schema-comparison";
 import type { ColumnDefinition, TriggerSchema } from "../base-controller";
-import { BaseController } from "../base-controller";
-
 export class SQLiteMigrationGenerator {
   static generateMigrationSQL(diff: SchemaDiff, targetTriggers: TriggerSchema[] = [], targetViews: import("../base-controller").ViewSchema[] = []): string[] {
     const statements: string[] = [];
@@ -177,13 +175,32 @@ export class SQLiteMigrationGenerator {
     // SQLite ADD COLUMN limitations
     for (const colDiff of tableDiff.columnDiffs) {
       if (colDiff.changeType === "CREATE" && colDiff.newColumn) {
+        
+        // Limitation A: PRIMARY KEY
+        // Cannot add a PRIMARY KEY column
+        if (colDiff.newColumn.primaryKey) return true;
+
+        // Limitation B: NOT NULL / Default
         if (
           colDiff.newColumn.notNull &&
-          colDiff.newColumn.defaultValue === undefined &&
-          !colDiff.newColumn.primaryKey
+          colDiff.newColumn.defaultValue === undefined
         ) {
           // Cannot add NOT NULL column without default to populated table in SQLite
           return true;
+        }
+        
+        // Limitation C: Non-Constant Defaults
+        // SQLite ADD COLUMN allows only constant defaults.
+        // We conservatively assume any parenthesized expression might be non-constant (e.g. (random())).
+        // Optimizing this would require SQL parsing to distinguish (1) from (random()).
+        // Safe approach: Rebuild if it looks like an expression (other than known constants).
+        const defVal = colDiff.newColumn.defaultValue;
+        if (typeof defVal === 'string') {
+             // If it starts with '(', it's possibly an expression we want to be careful with.
+             // Note: formatDefaultValue allows '('... ')' to pass through as raw SQL.
+             if (defVal.startsWith('(') && defVal.endsWith(')')) {
+                 return true; 
+             }
         }
       }
     }
@@ -256,10 +273,13 @@ export class SQLiteMigrationGenerator {
     const hasAutoIncrement = tableDiff.newSchema.columns.some(c => c.autoIncrement);
     
     if (hasAutoIncrement) {
-      statements.push(`DELETE FROM sqlite_sequence WHERE name = '${tempTableName}';`);
+      const escapedTempName = tempTableName.replace(/'/g, "''");
+      const escapedTableName = tableName.replace(/'/g, "''");
+      
+      statements.push(`DELETE FROM sqlite_sequence WHERE name = '${escapedTempName}';`);
       statements.push(`
         INSERT INTO sqlite_sequence (name, seq)
-        SELECT '${tempTableName}', seq FROM sqlite_sequence WHERE name = '${tableName}';
+        SELECT '${escapedTempName}', seq FROM sqlite_sequence WHERE name = '${escapedTableName}';
       `.trim());
     }
 
@@ -396,15 +416,26 @@ export class SQLiteMigrationGenerator {
       if (typeof value === "number") return String(value);
       if (typeof value === "string") {
            const upper = value.toUpperCase();
-           // SQL Functions
+           // SQL Constants / Functions that should be unquoted
+           // common SQLite time functions
            if (['CURRENT_TIMESTAMP', 'CURRENT_DATE', 'CURRENT_TIME'].includes(upper)) {
                return value;
            }
-           // Heuristic for functions/expressions: Wrapped in parentheses or starts with "abs(", "random(", etc.
-           // Safe bet: if it looks like func(), don't quote.
-           // Regex: ^[a-zA-Z0-9_]+\(.*\)$
-           if (/^[a-zA-Z0-9_]+\(.*\)$/.test(value) || value.startsWith('(')) {
-               return value;
+           // Wrapped expressions (e.g. (CURRENT_TIMESTAMP)) often returned by SQLite introspection
+           // Smart Heuristic for Wrapped Expressions (e.g. (CURRENT_TIMESTAMP) or (random()))
+           if (value.startsWith('(') && value.endsWith(')')) {
+               const inner = value.slice(1, -1).trim();
+               // 1. If it contains nested parentheses, it's likely a function call e.g. (scan(...))
+               if (inner.includes('(')) return value;
+               
+               // 2. If it is a known keyword (often wrapped in parens by SQLite)
+               const upper = inner.toUpperCase();
+               if (['CURRENT_TIMESTAMP', 'CURRENT_DATE', 'CURRENT_TIME', 'TRUE', 'FALSE', 'NULL'].includes(upper)) {
+                   return value;
+               }
+
+               // 3. Otherwise, it's likely just a string wrapped in parens e.g. "(pending)" -> treat as string.
+               // Fall through to quoting logic.
            }
            
            return `'${value.replace(/'/g, "''")}'`;

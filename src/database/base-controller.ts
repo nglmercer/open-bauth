@@ -1423,9 +1423,3 @@ export class BaseController<T = Record<string, unknown>> {
     return this.schemas?.[this.tableName]?.[operation];
   }
 }
-
-export * from "./config";
-export * from "./schema/schema-builder";
-export * from "./schema/oauth-schema-extensions";
-export * from "./schema/schema";
-export * from "./schema/schema-extractor";
