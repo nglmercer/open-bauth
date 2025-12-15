@@ -1,4 +1,4 @@
-import { SchemaDiff, TableDiff, ColumnDiff, IndexDiff } from "./schema-comparison";
+import { SchemaDiff, TableDiff, ColumnDiff, IndexDiff, ViewDiff } from "./schema-comparison";
 import type { ColumnDefinition, TriggerSchema } from "../base-controller";
 import { BaseController } from "../base-controller";
 
@@ -6,6 +6,13 @@ export class SQLiteMigrationGenerator {
   static generateMigrationSQL(diff: SchemaDiff, targetTriggers: TriggerSchema[] = []): string[] {
     const statements: string[] = [];
     const rebuiltTables = new Set<string>();
+
+    // 0. Views to DROP (Do this first to avoid dependency issues when dropping/altering tables)
+    for (const viewDiff of diff.viewDiffs) {
+        if (viewDiff.changeType === "DROP" || viewDiff.changeType === "ALTER") {
+            statements.push(`DROP VIEW IF EXISTS "${viewDiff.viewName}";`);
+        }
+    }
 
     // 1. Tables to DROP
     for (const tableDiff of diff.tableDiffs) {
@@ -52,15 +59,14 @@ export class SQLiteMigrationGenerator {
       }
     }
 
-    // 6. Views
-    for (const viewDiff of diff.viewDiffs) {
-        if (viewDiff.changeType === "DROP" || viewDiff.changeType === "ALTER") {
-            statements.push(`DROP VIEW IF EXISTS "${viewDiff.viewName}";`);
-        }
-        if (viewDiff.changeType === "CREATE" || viewDiff.changeType === "ALTER") {
-            if (viewDiff.newView?.sql) {
-                statements.push(viewDiff.newView.sql);
-            }
+    // 6. Views to CREATE (After tables are ready)
+    // Sort views by dependency to avoid creation errors
+    const viewsToCreate = diff.viewDiffs.filter(v => v.changeType === "CREATE" || v.changeType === "ALTER");
+    const sortedViews = this.sortViewsByDependency(viewsToCreate);
+
+    for (const viewDiff of sortedViews) {
+        if (viewDiff.newView?.sql) {
+            statements.push(viewDiff.newView.sql);
         }
     }
 
@@ -137,7 +143,7 @@ export class SQLiteMigrationGenerator {
     // So 'tableName' matches the current state of DB (new name).
     
     // Safety check: if we renamed, overrideTableName provided.
-    const currentDBTableName = (tableDiff.changeType === "RENAME" && tableDiff.newName) ? tableDiff.newName : tableDiff.tableName;
+    // const currentDBTableName = (tableDiff.changeType === "RENAME" && tableDiff.newName) ? tableDiff.newName : tableDiff.tableName;
     
     const tempTableName = `_new_${tableName}`;
     
@@ -153,7 +159,6 @@ export class SQLiteMigrationGenerator {
     });
     statements.push(createSQL);
 
-    // 2. Copy data
     // 2. Copy data
     const insertColumns: string[] = [];
     const selectColumns: string[] = [];
@@ -185,13 +190,28 @@ export class SQLiteMigrationGenerator {
         statements.push(`INSERT INTO "${tempTableName}" (${insertColumns.join(", ")}) SELECT ${selectColumns.join(", ")} FROM "${tableName}";`);
     }
 
-    // 3. Drop old table
+    // 3. Preserve sqlite_sequence (if applicable)
+    // Only if the new schema uses AUTOINCREMENT.
+    // If it does, sqlite_sequence is guaranteed to exist (created by the CREATE TABLE of _new_table).
+    // DELETE first to ensure we don't have duplicates or rely on REPLACE if name isn't unique constraint.
+    const hasAutoIncrement = tableDiff.newSchema.columns.some(c => c.autoIncrement);
+    
+    if (hasAutoIncrement) {
+      statements.push(`DELETE FROM sqlite_sequence WHERE name = '${tempTableName}';`);
+      statements.push(`
+        INSERT INTO sqlite_sequence (name, seq)
+        SELECT '${tempTableName}', seq FROM sqlite_sequence WHERE name = '${tableName}';
+      `.trim());
+    }
+
+
+    // 4. Drop old table
     statements.push(`DROP TABLE "${tableName}";`);
 
-    // 4. Rename new table
+    // 5. Rename new table
     statements.push(`ALTER TABLE "${tempTableName}" RENAME TO "${tableName}";`);
 
-    // 5. Recreate Indexes
+    // 6. Recreate Indexes
     if (tableDiff.newSchema.indexes) {
         for (const idx of tableDiff.newSchema.indexes) {
              statements.push(this.generateCreateIndexSQL(tableName, idx));
@@ -316,12 +336,55 @@ export class SQLiteMigrationGenerator {
       if (typeof value === "boolean") return value ? "1" : "0";
       if (typeof value === "number") return String(value);
       if (typeof value === "string") {
-           // Basic check for SQL functions
-           if (['CURRENT_TIMESTAMP', 'CURRENT_DATE', 'CURRENT_TIME'].includes(value.toUpperCase())) {
+           const upper = value.toUpperCase();
+           // SQL Functions
+           if (['CURRENT_TIMESTAMP', 'CURRENT_DATE', 'CURRENT_TIME'].includes(upper)) {
                return value;
            }
+           // Heuristic for functions/expressions: Wrapped in parentheses or starts with "abs(", "random(", etc.
+           // Safe bet: if it looks like func(), don't quote.
+           // Regex: ^[a-zA-Z0-9_]+\(.*\)$
+           if (/^[a-zA-Z0-9_]+\(.*\)$/.test(value) || value.startsWith('(')) {
+               return value;
+           }
+           
            return `'${value.replace(/'/g, "''")}'`;
       }
       return `'${JSON.stringify(value)}'`;
+  }
+
+  private static sortViewsByDependency(diffs: ViewDiff[]): ViewDiff[] {
+    const sorted: ViewDiff[] = [];
+    const visited = new Set<string>();
+    const temp = new Set<string>();
+
+    const visit = (diff: ViewDiff) => {
+        if (temp.has(diff.viewName)) return; // Cycle detected
+        if (visited.has(diff.viewName)) return;
+
+        temp.add(diff.viewName);
+
+        for (const otherDiff of diffs) {
+            if (diff === otherDiff) continue;
+            
+            // Check if this View depends on otherDiff (by name reference in SQL)
+            if (diff.newView) {
+                const regex = new RegExp(`\\b${otherDiff.viewName}\\b|"${otherDiff.viewName}"`, 'i');
+                if (regex.test(diff.newView.sql)) {
+                    visit(otherDiff);
+                }
+            }
+        }
+
+        temp.delete(diff.viewName);
+        visited.add(diff.viewName);
+        sorted.push(diff);
+    };
+
+    for (const diff of diffs) {
+        visit(diff);
+    }
+
+    return sorted;
   }
 }

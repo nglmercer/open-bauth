@@ -365,8 +365,17 @@ export class SchemaComparator {
     if (val1 === undefined && val2 === undefined) return true;
     
     // Normalize string representation
-    const s1 = String(val1);
-    const s2 = String(val2);
+    let s1 = String(val1);
+    let s2 = String(val2);
+
+    // Strip surrounding parentheses recursively (SQLite often adds them to expressions)
+    // E.g. "CURRENT_TIMESTAMP" vs "(CURRENT_TIMESTAMP)"
+    while (s1.startsWith('(') && s1.endsWith(')')) {
+        s1 = s1.slice(1, -1);
+    }
+    while (s2.startsWith('(') && s2.endsWith(')')) {
+        s2 = s2.slice(1, -1);
+    }
     
     if (s1 === s2) return true;
     

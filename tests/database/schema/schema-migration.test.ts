@@ -934,6 +934,44 @@ describe("Schema Migration System", () => {
           expect(finalViews[0].sql).toContain("SELECT id");
       });
 
+      it("should sort views by dependency during creation", async () => {
+          // 0. Cleanup
+          db.run("DROP VIEW IF EXISTS view_child;");
+          db.run("DROP VIEW IF EXISTS view_parent;");
+          db.run("DROP TABLE IF EXISTS base_table;");
+
+          db.run("CREATE TABLE base_table (id INTEGER);");
+
+          // 1. Define Views
+          // Parent depends on base_table. Child depends on Parent.
+          const viewParent: ViewSchema = {
+              name: "view_parent",
+              sql: "CREATE VIEW view_parent AS SELECT id FROM base_table"
+          };
+          
+          const viewChild: ViewSchema = {
+              name: "view_child",
+              sql: "CREATE VIEW view_child AS SELECT * FROM view_parent"
+          };
+
+          // 2. Submit in WRONG order (Child first)
+          // The generator should fix this.
+          const diff = SchemaComparator.compareSchemas([], [], {}, [], [viewChild, viewParent]); 
+          
+          const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+          
+          // 3. Verify SQL Order
+          const parentIndex = sql.findIndex(s => s.includes("CREATE VIEW view_parent"));
+          const childIndex = sql.findIndex(s => s.includes("CREATE VIEW view_child"));
+          
+          expect(parentIndex).toBeGreaterThan(-1);
+          expect(childIndex).toBeGreaterThan(-1);
+          expect(parentIndex).toBeLessThan(childIndex); // Parent MUST be before Child
+          
+          // 4. Execution check
+          for (const stmt of sql) db.run(stmt);
+      });
+
       it("should handle Triggers", async () => {
           // 0. Cleanup
           db.run("DROP TRIGGER IF EXISTS log_user_insert;");
@@ -970,5 +1008,49 @@ describe("Schema Migration System", () => {
           
           expect(await extractor.extractTriggers()).toHaveLength(0);
       });
+  });
+
+  it("should preserve sqlite_sequence when rebuilding table with AUTOINCREMENT", async () => {
+    // 1. Create table with AUTOINCREMENT
+    db.run(`DROP TABLE IF EXISTS seq_test`);
+    db.run(`CREATE TABLE seq_test (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT);`);
+    db.run(`INSERT INTO seq_test (name) VALUES ('A');`); // id=1
+    db.run(`INSERT INTO seq_test (name) VALUES ('B');`); // id=2
+    db.run(`DELETE FROM seq_test WHERE id = 2;`); // Delete last
+    
+    // Sequence should be 2 in SQLite (auto increment keeps the high water mark)
+    const seqBefore = db.query("SELECT seq FROM sqlite_sequence WHERE name = 'seq_test'").get() as any;
+    expect(seqBefore.seq).toBe(2);
+
+    const currentSchemas = await extractor.extractAsTableSchemas();
+
+    // 2. Rebuild table (change column type to force rebuild)
+    const targetSchema = new Schema({
+        id: { type: Number, primaryKey: true, autoIncrement: true }, // maintain autoIncrement
+        name: { type: Number } // Change Type TEXT -> NUMBER
+    }).toTableSchema("seq_test");
+
+    const diff = SchemaComparator.compareSchemas(currentSchemas, [targetSchema]);
+    const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+    
+    // Check if SQL contains sqlite_sequence logic
+    expect(sql.some(s => s.includes("sqlite_sequence"))).toBe(true);
+    expect(sql.some(s => s.includes("INSERT INTO"))).toBe(true);
+    
+    // 3. Apply
+    for (const stmt of sql) {
+        console.log("EXEC:", stmt);
+        db.run(stmt);
+    }
+    
+    // 4. Check Sequence
+    const seqAfter = db.query("SELECT seq FROM sqlite_sequence WHERE name = 'seq_test'").get() as any;
+    expect(seqAfter).toBeDefined();
+    expect(seqAfter.seq).toBe(2);
+    
+    // 5. Insert new -> should be 3
+    db.run(`INSERT INTO seq_test (name) VALUES (3);`);
+    const newRow = db.query("SELECT * FROM seq_test WHERE name = 3").get() as any;
+    expect(newRow.id).toBe(3);
   });
 });

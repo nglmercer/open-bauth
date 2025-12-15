@@ -506,6 +506,11 @@ export class Schema<T extends SchemaDefinition = SchemaDefinition> {
         sqlColumn.onDelete = value.onDelete;
       }
 
+      if (value.autoIncrement) {
+        sqlColumn.autoIncrement = true;
+      }
+
+
       if (value.default !== undefined) {
         if (value.default === Date.now) {
           sqlColumn.defaultValue = "CURRENT_TIMESTAMP";
