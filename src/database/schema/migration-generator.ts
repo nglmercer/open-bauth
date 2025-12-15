@@ -29,15 +29,62 @@ export class SQLiteMigrationGenerator {
       }
     }
 
-    // 3. Tables to ALTER
+    // 4. Tables to RENAME
     for (const tableDiff of diff.tableDiffs) {
-      if (tableDiff.changeType === "ALTER") {
+      // NOTE: If changeType is RENAME, we do this FIRST before altering validation
+      // But usually altering involves the new name, so rename first is good.
+      if (tableDiff.changeType === "RENAME" && tableDiff.newName) {
+          statements.push(`ALTER TABLE "${tableDiff.tableName}" RENAME TO "${tableDiff.newName}";`);
+          // Update tableName for subsequent operations in this loop?
+          // No, the tableDiff object still has old tableName likely, or whatever was passed.
+          // Comparator returned diff.tableName = OLD name for RENAME ops?
+          // In my comparator logic: "diff.tableName = oldName!". So we use tableDiff.tableName to identify it.
+          // Subsequent ALTERs in this loop (if any) need to use NEW name.
+          // Actually, if we have ALTERS inside a RENAME tableDiff, they target the NEW schema.
+          // So we should perform ALTERS on the NEW table name.
+          
+          // Let's mutate/shadow tableName for the next step?
+          // Or we handle it inside generateAlterTableSQL.
+      }
+    }
+
+    // 5. Tables to ALTER (including those just renamed)
+    for (const tableDiff of diff.tableDiffs) {
+      if (tableDiff.changeType === "ALTER" || tableDiff.changeType === "RENAME") {
+        const effectiveTableName = (tableDiff.changeType === "RENAME" && tableDiff.newName) 
+            ? tableDiff.newName 
+            : tableDiff.tableName;
+
         if (this.requiresTableRebuild(tableDiff)) {
-          statements.push(...this.generateRebuildTableSQL(tableDiff));
+          statements.push(...this.generateRebuildTableSQL(tableDiff, effectiveTableName));
         } else {
-          statements.push(...this.generateAlterTableSQL(tableDiff));
+          statements.push(...this.generateAlterTableSQL(tableDiff, effectiveTableName));
         }
       }
+    }
+
+    // 6. Views
+    for (const viewDiff of diff.viewDiffs) {
+        if (viewDiff.changeType === "DROP" || viewDiff.changeType === "ALTER") {
+            statements.push(`DROP VIEW IF EXISTS "${viewDiff.viewName}";`);
+        }
+        if (viewDiff.changeType === "CREATE" || viewDiff.changeType === "ALTER") {
+            if (viewDiff.newView?.sql) {
+                statements.push(viewDiff.newView.sql);
+            }
+        }
+    }
+
+    // 7. Triggers
+    for (const triggerDiff of diff.triggerDiffs) {
+        if (triggerDiff.changeType === "DROP" || triggerDiff.changeType === "ALTER") {
+            statements.push(`DROP TRIGGER IF EXISTS "${triggerDiff.triggerName}";`);
+        }
+        if (triggerDiff.changeType === "CREATE" || triggerDiff.changeType === "ALTER") {
+             if (triggerDiff.newTrigger?.sql) {
+                statements.push(triggerDiff.newTrigger.sql);
+            }
+        }
     }
 
     return statements;
@@ -67,9 +114,19 @@ export class SQLiteMigrationGenerator {
     return false;
   }
 
-  private static generateRebuildTableSQL(tableDiff: TableDiff): string[] {
+  private static generateRebuildTableSQL(tableDiff: TableDiff, overrideTableName?: string): string[] {
     const statements: string[] = [];
-    const tableName = tableDiff.tableName;
+    const tableName = overrideTableName || tableDiff.tableName; // Target table name (if renamed, this is the new name)
+    const oldTableName = tableDiff.tableName; // Always the identifier we started with (old name)
+    
+    // If it was renamed, the table ALREADY has the new name in the DB because we ran RENAME first.
+    // So both should essentially be the same for the purpose of 'rebuilding the current table'
+    // UNLESS we haven't run rename yet. But step 4 runs before step 5.
+    // So 'tableName' matches the current state of DB (new name).
+    
+    // Safety check: if we renamed, overrideTableName provided.
+    const currentDBTableName = (tableDiff.changeType === "RENAME" && tableDiff.newName) ? tableDiff.newName : tableDiff.tableName;
+    
     const tempTableName = `_new_${tableName}`;
     
     if (!tableDiff.newSchema || !tableDiff.oldSchema) {
@@ -113,9 +170,9 @@ export class SQLiteMigrationGenerator {
     return statements;
   }
 
-  private static generateAlterTableSQL(tableDiff: TableDiff): string[] {
+  private static generateAlterTableSQL(tableDiff: TableDiff, overrideTableName?: string): string[] {
     const statements: string[] = [];
-    const tableName = tableDiff.tableName;
+    const tableName = overrideTableName || tableDiff.tableName;
 
     // Indexes changes
     for (const indexDiff of tableDiff.indexDiffs) {
@@ -133,6 +190,19 @@ export class SQLiteMigrationGenerator {
     for (const colDiff of tableDiff.columnDiffs) {
         if (colDiff.changeType === "DROP") {
             statements.push(`ALTER TABLE "${tableName}" DROP COLUMN "${colDiff.columnName}";`);
+        }
+    }
+
+
+
+    // Handle Rename Columns
+    for (const colDiff of tableDiff.columnDiffs) {
+        if (colDiff.changeType === "RENAME" && colDiff.oldColumn && colDiff.newColumn) {
+            statements.push(`ALTER TABLE "${tableName}" RENAME COLUMN "${colDiff.oldColumn.name}" TO "${colDiff.newColumn.name}";`);
+            
+            // If there are other changes (type/constraints) to this column, they might need a rebuild or separate handling.
+            // But 'diff' usually captures changes relative to the NEW column name.
+            // SQLite Rename Column is metadata only usually.
         }
     }
 

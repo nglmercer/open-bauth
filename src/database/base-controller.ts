@@ -129,6 +129,19 @@ export interface TableSchema {
     columns: string[];
     unique?: boolean;
   }[];
+
+}
+export interface TriggerSchema {
+  name: string;
+  tableName: string;
+  sql: string; // Full CREATE TRIGGER statement
+  timing?: "BEFORE" | "AFTER" | "INSTEAD OF";
+  event?: "INSERT" | "UPDATE" | "DELETE";
+}
+
+export interface ViewSchema {
+  name: string;
+  sql: string; // Full CREATE VIEW statement
 }
 
 export interface DatabaseConnection {

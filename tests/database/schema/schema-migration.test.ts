@@ -4,11 +4,13 @@ import { SQLiteSchemaExtractor } from "../../../src/database/schema/schema-extra
 import { SchemaComparator } from "../../../src/database/schema/schema-comparison";
 import { SQLiteMigrationGenerator } from "../../../src/database/schema/migration-generator";
 import { DatabaseInitializer } from "../../../src/database/database-initializer";
+import { MigrationManager } from "../../../src/database/schema/migration-manager";
 import { Schema } from "../../../src/database/schema/schema";
 import type { TableSchema } from "../../../src/database/base-controller";
 import { SchemaRegistry } from "../../../src/database/database-initializer";
 import { getOAuthSchemas } from "../../../src/database/schema/oauth-schema-extensions";
 import { BaseController } from "../../../src/database/base-controller";
+import type { ViewSchema, TriggerSchema } from "../../../src/database/base-controller";
 const newschemas = new Schema({
     id: { type: String, primaryKey: true },
     name: { type: String, required: true }
@@ -595,5 +597,271 @@ describe("Schema Migration System", () => {
         expect(finalTables).not.toContain("series");
         expect(finalTables).toContain("shows");
     });
+  });
+
+  describe("Robustness and Error Handling", () => {
+      it("should fail when rebuilding a table referenced by foreign keys (Standard Execution)", async () => {
+        // 1. Setup with FKs enforced
+        db.run("PRAGMA foreign_keys = ON;");
+        
+        // Clean slate
+        db.run("DROP TABLE IF EXISTS posts");
+        db.run("DROP TABLE IF EXISTS users");
+
+        // Parent table
+        db.run("CREATE TABLE users (id TEXT PRIMARY KEY, name INTEGER);"); 
+        db.run("INSERT INTO users (id, name) VALUES ('u1', 123);");
+        
+        // Child table
+        db.run("CREATE TABLE posts (id TEXT PRIMARY KEY, user_id TEXT REFERENCES users(id));");
+        db.run("INSERT INTO posts (id, user_id) VALUES ('p1', 'u1');");
+
+        const currentSchemas = await extractor.extractAsTableSchemas();
+        const postsSchema = currentSchemas.find(t => t.tableName === "posts");
+        if (!postsSchema) throw new Error("Posts schema not found in extraction!");
+
+        // 2. Target: Change users.name type (Trigger Rebuild)
+        // We must include posts in target to avoid dropping it
+        const targetSchema = new Schema({
+            id: { type: String, primaryKey: true },
+            name: { type: String } 
+        }).toTableSchema("users");
+
+        const diff = SchemaComparator.compareSchemas(currentSchemas, [targetSchema, postsSchema]);
+        const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+
+        // 3. Expect standard execution to fail
+        expect(() => {
+            db.transaction(() => {
+                for (const stmt of sql) db.run(stmt);
+            })();
+        }).toThrow(/FOREIGN KEY constraint failed/);
+      });
+
+      it("should successfully rebuild table with foreign keys using MigrationManager", async () => {
+        // 1. Setup with FKs enforced
+        db.run("PRAGMA foreign_keys = ON;");
+        
+        db.run("DROP TABLE IF EXISTS posts");
+        db.run("DROP TABLE IF EXISTS users");
+
+        db.run("CREATE TABLE users (id TEXT PRIMARY KEY, name INTEGER);"); 
+        db.run("INSERT INTO users (id, name) VALUES ('u1', 123);");
+        db.run("CREATE TABLE posts (id TEXT PRIMARY KEY, user_id TEXT REFERENCES users(id));");
+        db.run("INSERT INTO posts (id, user_id) VALUES ('p1', 'u1');");
+
+        const currentSchemas = await extractor.extractAsTableSchemas();
+        const postsSchema = currentSchemas.find(t => t.tableName === "posts");
+        if (!postsSchema) throw new Error("Posts schema not found in extraction!");
+
+        // 2. Target: Change users.name type (Trigger Rebuild)
+        const targetSchema = new Schema({
+            id: { type: String, primaryKey: true },
+            name: { type: String } 
+        }).toTableSchema("users");
+
+        const diff = SchemaComparator.compareSchemas(currentSchemas, [targetSchema, postsSchema]);
+        const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+
+        // 3. Execute using Manager
+        expect(() => {
+            MigrationManager.runMigrations(db, sql);
+        }).not.toThrow();
+
+        // 4. Verify integrity
+        const row = db.query("SELECT * FROM users WHERE id = 'u1'").get() as any;
+        expect(String(row.name)).toBe("123");
+        
+        // Verify FK still enforces (try invalid insert)
+        expect(() => {
+            db.run("INSERT INTO posts (id, user_id) VALUES ('p2', 'invalid');");
+        }).toThrow(/FOREIGN KEY constraint failed/);
+      });
+
+      it("should demonstrate data loss when renaming columns (Warning Test)", async () => {
+        // 1. Setup
+        db.run("DROP TABLE IF EXISTS users");
+        db.run("CREATE TABLE users (id TEXT PRIMARY KEY, fullname TEXT);");
+        db.run("INSERT INTO users (id, fullname) VALUES ('1', 'John Doe');");
+
+        const currentSchemas = await extractor.extractAsTableSchemas();
+
+        // 2. Target: Rename 'fullname' to 'name'
+        const targetSchema = new Schema({
+            id: { type: String, primaryKey: true },
+            name: { type: String }
+        }).toTableSchema("users");
+
+        const diff = SchemaComparator.compareSchemas(currentSchemas, [targetSchema]);
+        const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+
+        // 3. Migrate
+        MigrationManager.runMigrations(db, sql);
+
+        // 4. Verify 'name' is empty (Data Loss)
+        const row = db.query("SELECT * FROM users").get() as any;
+        expect(row.name).toBeNull(); 
+        expect(row.fullname).toBeUndefined();
+      });
+  });
+
+  describe("Advanced Features: Renames, Views, Triggers", () => {
+      it("should generate SQL for Table Rename when provided with mapping", async () => {
+          // 0. Cleanup
+          db.run("DROP TABLE IF EXISTS old_users;");
+          db.run("DROP TABLE IF EXISTS new_users;");
+
+          // 1. Setup
+          db.run("CREATE TABLE old_users (id TEXT PRIMARY KEY, name TEXT);");
+          const currentSchemas = await extractor.extractAsTableSchemas();
+          
+          // 2. Target with NEW name
+          const targetSchema = new Schema({
+              id: { type: String, primaryKey: true },
+              name: { type: String }
+          }).toTableSchema("new_users");
+          
+          // 3. Compare with Rename Hint
+          const diff = SchemaComparator.compareSchemas(
+              currentSchemas, 
+              [targetSchema],
+              { renames: { tables: { "old_users": "new_users" } } }
+          );
+          
+          const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+          
+          // 4. Verify
+          expect(diff.tableDiffs.find(t => t.tableName === "old_users")?.changeType).toBe("RENAME");
+          
+          const renameSql = sql.find(s => s.includes('ALTER TABLE "old_users" RENAME TO "new_users"'));
+          expect(renameSql).toBeDefined();
+          
+          // Execution
+          for (const stmt of sql) db.run(stmt);
+          const tables = await extractor.getAllTableNames();
+          expect(tables).toContain("new_users");
+          expect(tables).not.toContain("old_users");
+      });
+
+      it("should generate SQL for Column Rename when provided with mapping", async () => {
+          // 0. Cleanup
+          db.run("DROP TABLE IF EXISTS users;");
+
+          // 1. Setup
+          db.run("CREATE TABLE users (id TEXT PRIMARY KEY, fullname TEXT);");
+          const currentSchemas = await extractor.extractAsTableSchemas();
+          
+          // 2. Target with NEW column name
+          const targetSchema = new Schema({
+              id: { type: String, primaryKey: true },
+              name: { type: String }
+          }).toTableSchema("users");
+          
+          // 3. Compare with Rename Hint
+          const diff = SchemaComparator.compareSchemas(
+              currentSchemas, 
+              [targetSchema],
+              { 
+                  renames: { 
+                      columns: { 
+                          "users": { "fullname": "name" } 
+                      } 
+                  } 
+              }
+          );
+          
+          const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+          
+          // 4. Verify
+          const renameStmt = sql.find(s => s.includes("RENAME COLUMN"));
+          expect(renameStmt).toBeDefined();
+          expect(renameStmt).toContain('RENAME COLUMN "fullname" TO "name"');
+          
+          // Execution
+          for (const stmt of sql) db.run(stmt);
+          const schema = await extractor.extractTableSchema("users");
+          expect(schema!.tableSchema.columns.find(c => c.name === "name")).toBeDefined();
+          expect(schema!.tableSchema.columns.find(c => c.name === "fullname")).toBeUndefined();
+      });
+
+      it("should handle Views creation and updates", async () => {
+          // 0. Cleanup
+          db.run("DROP VIEW IF EXISTS active_users;");
+          db.run("DROP TABLE IF EXISTS users;");
+
+          // 1. Target View
+          const targetView: ViewSchema = {
+              name: "active_users",
+              sql: "CREATE VIEW active_users AS SELECT * FROM users WHERE active = 1"
+          };
+          
+          db.run("CREATE TABLE users (id TEXT, active INTEGER);"); // Dependency
+          
+          // 2. Initial Diff (Create)
+          const diffCreate = SchemaComparator.compareSchemas([], [], {}, [], [targetView]);
+          const sqlCreate = SQLiteMigrationGenerator.generateMigrationSQL(diffCreate);
+          
+          expect(sqlCreate).toContain(targetView.sql);
+          for (const stmt of sqlCreate) db.run(stmt);
+          
+          // 3. Verify Creation
+          const currentViews = await extractor.extractViews();
+          expect(currentViews).toHaveLength(1);
+          expect(currentViews[0].name).toBe("active_users");
+          
+          // 4. Update View
+          const updatedView: ViewSchema = {
+              name: "active_users",
+              sql: "CREATE VIEW active_users AS SELECT id FROM users WHERE active = 1" // Changed * to id
+          };
+          
+          const diffUpdate = SchemaComparator.compareSchemas([], [], {}, currentViews, [updatedView]);
+          const sqlUpdate = SQLiteMigrationGenerator.generateMigrationSQL(diffUpdate);
+          
+          expect(sqlUpdate.some(s => s.includes("DROP VIEW"))).toBe(true);
+          expect(sqlUpdate.some(s => s.includes("SELECT id"))).toBe(true);
+          
+          for (const stmt of sqlUpdate) db.run(stmt);
+          
+          const finalViews = await extractor.extractViews();
+          expect(finalViews[0].sql).toContain("SELECT id");
+      });
+
+      it("should handle Triggers", async () => {
+          // 0. Cleanup
+          db.run("DROP TRIGGER IF EXISTS log_user_insert;");
+          db.run("DROP TABLE IF EXISTS logs;");
+          db.run("DROP TABLE IF EXISTS users;");
+
+          db.run("CREATE TABLE logs (id INTEGER PRIMARY KEY, msg TEXT);");
+          db.run("CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT);"); // Trigger target
+          
+          const targetTrigger: TriggerSchema = {
+              name: "log_user_insert",
+              tableName: "users",
+              sql: `CREATE TRIGGER log_user_insert AFTER INSERT ON users BEGIN INSERT INTO logs (msg) VALUES ('new user'); END`
+          };
+          
+          // Create
+          const diff = SchemaComparator.compareSchemas([], [], {}, [], [], [], [targetTrigger]);
+          const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+          
+          expect(sql[0]).toBe(targetTrigger.sql);
+          for (const stmt of sql) db.run(stmt);
+          
+          // Verify
+          const currentTriggers = await extractor.extractTriggers();
+          expect(currentTriggers).toHaveLength(1);
+          expect(currentTriggers[0].name).toBe("log_user_insert");
+          
+          // Drop
+          const diffDrop = SchemaComparator.compareSchemas([], [], {}, [], [], currentTriggers, []);
+          const sqlDrop = SQLiteMigrationGenerator.generateMigrationSQL(diffDrop);
+          
+          expect(sqlDrop[0]).toContain("DROP TRIGGER");
+          for (const stmt of sqlDrop) db.run(stmt);
+          
+          expect(await extractor.extractTriggers()).toHaveLength(0);
+      });
   });
 });

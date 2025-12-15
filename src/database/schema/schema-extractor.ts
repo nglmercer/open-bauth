@@ -5,6 +5,8 @@ import type {
   TableSchema,
   ColumnDefinition,
   ColumnType,
+  TriggerSchema,
+  ViewSchema,
 } from "../base-controller";
 import type { IDatabaseAdapter, DatabaseAdapterConfig } from "../adapter";
 import { AdapterFactory } from "../adapter";
@@ -862,6 +864,38 @@ export class SQLiteSchemaExtractor {
     }
 
     return field;
+  }
+
+
+  /**
+   * Extracts all Views
+   */
+  async extractViews(): Promise<ViewSchema[]> {
+      const connection = this.adapter.getConnection();
+      const result = await connection.query(
+          `SELECT name, sql FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`
+      ).all();
+      
+      return Array.isArray(result) ? (result as { name: string, sql: string }[]).map(r => ({
+          name: r.name,
+          sql: r.sql
+      })) : [];
+  }
+
+  /**
+   * Extracts all Triggers
+   */
+  async extractTriggers(): Promise<TriggerSchema[]> {
+      const connection = this.adapter.getConnection();
+      const result = await connection.query(
+          `SELECT name, tbl_name as tableName, sql FROM sqlite_master WHERE type='trigger' AND name NOT LIKE 'sqlite_%'`
+      ).all();
+      
+      return Array.isArray(result) ? (result as { name: string, tableName: string, sql: string }[]).map(r => ({
+          name: r.name,
+          tableName: r.tableName,
+          sql: r.sql
+      })) : [];
   }
 }
 
