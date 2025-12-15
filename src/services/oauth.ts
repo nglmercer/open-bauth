@@ -30,7 +30,7 @@ import {
 import { SecurityService } from "./security";
 import type { IJWTServiceExtended } from "../types/jwt-service";
 import { AuthService } from "./auth";
-import { ServiceErrors } from "./constants";
+import { ServiceErrors,errorParser } from "./constants";
 
 /**
  * Configuration options for the OAuthService.
@@ -147,8 +147,7 @@ export class OAuthService {
     });
 
     if (!result.success || !result.data) {
-      const errorMessage = typeof result.error === 'string' ? result.error : (result.error as any)?.message || 'Unknown error';
-      throw new Error(`${ServiceErrors.CLIENT_CREATE_FAILED}: ${errorMessage}`);
+      throw errorParser(result.error,ServiceErrors.CLIENT_CREATE_FAILED);
     }
 
     return this.mapClientFromDB(result.data);
@@ -159,7 +158,7 @@ export class OAuthService {
     data: UpdateOAuthClientData,
   ): Promise<OAuthClient> {
     // Hash client secret if provided
-    let updateData: any = { ...data };
+    let updateData: Record<string, any> = { ...data };
     if ((data).client_secret) {
       const { hash, salt } = await this.securityService.hashPassword(
         (data).client_secret,
@@ -169,15 +168,15 @@ export class OAuthService {
     }
 
     if (data.grant_types) {
-      updateData.grant_types = JSON.stringify(data.grant_types) as any;
+      updateData.grant_types = JSON.stringify(data.grant_types);
     }
 
     if (data.response_types) {
-      updateData.response_types = JSON.stringify(data.response_types) as any;
+      updateData.response_types = JSON.stringify(data.response_types);
     }
 
     if (data.redirect_uris) {
-      updateData.redirect_uris = JSON.stringify(data.redirect_uris) as any;
+      updateData.redirect_uris = JSON.stringify(data.redirect_uris);
     }
 
     const result = await this.clientController.update(id, updateData);
@@ -458,10 +457,10 @@ export class OAuthService {
         error_description: ServiceErrors.USER_AUTH_REQUIRED,
         state: request.state,
       };
-    } catch (error: any) {
+    } catch (error) {
       return {
         error: OAuthErrorType.SERVER_ERROR,
-        error_description: error.message,
+        error_description: errorParser(error).message,
         state: request.state,
       };
     }
@@ -542,10 +541,10 @@ export class OAuthService {
             expires_in: 0,
           };
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         error: OAuthErrorType.SERVER_ERROR,
-        error_description: error.message,
+        error_description: errorParser(error).message,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -912,10 +911,10 @@ export class OAuthService {
         refresh_token: refreshToken.token,
         scope: request.scope || client.scope,
       };
-    } catch (error: any) {
+    } catch (error) {
       return {
         error: OAuthErrorType.SERVER_ERROR,
-        error_description: error.message,
+        error_description: errorParser(error).message,
         access_token: "",
         token_type: "Bearer",
         expires_in: 0,
@@ -1046,7 +1045,7 @@ export class OAuthService {
       }
 
       return { active: false };
-    } catch (error: any) {
+    } catch (error) {
       return { active: false };
     }
   }
@@ -1074,8 +1073,8 @@ export class OAuthService {
       }
 
       return { success: true }; // Always return success for revocation per RFC 7009
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error) {
+      return { success: false, error: errorParser(error).message };
     }
   }
 }

@@ -47,7 +47,7 @@ const completeCustomConfig = {
         {
           name: "color",
           type: "TEXT" as const,
-          defaultValue: "#007bff" as any,
+          defaultValue: "#007bff",
         },
       ],
     },

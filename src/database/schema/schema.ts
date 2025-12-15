@@ -79,6 +79,7 @@ export interface SchemaTypeOptions {
   };
   check?: string;
   onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+  autoIncrement?: boolean;
 }
 
 export type SchemaField =

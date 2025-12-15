@@ -10,6 +10,41 @@ import type { IDatabaseAdapter, DatabaseAdapterConfig } from "../adapter";
 import { AdapterFactory } from "../adapter";
 import { Schema } from "./schema";
 import { mapSqlTypeToZodType } from "./zod-mapping";
+import type { SchemaField, SchemaDefinition, SchemaTypeOptions } from "./schema";
+
+/**
+ * Interface for SQLite PRAGMA index_list result
+ */
+interface SQLiteIndexListEntry {
+  seq: number;
+  name: string;
+  unique: number;
+  origin: string;
+  partial: number;
+}
+
+/**
+ * Interface for SQLite PRAGMA index_info result
+ */
+interface SQLiteIndexInfoEntry {
+  seqno: number;
+  cid: number;
+  name: string;
+}
+
+/**
+ * Interface for SQLite PRAGMA foreign_key_list result
+ */
+interface SQLiteForeignKeyEntry {
+  id: number;
+  seq: number;
+  table: string;
+  from: string;
+  to: string;
+  on_update: string;
+  on_delete: string;
+  match: string;
+}
 
 /**
  * Interface for extracted SQLite column info
@@ -19,7 +54,7 @@ export interface SQLiteColumnInfo {
   name: string;
   type: string;
   notnull: number;
-  dflt_value: any;
+  dflt_value: string | number | null;
   pk: number;
 }
 
@@ -40,7 +75,7 @@ export interface TableInfo {
  */
 export interface GeneratedZodSchema {
   tableName: string;
-  schema: z.ZodObject<any>;
+  schema: z.ZodObject<z.ZodRawShape>;
   tableSchema: TableSchema;
 }
 
@@ -69,8 +104,8 @@ export class SQLiteSchemaExtractor {
   /**
    * Checks if parameter is a DatabaseAdapterConfig
    */
-  private isAdapterConfig(db: any): db is DatabaseAdapterConfig {
-    return typeof db === "object" && "database" in db;
+  private isAdapterConfig(db: unknown): db is DatabaseAdapterConfig {
+    return typeof db === "object" && db !== null && "database" in db;
   }
 
   /**
@@ -100,7 +135,7 @@ export class SQLiteSchemaExtractor {
         )
         .all();
 
-      return Array.isArray(result) ? result.map((row: any) => row.name) : [];
+      return Array.isArray(result) ? (result as { name: string }[]).map((row) => row.name) : [];
     } catch (error) {
       console.error("Error getting table names:", error);
       return [];
@@ -158,7 +193,7 @@ export class SQLiteSchemaExtractor {
         )
         .get(tableName);
 
-      const sql = (sqlResult as any)?.sql || "";
+      const sql = (sqlResult as { sql: string })?.sql || "";
 
       // Perform data inspection for potential date columns
       const inspectedTypes: Record<string, string> = {};
@@ -269,24 +304,24 @@ export class SQLiteSchemaExtractor {
       const indexes: { name: string; columns: string[]; unique?: boolean }[] =
         [];
 
-      for (const idx of indexList) {
+      for (const idx of indexList as SQLiteIndexListEntry[]) {
         // Skip auto-indexes (primary keys, unique constraints created by CREATE TABLE)
         // actually we WANT unique constraints, but maybe not PKs if they are implicit
         // origin 'pk' means primary key. 'u' means unique constraint. 'c' means create index.
-        if ((idx as any).origin === "pk") continue;
+        if (idx.origin === "pk") continue;
 
         const indexInfo = await connection
-          .query(`PRAGMA index_info("${(idx as any).name}")`)
+          .query(`PRAGMA index_info("${idx.name}")`)
           .all();
         if (Array.isArray(indexInfo)) {
-          const columns = indexInfo
-            .sort((a: any, b: any) => a.seqno - b.seqno)
-            .map((col: any) => col.name);
+          const columns = (indexInfo as SQLiteIndexInfoEntry[])
+            .sort((a, b) => a.seqno - b.seqno)
+            .map((col) => col.name);
 
           indexes.push({
-            name: (idx as any).name,
+            name: idx.name,
             columns,
-            unique: (idx as any).unique === 1,
+            unique: idx.unique === 1,
           });
         }
       }
@@ -311,7 +346,7 @@ export class SQLiteSchemaExtractor {
 
       if (!Array.isArray(fkList)) return [];
 
-      return fkList.map((fk: any) => ({
+      return (fkList as SQLiteForeignKeyEntry[]).map((fk) => ({
         table: fk.table,
         from: fk.from,
         to: fk.to,
@@ -350,7 +385,7 @@ export class SQLiteSchemaExtractor {
       let dateCount = 0;
 
       for (const row of result) {
-        const val = (row as any).val;
+        const val = (row as { val: unknown }).val;
         if (typeof val === "string") {
           // Use Date.parse to check if it's a valid date string
           const timestamp = Date.parse(val);
@@ -389,7 +424,7 @@ export class SQLiteSchemaExtractor {
   private mapSQLiteTypeToColumnType(
     sqliteType: string,
     columnName?: string,
-    defaultValue?: any,
+    defaultValue?: unknown,
     inspectedType?: string | null,
   ): ColumnType {
     const type = sqliteType.toUpperCase();
@@ -653,7 +688,7 @@ export class SQLiteSchemaExtractor {
   /**
    * Generates a complete Zod schema for a table
    */
-  generateZodSchema(tableSchema: TableSchema): z.ZodObject<any> {
+  generateZodSchema(tableSchema: TableSchema): z.ZodObject<z.ZodRawShape> {
     const schemaFields: Record<string, z.ZodTypeAny> = {};
 
     for (const column of tableSchema.columns) {
@@ -752,8 +787,10 @@ export class SQLiteSchemaExtractor {
   /**
    * Converts TableSchema to SchemaDefinition
    */
-  private convertTableSchemaToSchemaDefinition(tableSchema: TableSchema): any {
-    const definition: any = {};
+  private convertTableSchemaToSchemaDefinition(
+    tableSchema: TableSchema,
+  ): SchemaDefinition {
+    const definition: SchemaDefinition = {};
 
     for (const column of tableSchema.columns) {
       definition[column.name] =
@@ -766,8 +803,11 @@ export class SQLiteSchemaExtractor {
   /**
    * Converts ColumnDefinition to SchemaField
    */
-  private convertColumnDefinitionToSchemaField(column: ColumnDefinition): any {
-    const field: any = {
+  private convertColumnDefinitionToSchemaField(
+    column: ColumnDefinition,
+  ): SchemaField {
+    // We are constructing a SchemaTypeOptions object which is a valid SchemaField
+    const field: SchemaTypeOptions = {
       type: column.type, // Use string type instead of constructor
     };
 

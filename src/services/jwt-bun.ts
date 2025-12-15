@@ -548,7 +548,7 @@ export class JWTServiceBun implements IJWTServiceExtended {
       const now = Math.floor(Date.now() / 1000);
       // Calcular nueva expiración (menor entre 7 días o lo que le quedaba al anterior)
       const sevenDays = this.parseExpirationTime("7d");
-      const remainingOld = (oldPayload as any).exp - now;
+      const remainingOld = oldPayload.exp - now;
       
       const newExpirationTime = Math.min(sevenDays, remainingOld);
 
