@@ -24,7 +24,6 @@ export class AuthService {
     role_id: string;
   }>;
   private jwtService: IJWTServiceExtended;
-
   constructor(dbInitializer: DatabaseInitializer, jwtService: IJWTServiceExtended) {
     // Use configured table names instead of hardcoded ones
     this.userController = dbInitializer.createControllerByKey<User>("users");
@@ -32,7 +31,14 @@ export class AuthService {
     this.userRoleController = dbInitializer.createControllerByKey("userRoles");
     this.jwtService = jwtService;
   }
-
+  public getServices(){
+    return {
+      userController: this.userController,
+      roleController: this.roleController,
+      userRoleController: this.userRoleController,
+      jwtService: this.jwtService,
+    };
+  }
   private getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
   }

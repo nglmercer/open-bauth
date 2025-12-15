@@ -2,9 +2,9 @@
 // Versión optimizada usando Bun.CryptoHasher para mejor rendimiento
 
 import type { JWTPayload, User } from "../types/auth";
-import type { OAuthJWTPayload } from "../types/oauth";
 import type { IJWTServiceExtended } from "../types/jwt-service";
-import { ServiceErrors } from "./constants";
+import { ServiceErrors,errorParser } from "./constants";
+
 
 /**
  * JWT with Bun.CryptoHasher
@@ -15,12 +15,14 @@ export class JWTServiceBun implements IJWTServiceExtended {
   private issuer: string;
   private audience: string;
   private dpopNonceCache: Map<string, number> = new Map();
+  private emailVerication: boolean;
 
   constructor(
     secret: string,
     expiresIn: string = "24h",
     issuer: string = "http://localhost",
     audience: string = "audience",
+    emailVerication: boolean = true,
   ) {
     if (!secret) {
       throw new Error(ServiceErrors.JWT_SECRET_REQUIRED);
@@ -29,6 +31,7 @@ export class JWTServiceBun implements IJWTServiceExtended {
     this.expiresIn = expiresIn;
     this.issuer = issuer;
     this.audience = audience;
+    this.emailVerication = emailVerication;
   }
 
   /**
@@ -66,16 +69,16 @@ export class JWTServiceBun implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error generating JWT token:", error);
-      throw new Error(ServiceErrors.TOKEN_GEN_FAILED);
+      throw errorParser(error, ServiceErrors.TOKEN_GEN_FAILED);
     }
   }
 
   /**
    * Generate token with custom payload (optimized version)
    */
-  async generateTokenWithPayload(payload: any): Promise<string> {
+  async generateTokenWithPayload(payload: Record<string, any>): Promise<string> {
     try {
       const now = Math.floor(Date.now() / 1000);
       const expirationTime = this.parseExpirationTime(this.expiresIn);
@@ -101,9 +104,9 @@ export class JWTServiceBun implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error generating JWT token:", error);
-      throw new Error(ServiceErrors.TOKEN_GEN_FAILED);
+      throw errorParser(error, ServiceErrors.TOKEN_GEN_FAILED);
     }
   }
 
@@ -129,8 +132,8 @@ export class JWTServiceBun implements IJWTServiceExtended {
         nonce: nonce,
         name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
         email: user.email,
-        email_verified: true,
-        picture: (user as any).avatar_url || undefined,
+        email_verified: this.emailVerication,
+        picture: (user as Record<string, any>).avatar_url || undefined,
       };
 
       const header = {
@@ -146,9 +149,9 @@ export class JWTServiceBun implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error generating ID token:", error);
-      throw new Error(ServiceErrors.ID_TOKEN_GEN_FAILED);
+      throw errorParser(error, ServiceErrors.ID_TOKEN_GEN_FAILED);
     }
   }
   createSignature(data: string){
@@ -194,8 +197,8 @@ export class JWTServiceBun implements IJWTServiceExtended {
       }
 
       return payload;
-    } catch (error: any) {
-      throw new Error(`Invalid token: ${error.message}`);
+    } catch (error: unknown) {
+      throw errorParser(error, 'Invalid token');
     }
   }
 
@@ -284,7 +287,7 @@ export class JWTServiceBun implements IJWTServiceExtended {
       const now = Math.floor(Date.now() / 1000);
 
       return payload.exp ? payload.exp < now : false;
-    } catch (error: any) {
+    } catch (error) {
       return true;
     }
   }
@@ -305,7 +308,7 @@ export class JWTServiceBun implements IJWTServiceExtended {
 
       const remaining = payload.exp - now;
       return Math.max(0, remaining);
-    } catch (error: any) {
+    } catch (error) {
       return 0;
     }
   }
@@ -318,7 +321,7 @@ export class JWTServiceBun implements IJWTServiceExtended {
     httpUri: string,
   ): Promise<{
     valid: boolean;
-    payload?: any;
+    payload?: Record<string, any>;
     error?: string;
     jti?: string;
   }> {
@@ -388,8 +391,8 @@ export class JWTServiceBun implements IJWTServiceExtended {
       }
 
       return { valid: true, payload, jti: payload.jti };
-    } catch (error: any) {
-      return { valid: false, error: error.message };
+    } catch (error) {
+      return { valid: false, error: errorParser(error).message };
     }
   }
   /**
@@ -440,9 +443,9 @@ export class JWTServiceBun implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error generating refresh token:", error);
-      throw new Error(ServiceErrors.REFRESH_TOKEN_GEN_FAILED);
+      throw errorParser(error, ServiceErrors.REFRESH_TOKEN_GEN_FAILED);
     }
   }
 
@@ -493,8 +496,8 @@ export class JWTServiceBun implements IJWTServiceExtended {
       }
 
       return payload.userId;
-    } catch (error: any) {
-      throw new Error(`Invalid refresh token: ${error.message}`);
+    } catch (error: unknown) {
+      throw errorParser(error, 'Invalid refresh token');
     }
   }
 
@@ -526,8 +529,8 @@ export class JWTServiceBun implements IJWTServiceExtended {
        if (!payload.userId) throw new Error(ServiceErrors.REFRESH_TOKEN_MISSING_USER);
 
        return payload;
-    } catch (error: any) {
-      throw new Error(`Invalid refresh token: ${error.message}`);
+    } catch (error: unknown) {
+      throw errorParser(error, 'Invalid refresh token');
     }
   }
 
@@ -570,9 +573,9 @@ export class JWTServiceBun implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error rotating refresh token:", error);
-      throw new Error(ServiceErrors.REFRESH_TOKEN_ROTATE_FAILED);
+      throw errorParser(error, ServiceErrors.REFRESH_TOKEN_ROTATE_FAILED);
     }
   }
 }

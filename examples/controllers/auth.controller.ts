@@ -30,9 +30,9 @@ export class AuthController {
     }
 
     // Generate refresh token
-    const jwtService = (this.authService as any).jwtService;
-    const refreshToken = await jwtService.generateRefreshToken(
-      result.user?.id || "",
+    const jwtService = this.authService.getServices().jwtService;
+    const refreshToken = await jwtService.generateRefreshToken?.(
+      result.user?.id!,
     );
 
     return c.json(
@@ -68,9 +68,9 @@ export class AuthController {
     }
 
     // Generate refresh token
-    const jwtService = (this.authService as any).jwtService;
-    const refreshToken = await jwtService.generateRefreshToken(
-      result.user?.id || "",
+    const jwtService = this.authService.getServices().jwtService;
+    const refreshToken = await jwtService.generateRefreshToken?.(
+      result.user?.id!,
     );
 
     return c.json({
@@ -112,10 +112,10 @@ export class AuthController {
       }
 
       // Get JWT service from auth service (we need to access it)
-      const jwtService = (this.authService as any).jwtService;
+      const jwtService = this.authService.getServices().jwtService;
 
       // Verify refresh token and get user ID
-      const userId = await jwtService.verifyRefreshToken(refreshToken);
+      const userId = await jwtService.verifyRefreshToken?.(refreshToken);
 
       // Get user data with roles
       const user = await this.authService.findUserById(String(userId), {
@@ -136,9 +136,9 @@ export class AuthController {
       }
 
       // Generate new access token and refresh token
-      const newAccessToken = await jwtService.generateToken(user);
-      const newRefreshToken = await jwtService.generateRefreshToken(
-        user.id || "",
+      const newAccessToken = await jwtService.generateToken?.(user);
+      const newRefreshToken = await jwtService.generateRefreshToken?.(
+        user.id!,
       );
 
       return c.json({

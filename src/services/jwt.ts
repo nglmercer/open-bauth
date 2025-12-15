@@ -2,7 +2,7 @@
 import type { JWTPayload, User } from "../types/auth";
 import type { OAuthJWTPayload } from "../types/oauth";
 import type { IJWTServiceExtended } from "../types/jwt-service";
-import { ServiceErrors } from "./constants";
+import { ServiceErrors,errorParser } from "./constants";
 
 /**
  * Servicio para manejar operaciones JWT
@@ -14,6 +14,7 @@ export class JWTService implements IJWTServiceExtended {
   private expiresIn: string;
   private issuer: string;
   private audience: string;
+  private emailVerication: boolean;
   private dpopNonceCache: Map<string, number> = new Map();
 
   constructor(
@@ -21,6 +22,7 @@ export class JWTService implements IJWTServiceExtended {
     expiresIn: string = "24h",
     issuer: string = "http://localhost",
     audience: string = "audience",
+    emailVerication: boolean = true,
   ) {
     if (!secret) {
       throw new Error(ServiceErrors.JWT_SECRET_REQUIRED);
@@ -29,6 +31,7 @@ export class JWTService implements IJWTServiceExtended {
     this.expiresIn = expiresIn;
     this.issuer = issuer;
     this.audience = audience;
+    this.emailVerication = emailVerication;
   }
 
   /**
@@ -71,9 +74,8 @@ export class JWTService implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
-      console.error("Error generating JWT token:", error);
-      throw new Error(ServiceErrors.TOKEN_GEN_FAILED);
+    } catch (error) {
+      throw errorParser(error,ServiceErrors.TOKEN_GEN_FAILED);
     }
   }
 
@@ -82,17 +84,19 @@ export class JWTService implements IJWTServiceExtended {
    * @param payload Custom payload for token
    * @returns Token JWT
    */
-  async generateTokenWithPayload(payload: any): Promise<string> {
+  async generateTokenWithPayload(payload: Record<string, any>): Promise<string> {
     try {
       const now = Math.floor(Date.now() / 1000);
       const expirationTime = this.parseExpirationTime(this.expiresIn);
 
+      const safePayload = payload;
+
       const fullPayload = {
-        ...payload,
+        ...safePayload,
         iat: now,
-        exp: payload.exp || now + expirationTime,
-        iss: payload.iss || this.issuer,
-        aud: payload.aud || this.audience,
+        exp: safePayload.exp || now + expirationTime,
+        iss: safePayload.iss || this.issuer,
+        aud: safePayload.aud || this.audience,
       };
 
       // Implementar JWT usando Web Crypto API nativo
@@ -109,9 +113,8 @@ export class JWTService implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
-      console.error("Error generating JWT token:", error);
-      throw new Error(ServiceErrors.TOKEN_GEN_FAILED);
+    } catch (error) {
+      throw errorParser(error,ServiceErrors.TOKEN_GEN_FAILED);
     }
   }
 
@@ -141,8 +144,7 @@ export class JWTService implements IJWTServiceExtended {
         nonce: nonce,
         name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
         email: user.email,
-        email_verified: true, // In a real implementation, check if email is verified
-        picture: (user as any).avatar_url || undefined,
+        email_verified: this.emailVerication,
       };
 
       // Implementar JWT usando Web Crypto API nativo
@@ -159,9 +161,8 @@ export class JWTService implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
-      console.error("Error generating ID token:", error);
-      throw new Error(ServiceErrors.ID_TOKEN_GEN_FAILED);
+    } catch (error) {
+      throw errorParser(error,ServiceErrors.ID_TOKEN_GEN_FAILED);
     }
   }
 
@@ -178,7 +179,7 @@ export class JWTService implements IJWTServiceExtended {
     httpUri: string,
   ): Promise<{
     valid: boolean;
-    payload?: any;
+    payload?: Record<string, any>;
     error?: string;
     jti?: string;
   }> {
@@ -240,8 +241,8 @@ export class JWTService implements IJWTServiceExtended {
       }
 
       return { valid: true, payload, jti: payload.jti };
-    } catch (error: any) {
-      return { valid: false, error: error.message };
+    } catch (error) {
+      return { valid: false, error: errorParser(error).message };
     }
   }
 
@@ -296,8 +297,8 @@ export class JWTService implements IJWTServiceExtended {
 
         return payload;
       })
-      .catch((error: any) => {
-        throw new Error(`Invalid token: ${error.message}`);
+      .catch((error) => {
+        throw errorParser(error,'Invalid token');
       });
   }
 
@@ -336,7 +337,7 @@ export class JWTService implements IJWTServiceExtended {
       const now = Math.floor(Date.now() / 1000);
 
       return payload.exp ? payload.exp < now : false;
-    } catch (error: any) {
+    } catch (error) {
       // Si hay cualquier error de decodificación o parsing, consideramos el token como expirado
       return true;
     }
@@ -363,7 +364,7 @@ export class JWTService implements IJWTServiceExtended {
 
       const remaining = payload.exp - now;
       return Math.max(0, remaining);
-    } catch (error: any) {
+    } catch (error) {
       return 0;
     }
   }
@@ -401,13 +402,13 @@ export class JWTService implements IJWTServiceExtended {
   ): Promise<string> {
     try {
       // Verify old refresh token
-      const oldPayload = await this.verifyRefreshToken(oldRefreshToken);
+      const oldPayload = await this.verifyRefreshTokenWithSecurity(oldRefreshToken);
 
       // Generate new refresh token with shorter lifetime for security
       const now = Math.floor(Date.now() / 1000);
       const newExpirationTime = Math.min(
         this.parseExpirationTime("7d"),
-        (oldPayload as any).exp - now,
+        oldPayload.exp - now,
       );
 
       const newPayload = {
@@ -432,9 +433,8 @@ export class JWTService implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
-      console.error("Error rotating refresh token:", error);
-      throw new Error(ServiceErrors.REFRESH_TOKEN_ROTATE_FAILED);
+    } catch (error) {
+      throw errorParser(error,ServiceErrors.REFRESH_TOKEN_ROTATE_FAILED);
     }
   }
 
@@ -443,7 +443,7 @@ export class JWTService implements IJWTServiceExtended {
    * @param refreshToken Refresh token to verify
    * @returns User ID if valid
    */
-  async verifyRefreshTokenWithSecurity(refreshToken: string): Promise<any> {
+  async verifyRefreshTokenWithSecurity(refreshToken: string) {
     try {
       if (!refreshToken) {
         throw new Error(ServiceErrors.REFRESH_TOKEN_REQUIRED);
@@ -490,8 +490,8 @@ export class JWTService implements IJWTServiceExtended {
       }
 
       return payload;
-    } catch (error: any) {
-      throw new Error(`Invalid refresh token: ${error.message}`);
+    } catch (error) {
+      throw errorParser(error,'Invalid refresh token');
     }
   }
 
@@ -616,9 +616,8 @@ export class JWTService implements IJWTServiceExtended {
       );
 
       return `${encodedHeader}.${encodedPayload}.${signature}`;
-    } catch (error: any) {
-      console.error("Error generating refresh token:", error);
-      throw new Error(ServiceErrors.REFRESH_TOKEN_GEN_FAILED);
+    } catch (error) {
+      throw errorParser(error,ServiceErrors.REFRESH_TOKEN_GEN_FAILED);
     }
   }
 
@@ -680,8 +679,8 @@ export class JWTService implements IJWTServiceExtended {
       }
 
       return payload.userId;
-    } catch (error: any) {
-      throw new Error(`Invalid refresh token: ${error.message}`);
+    } catch (error) {
+      throw errorParser(error,'Invalid refresh token');
     }
   }
 }

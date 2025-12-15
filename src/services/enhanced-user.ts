@@ -464,7 +464,7 @@ export class EnhancedUserService {
       const isValid = await this.securityService.verifyPassword(
         secret,
         deviceSecret.data.secret_hash || "",
-        (deviceSecret.data as any).secret_salt || "",
+        deviceSecret.data.secret_salt || "",
       );
 
       if (!isValid) {

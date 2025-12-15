@@ -1,4 +1,3 @@
-
 export const ServiceErrors = {
     // Common
     DATABASE_ERROR: "Database operation failed",
@@ -119,3 +118,24 @@ export const ServiceErrors = {
     REMOVE_PERMISSION_FAILED: "Failed to remove permission from role",
     ASSIGN_ROLE_FAILED: "Failed to assign role to user",
 } as const;
+export function errorParser(error: unknown, prefix?: string): Error {
+  let parsedError: Error;
+
+  // Parse the error
+  if (error instanceof Error) {
+    parsedError = error;
+  } else if (typeof error === "string") {
+    parsedError = new Error(error);
+  } else if (error && typeof error === "object" && "message" in error) {
+    parsedError = new Error(String(error.message));
+  } else {
+    parsedError = new Error(String(error));
+  }
+
+  // Prepend prefix if provided
+  if (prefix) {
+    parsedError.message = `${prefix}: ${parsedError.message}`;
+  }
+
+  return parsedError;
+}
