@@ -19,6 +19,7 @@ A comprehensive, framework-agnostic authentication and authorization library wit
 ## ✨ Key Features
 
 ### 🔐 Core Authentication
+
 - **JWT-based authentication** with secure token generation and validation
 - **Role-Based Access Control (RBAC)** with flexible permissions system
 - **Complete OAuth 2.0 implementation** with all standard flows
@@ -26,6 +27,7 @@ A comprehensive, framework-agnostic authentication and authorization library wit
 - **Biometric Authentication** with secure credential storage
 
 ### 🗄️ Database & Schema Management
+
 - **Advanced Schema Class** for flexible table definitions
 - **Built-in Schema Builder** with standard authentication tables
 - **OAuth 2.0 Schema Extensions** for complete implementation
@@ -34,6 +36,7 @@ A comprehensive, framework-agnostic authentication and authorization library wit
 - **Cascade Delete Support** for defining relationships with automatic cleanup
 
 ### 🛡️ Security Features
+
 - **PKCE support** (RFC 7636) for public clients
 - **DPoP implementation** (RFC 9449) for token binding
 - **Device secrets** for Single Sign-On (SSO)
@@ -41,6 +44,7 @@ A comprehensive, framework-agnostic authentication and authorization library wit
 - **Audit logging** for compliance and monitoring
 
 ### 🌐 Framework Integration
+
 - **Refactored Core + Adapter Architecture** - Framework-agnostic core logic with framework-specific adapters
 - **Framework adapters** for Hono, Bun, Express, Elysia, Fastify
 - **Type-safe interfaces** for all framework integrations
@@ -76,10 +80,10 @@ bun test
 ### 1) Initialize database and seed defaults (users/roles/permissions tables):
 
 ```typescript
-import { Database } from 'bun:sqlite';
-import { DatabaseInitializer } from 'open-bauth';
+import { Database } from "bun:sqlite";
+import { DatabaseInitializer } from "open-bauth";
 
-const db = new Database('auth.db');
+const db = new Database("auth.db");
 const dbInitializer = new DatabaseInitializer({ database: db });
 await dbInitializer.initialize();
 await dbInitializer.seedDefaults();
@@ -88,9 +92,12 @@ await dbInitializer.seedDefaults();
 ### 2) Initialize services (JWT, Auth, Permissions):
 
 ```typescript
-import { JWTService, AuthService, PermissionService } from 'open-bauth';
+import { JWTService, AuthService, PermissionService } from "open-bauth";
 
-const jwtService = new JWTService(process.env.JWT_SECRET || 'dev-secret', '24h');
+const jwtService = new JWTService(
+  process.env.JWT_SECRET || "dev-secret",
+  "24h"
+);
 const authService = new AuthService(dbInitializer, jwtService);
 const permissionService = new PermissionService(dbInitializer);
 ```
@@ -99,28 +106,28 @@ const permissionService = new PermissionService(dbInitializer);
 
 ```typescript
 const register = await authService.register({
-  email: 'user@example.com',
-  password: 'StrongP@ssw0rd',
-  username: 'johndoe',
-  first_name: 'John',
-  last_name: 'Doe'
+  email: "user@example.com",
+  password: "StrongP@ssw0rd",
+  username: "johndoe",
+  first_name: "John",
+  last_name: "Doe",
 });
 
 if (!register.success) throw new Error(register.error?.message);
 
-const login = await authService.login({ 
-  email: 'user@example.com', 
-  password: 'StrongP@ssw0rd' 
+const login = await authService.login({
+  email: "user@example.com",
+  password: "StrongP@ssw0rd",
 });
 
 if (!login.success) throw new Error(login.error?.message);
-console.log('JWT:', login.token);
+console.log("JWT:", login.token);
 ```
 
 ### 4) Extract schemas from an existing database:
 
 ```typescript
-import { createSchemaExtractor, DatabaseInitializer } from 'open-bauth';
+import { createSchemaExtractor, DatabaseInitializer } from "open-bauth";
 
 // Extract schemas from an existing database
 const extractor = createSchemaExtractor("legacy.db");
@@ -129,11 +136,11 @@ const schemas = await extractor.extractAllSchemas();
 // Use with DatabaseInitializer
 const dbInitializer = new DatabaseInitializer({
   database: db,
-  externalSchemas: schemas.map(s => s.tableSchema)
+  externalSchemas: schemas.map((s) => s.tableSchema),
 });
 
 // Access generated Zod schemas
-const userSchema = schemas.find(s => s.tableName === 'users')?.schema;
+const userSchema = schemas.find((s) => s.tableName === "users")?.schema;
 if (userSchema) {
   const validatedUser = userSchema.parse({ id: 1, email: "test@example.com" });
 }
@@ -142,7 +149,7 @@ if (userSchema) {
 ### 5) Use advanced schema extensions and BIT type support:
 
 ```typescript
-import { setDatabaseConfig, SchemaExtensions } from 'open-bauth';
+import { setDatabaseConfig, SchemaExtensions } from "open-bauth";
 
 // Configure schema extensions
 setDatabaseConfig({
@@ -150,14 +157,14 @@ setDatabaseConfig({
     users: SchemaExtensions.addUserProfileFields(), // Add phone, avatar, etc.
     roles: SchemaExtensions.addMetadata(), // Add metadata field
     sessions: SchemaExtensions.addSoftDelete(), // Add soft delete
-  }
+  },
 });
 
 // Re-initialize with extensions
 await dbInitializer.initialize();
 
 // Use BIT type fields with advanced filtering
-const notifications = dbInitializer.createController('notifications');
+const notifications = dbInitializer.createController("notifications");
 const activeNotifications = await notifications.search({
   read: { isTruthy: false }, // Find unread notifications
   priority: { isSet: true }, // Find notifications with priority set
@@ -167,11 +174,11 @@ const activeNotifications = await notifications.search({
 ### 6) Use framework-agnostic middleware with new Core + Adapter Architecture (example with Hono):
 
 ```typescript
-import { Hono } from 'hono';
+import { Hono } from "hono";
 import {
   createHonoAuthMiddleware,
-  createHonoPermissionMiddleware
-} from 'open-bauth/src/middleware/adapters/hono.adapter';
+  createHonoPermissionMiddleware,
+} from "open-bauth/src/middleware/adapters/hono.adapter";
 
 const app = new Hono();
 
@@ -179,31 +186,40 @@ const app = new Hono();
 const authMiddleware = createHonoAuthMiddleware({
   jwtService,
   authService,
-  permissionService
+  permissionService,
 });
 
-const editContentMiddleware = createHonoPermissionMiddleware({
-  permissionService
-}, ['edit:content']);
+const editContentMiddleware = createHonoPermissionMiddleware(
+  {
+    permissionService,
+  },
+  ["edit:content"]
+);
 
 // Apply middleware to routes
-app.use('/api/*', authMiddleware);
-app.get('/protected', authMiddleware, (c) => {
-  const auth = c.get('auth');
+app.use("/api/*", authMiddleware);
+app.get("/protected", authMiddleware, (c) => {
+  const auth = c.get("auth");
   return c.json({ success: true, user: auth.user });
 });
 
-app.get('/moderate', authMiddleware, editContentMiddleware, (c) => {
-  return c.json({ success: true, message: 'Content moderation access' });
+app.get("/moderate", authMiddleware, editContentMiddleware, (c) => {
+  return c.json({ success: true, message: "Content moderation access" });
 });
 ```
 
 ### Legacy middleware (still supported):
-```typescript
-import { createAuthMiddleware, createPermissionMiddleware } from 'open-bauth';
 
-const authMw = createAuthMiddleware({ jwtService, authService, permissionService }, true);
-const canEditContent = createPermissionMiddleware({ permissionService }, ['edit:content']);
+```typescript
+import { createAuthMiddleware, createPermissionMiddleware } from "open-bauth";
+
+const authMw = createAuthMiddleware(
+  { jwtService, authService, permissionService },
+  true
+);
+const canEditContent = createPermissionMiddleware({ permissionService }, [
+  "edit:content",
+]);
 ```
 
 ---
@@ -213,23 +229,28 @@ const canEditContent = createPermissionMiddleware({ permissionService }, ['edit:
 This library's public API is re-exported from the entrypoint so you can import from a single place.
 
 ### Middleware (Core + Adapter Architecture)
+
 #### Core Functions (Framework-Agnostic)
+
 - [`authenticateRequest(request, services)`](docs/middleware.md#core-functions) - Core authentication logic
 - [`authorizePermissions(request)`](docs/middleware.md#core-functions) - Core permission authorization
 - [`authorizeRoles(request)`](docs/middleware.md#core-functions) - Core role authorization
 
 #### Framework Adapters
+
 - [`createHonoAuthMiddleware(services)`](docs/middleware.md#framework-adapters) - Hono-specific auth middleware
 - [`createHonoPermissionMiddleware(services, permissions)`](docs/middleware.md#framework-adapters) - Hono permission middleware
 - [`createHonoRoleMiddleware(services, roles)`](docs/middleware.md#framework-adapters) - Hono role middleware
 - [`createBunAuthMiddleware(services)`](docs/middleware.md#framework-adapters) - Bun-specific auth middleware
 
 #### Legacy Middleware (Still Supported)
+
 - [`createAuthMiddleware(services, required?)`](docs/middleware.md#core-middleware) - Framework-agnostic auth middleware
 - [`createPermissionMiddleware(services, requiredPermissions, options?)`](docs/middleware.md#core-middleware) - Permission middleware
 - [`createRoleMiddleware(requiredRoles)`](docs/middleware.md#core-middleware) - Role middleware
 
 ### Services
+
 - [`AuthService`](docs/services.md#authservice) - Registration, login, user management, role assignment
 - [`JWTService, initJWTService(secret, expiresIn?), getJWTService()`](docs/services.md#jwtservice) - JWT generation/verification, DPoP, refresh rotation
 - [`PermissionService`](docs/services.md#permissionservice) - RBAC - roles, permissions, checks
@@ -238,28 +259,35 @@ This library's public API is re-exported from the entrypoint so you can import f
 - [`EnhancedUserService`](docs/services.md#enhanceduserservice) - MFA, biometrics, devices
 
 ### Database
+
 - [`BaseController`](docs/database-extension-spec.md#basecontroller) (generic CRUD + query helpers)
 - [`DatabaseInitializer`](docs/database-extension-spec.md#databaseinitializer) (migrations, integrity checks, seeds, controllers)
 - [`Schema Extensions`](docs/database-extension-spec.md#predefined-extensions) (addUserProfileFields, addSoftDelete, addMetadata, etc.)
 - [`Schema Extractor`](docs/schema-extractor/schema-extractor.md) (automatic schema extraction from existing databases)
+- [`Schema Comparison`](docs/database/schema-comparison.md) (SchemaComparator for detecting changes)
+- [`Migration Generator`](docs/database/migration-generator.md) (SQLiteMigrationGenerator)
 
 ### Configuration
+
 - [`setDatabaseConfig(), getDatabaseConfig()`](docs/database-extension-spec.md#global-configuration)
 - [`SchemaExtensions`](docs/database-extension-spec.md#extension-functions) helper functions
 - [`Custom table names`](docs/database-extension-spec.md#custom-table-names) support
 
 ### Database Adapters
+
 - [`IDatabaseAdapter`](docs/adapter-usage.md#idatabaseadapter-interface) - Interface for custom database adapters
 - [`JsonFileAdapter`](docs/adapter-usage.md#jsonfileadapter) - File-based JSON adapter
 - [`MemoryAdapter`](docs/adapter-usage.md#memoryadapter) - In-memory adapter
 - [`AdapterFactory`](docs/adapter-usage.md#adapter-factory) - Factory for creating adapters
 
 ### Logger
+
 - [`Logger class, getLogger(), defaultLogger`](docs/logger.md#logger-class) - Complete logging system
 - [`convenience log methods`](docs/logger.md#convenience-functions) - Quick logging functions
 - [`configuration helpers`](docs/logger.md#configuration) - Setup and management helpers
 
 ### Types (from src/types/auth)
+
 - [`User, Role, Permission`](docs/services.md#main-types) - Main entities
 - [`RegisterData, LoginData, AuthResult`](docs/services.md#authresult) - Authentication types
 - [`JWTPayload, OAuthClient, TokenResponse`](docs/services.md#oauth-types) - JWT and OAuth types
@@ -274,17 +302,17 @@ The library now includes a flexible adapter system that allows you to use custom
 ### Using Custom Adapters
 
 ```typescript
-import { BaseController } from 'open-bauth';
-import { SimpleCustomAdapter } from './examples/custom-adapter-example';
+import { BaseController } from "open-bauth";
+import { SimpleCustomAdapter } from "./examples/custom-adapter-example";
 
 // Create a custom adapter
 const customAdapter = new SimpleCustomAdapter({
-  connectionString: "custom://localhost"
+  connectionString: "custom://localhost",
 });
 
 // Use it with BaseController
 const userController = new BaseController("users", {
-  adapter: customAdapter
+  adapter: customAdapter,
 });
 
 // All existing methods work the same
@@ -295,11 +323,11 @@ const user = await userController.findById(1);
 ### Creating Your Own Adapter
 
 ```typescript
-import { IDatabaseAdapter, DatabaseConnection } from 'open-bauth';
+import { IDatabaseAdapter, DatabaseConnection } from "open-bauth";
 
 export class MyCustomAdapter implements IDatabaseAdapter {
   private connection: DatabaseConnection;
-  
+
   constructor(config: any) {
     // Initialize your database connection
     this.connection = this.createConnection();
@@ -326,7 +354,7 @@ export class MyCustomAdapter implements IDatabaseAdapter {
       isSQLite: false,
       isSQLServer: false,
       isPostgreSQL: false,
-      isMySQL: false
+      isMySQL: false,
     };
   }
 
@@ -339,8 +367,10 @@ export class MyCustomAdapter implements IDatabaseAdapter {
       mapDataType: (type: string) => type,
       formatDefaultValue: (value: any) => String(value),
       getRandomOrder: () => "ORDER BY RANDOM()",
-      getPrimaryKeyQuery: (tableName: string) => `SELECT * FROM ${tableName} LIMIT 1`,
-      getTableInfoQuery: (tableName: string) => `SELECT * FROM ${tableName} LIMIT 1`
+      getPrimaryKeyQuery: (tableName: string) =>
+        `SELECT * FROM ${tableName} LIMIT 1`,
+      getTableInfoQuery: (tableName: string) =>
+        `SELECT * FROM ${tableName} LIMIT 1`,
     };
   }
 
@@ -348,7 +378,7 @@ export class MyCustomAdapter implements IDatabaseAdapter {
   async getSimpleValue(): Promise<{ value: number; timestamp: string }> {
     return {
       value: 42,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -361,33 +391,36 @@ export class MyCustomAdapter implements IDatabaseAdapter {
 ## Core Concepts and APIs
 
 ### Database Schema Management
+
 Advanced schema system for defining and managing database tables:
 
 ```typescript
 // Create custom schemas with the Schema class
-const customSchema = new Schema({
-  id: { type: String, primaryKey: true },
-  name: { type: String, required: true },
-  metadata: { type: Object, default: {} },
-  is_active: { type: Boolean, default: true }
-}, {
-  indexes: [
-    { name: "idx_custom_name", columns: ["name"] }
-  ]
-});
+const customSchema = new Schema(
+  {
+    id: { type: String, primaryKey: true },
+    name: { type: String, required: true },
+    metadata: { type: Object, default: {} },
+    is_active: { type: Boolean, default: true },
+  },
+  {
+    indexes: [{ name: "idx_custom_name", columns: ["name"] }],
+  }
+);
 
 // Register OAuth 2.0 schema extensions
 registerOAuthSchemaExtensions();
 
 // Get built-in schemas
-const usersSchema = getTableSchemaByKey('users');
-const rolesSchema = getTableSchemaByKey('roles');
+const usersSchema = getTableSchemaByKey("users");
+const rolesSchema = getTableSchemaByKey("roles");
 
 // Build all standard schemas
 const allSchemas = buildDatabaseSchemas();
 ```
 
 ### OAuthService
+
 Complete OAuth 2.0 implementation with all standard flows:
 
 - `createClient(data: CreateOAuthClientData) -> OAuthClient`
@@ -398,6 +431,7 @@ Complete OAuth 2.0 implementation with all standard flows:
 - `introspectToken(token) -> TokenInfo`
 
 ### SecurityService
+
 Advanced security features for modern authentication:
 
 - `generatePKCEChallenge(method) -> PKCEChallenge`
@@ -408,6 +442,7 @@ Advanced security features for modern authentication:
 - `generateNonce() -> string`
 
 ### AuthService
+
 High-level auth flows: register, login, user lookup/update, role assignment, etc. Depends on the database layer and JWT service.
 
 - `register(data: RegisterData) -> AuthResult`
@@ -417,6 +452,7 @@ High-level auth flows: register, login, user lookup/update, role assignment, etc
 - `getUsers(page?, limit?, options?) -> { users, total }`
 
 ### JWTService
+
 Minimal, native Web Crypto–based JWT operations with DPoP support:
 
 - `generateToken(user, options?) -> string`
@@ -428,9 +464,11 @@ Minimal, native Web Crypto–based JWT operations with DPoP support:
 - `refreshTokenIfNeeded(token, user, threshold?)`
 
 ### PermissionService
+
 Queries and helpers for roles and permissions (e.g., getRolePermissions, user permission checks).
 
 ### DatabaseInitializer and BaseController
+
 - `DatabaseInitializer` handles table creation/migrations, integrity checks, seeding defaults, and creating controllers for tables.
 - `BaseController<T>` provides CRUD and query utilities (findFirst, search, count, random, etc.).
 
@@ -443,7 +481,7 @@ The library includes a powerful schema extension system that allows you to custo
 ### Basic Schema Extensions
 
 ```typescript
-import { setDatabaseConfig, SchemaExtensions } from 'open-bauth';
+import { setDatabaseConfig, SchemaExtensions } from "open-bauth";
 
 // Add profile fields to users table
 setDatabaseConfig({
@@ -451,7 +489,7 @@ setDatabaseConfig({
     users: SchemaExtensions.addUserProfileFields(), // Adds phone, avatar, timezone, language
     roles: SchemaExtensions.addMetadata(), // Adds metadata field for JSON data
     sessions: SchemaExtensions.addSoftDelete(), // Adds soft delete functionality
-  }
+  },
 });
 ```
 
@@ -471,14 +509,14 @@ setDatabaseConfig({
     users: {
       additionalColumns: [
         { name: "age", type: "INTEGER" },
-        { name: "bio", type: "TEXT" }
+        { name: "bio", type: "TEXT" },
       ],
       removedColumns: ["is_active"], // Remove default column
       modifiedColumns: [
-        { name: "email", type: "TEXT", notNull: true, unique: true }
-      ]
-    }
-  }
+        { name: "email", type: "TEXT", notNull: true, unique: true },
+      ],
+    },
+  },
 });
 ```
 
@@ -489,8 +527,8 @@ setDatabaseConfig({
   tableNames: {
     users: "app_users",
     roles: "user_roles",
-    permissions: "app_permissions"
-  }
+    permissions: "app_permissions",
+  },
 });
 ```
 
@@ -506,10 +544,10 @@ BIT fields automatically handle multiple boolean representations:
 
 ```typescript
 // All these are equivalent for BIT fields
-create({ priority: true })
-create({ priority: 1 })
-create({ priority: new Uint8Array([1]) })
-create({ priority: Buffer.from([1]) })
+create({ priority: true });
+create({ priority: 1 });
+create({ priority: new Uint8Array([1]) });
+create({ priority: Buffer.from([1]) });
 ```
 
 ### Advanced Filters
@@ -518,16 +556,16 @@ Use advanced filters for complex boolean logic:
 
 ```typescript
 // Find records where field is truthy (equals 1 or true)
-controller.search({ read: { isTruthy: true } })
+controller.search({ read: { isTruthy: true } });
 
 // Find records where field is falsy (equals 0, false, or null)
-controller.search({ priority: { isFalsy: true } })
+controller.search({ priority: { isFalsy: true } });
 
 // Find records where field is set (not null)
-controller.search({ status: { isSet: true } })
+controller.search({ status: { isSet: true } });
 
 // Find records where field is not set (null)
-controller.search({ archived: { isSet: false } })
+controller.search({ archived: { isSet: false } });
 ```
 
 ### Mixed Type Queries
@@ -537,8 +575,8 @@ Search with mixed boolean representations in IN queries:
 ```typescript
 // All these representations work together
 controller.search({
-  read: [true, 1, new Uint8Array([1]), Buffer.from([1])]
-})
+  read: [true, 1, new Uint8Array([1]), Buffer.from([1])],
+});
 ```
 
 ### External Schemas
@@ -550,17 +588,22 @@ const customSchema = {
   tableName: "notifications",
   columns: [
     { name: "id", type: "TEXT", primaryKey: true },
-    { name: "user_id", type: "TEXT", notNull: true, references: { table: "users", column: "id" } },
+    {
+      name: "user_id",
+      type: "TEXT",
+      notNull: true,
+      references: { table: "users", column: "id" },
+    },
     { name: "title", type: "TEXT", notNull: true },
     { name: "read", type: "BIT", defaultValue: false },
-    { name: "priority", type: "BIT" }
+    { name: "priority", type: "BIT" },
   ],
-  indexes: [{ name: "idx_notifications_user", columns: ["user_id"] }]
+  indexes: [{ name: "idx_notifications_user", columns: ["user_id"] }],
 };
 
-const dbInitializer = new DatabaseInitializer({ 
-  database: db, 
-  externalSchemas: [customSchema] 
+const dbInitializer = new DatabaseInitializer({
+  database: db,
+  externalSchemas: [customSchema],
 });
 ```
 
@@ -573,12 +616,16 @@ The library provides several helper functions for managing database configuratio
 ### Global Configuration
 
 ```typescript
-import { setDatabaseConfig, getDatabaseConfig, getAllTableNames } from 'open-bauth';
+import {
+  setDatabaseConfig,
+  getDatabaseConfig,
+  getAllTableNames,
+} from "open-bauth";
 
 // Set global configuration
 setDatabaseConfig({
-  tableNames: { users: 'app_users' },
-  schemaExtensions: { users: SchemaExtensions.addUserProfileFields() }
+  tableNames: { users: "app_users" },
+  schemaExtensions: { users: SchemaExtensions.addUserProfileFields() },
 });
 
 // Get current configuration
@@ -591,22 +638,22 @@ const tableNames = getAllTableNames();
 ### Common Columns
 
 ```typescript
-import { COMMON_COLUMNS } from 'open-bauth';
+import { COMMON_COLUMNS } from "open-bauth";
 
 // Access predefined column definitions
 const customExtension = {
   additionalColumns: [
     COMMON_COLUMNS.phoneNumber,
     COMMON_COLUMNS.avatarUrl,
-    COMMON_COLUMNS.metadata
-  ]
+    COMMON_COLUMNS.metadata,
+  ],
 };
 ```
 
 ### Schema Registry
 
 ```typescript
-import { SchemaRegistry } from 'open-bauth';
+import { SchemaRegistry } from "open-bauth";
 
 // Create and manage schema registries
 const registry1 = new SchemaRegistry([schema1, schema2]);
@@ -624,6 +671,7 @@ registry1.registerMany([schema5, schema6]);
 ## Middleware (Refactored Core + Adapter Architecture)
 
 ### Core Functions (Framework-Agnostic)
+
 - `authenticateRequest(request, { jwtService, authService, permissionService })`
   - Core authentication logic that verifies JWT and returns AuthContext
 - `authorizePermissions(request, { userId, requiredPermissions, requireAll, dbInitializer })`
@@ -632,12 +680,14 @@ registry1.registerMany([schema5, schema6]);
   - Core role authorization logic
 
 ### Framework Adapters (New Architecture)
+
 - `createHonoAuthMiddleware(services)` - Hono-specific auth middleware adapter
 - `createHonoPermissionMiddleware(services, permissions, options?)` - Hono permission middleware adapter
 - `createHonoRoleMiddleware(services, roles, options?)` - Hono role middleware adapter
 - `createBunAuthMiddleware(services)` - Bun-specific auth middleware adapter
 
 ### Legacy Middleware (Still Supported)
+
 - `createAuthMiddleware(services, required = true)`
   - Attaches auth context to request. When required is true, rejects if unauthenticated.
 - `createPermissionMiddleware(services, permissions, { requireAll = false })`
@@ -650,6 +700,7 @@ registry1.registerMany([schema5, schema6]);
 ## Logging
 
 A simple yet flexible logger is included:
+
 - `getLogger(), defaultLogger, convenience log.debug/info/warn/error/fatal`
 - Configuration helpers via `createConfig` and `ENVIRONMENT_CONFIGS`
 
@@ -666,27 +717,27 @@ The library ships with rich TypeScript types for requests, responses, entities, 
 Here's a complete example using schema extensions and BIT type support:
 
 ```typescript
-import { Database } from 'bun:sqlite';
-import { 
-  DatabaseInitializer, 
-  setDatabaseConfig, 
+import { Database } from "bun:sqlite";
+import {
+  DatabaseInitializer,
+  setDatabaseConfig,
   SchemaExtensions,
   AuthService,
   JWTService,
-  PermissionService 
-} from 'open-bauth';
+  PermissionService,
+} from "open-bauth";
 
 // 1. Configure schema extensions
 setDatabaseConfig({
   schemaExtensions: {
     users: SchemaExtensions.addUserProfileFields(),
     roles: SchemaExtensions.addMetadata(),
-    sessions: SchemaExtensions.addSoftDelete()
-  }
+    sessions: SchemaExtensions.addSoftDelete(),
+  },
 });
 
 // 2. Initialize database
-const db = new Database('auth.db');
+const db = new Database("auth.db");
 const dbInitializer = new DatabaseInitializer({ database: db });
 await dbInitializer.initialize();
 await dbInitializer.seedDefaults();
@@ -699,29 +750,29 @@ const notificationsSchema = {
     { name: "user_id", type: "TEXT", notNull: true },
     { name: "title", type: "TEXT", notNull: true },
     { name: "read", type: "BIT", defaultValue: false },
-    { name: "priority", type: "BIT" }
-  ]
+    { name: "priority", type: "BIT" },
+  ],
 };
 
-const customInitializer = new DatabaseInitializer({ 
-  database: db, 
-  externalSchemas: [notificationsSchema] 
+const customInitializer = new DatabaseInitializer({
+  database: db,
+  externalSchemas: [notificationsSchema],
 });
 await customInitializer.initialize();
 
 // 4. Initialize services
-const jwtService = new JWTService('your-secret', '24h');
+const jwtService = new JWTService("your-secret", "24h");
 const authService = new AuthService(dbInitializer, jwtService);
 const permissionService = new PermissionService(dbInitializer);
 
 // 5. Use advanced filtering
-const notifications = customInitializer.createController('notifications');
+const notifications = customInitializer.createController("notifications");
 const unreadHighPriority = await notifications.search({
   read: { isFalsy: true },
-  priority: { isTruthy: true }
+  priority: { isTruthy: true },
 });
 
-console.log('Unread high priority notifications:', unreadHighPriority.data);
+console.log("Unread high priority notifications:", unreadHighPriority.data);
 ```
 
 ## 📚 Detailed Documentation
@@ -729,17 +780,25 @@ console.log('Unread high priority notifications:', unreadHighPriority.data);
 For in-depth guides and specifications, see the [docs/](./docs/) directory:
 
 ### 📖 Main Guides
+
 - [**Services**](./docs/services.md) - Complete API of all services
 - [**Middleware**](./docs/middleware.md) - Framework-agnostic middleware
 - [**Database Adapters**](./docs/adapter-usage.md) - Custom database adapters
 - [**Database Extensions**](./docs/database-extension-spec.md) - Schema extension specification
 
 ### 🔐 Security & Authentication
+
 - [**OAuth 2.0 Implementation**](./docs/oauth-2.0-implementation.md) - Complete OAuth 2.0 guide
 - [**Logger**](./docs/logger.md) - Logging system documentation
 - [**Testing**](./docs/testing.md) - Running and writing tests
 
+### 🗄️ Database Internals
+
+- [**Schema Comparison**](./docs/database/schema-comparison.md) - How schema differences are detected
+- [**Migration Generator**](./docs/database/migration-generator.md) - How migrations are generated and executed
+
 ### 📋 Reference
+
 - [**Zod Usage**](./docs/zod-usage.md) - Zod integration and type mapping guide
 
 ---
@@ -789,7 +848,7 @@ See `examples/` and `docs/` directories for comprehensive usage examples:
 ```typescript
 // Test mixed boolean representations
 const results = await controller.search({
-  read: [true, false, 1, 0, new Uint8Array([1]), Buffer.from([0])]
+  read: [true, false, 1, 0, new Uint8Array([1]), Buffer.from([0])],
 });
 
 // Test advanced filters
