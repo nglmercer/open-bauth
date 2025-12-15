@@ -14,9 +14,6 @@ export {
 export type {
   MigrationResult,
   IntegrityCheckResult,
-  UserRole,
-  RolePermission,
-  Session,
   DatabaseConfig as DatabaseInitializerConfig,
 } from "./database-initializer";
 

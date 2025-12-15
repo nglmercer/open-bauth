@@ -19,9 +19,62 @@ const timeschemas = new Schema({
     updated_at: { type: Date, required: true }
 }).toTableSchema("users");
 const registry = new SchemaRegistry();
+
 registry.register(newschemas);
 registry.register(timeschemas);
+// 1. Define Spanish Schemas (Current State)
+// 1. Define Spanish Schemas (Current State)
+const spanishSchemas = [
+    new Schema({
+        id: { type: String, primaryKey: true },
+        titulo: { type: String, required: true },
+        descripcion: { type: String },
+        es_activo: { type: String },     // "true", "false", "1", "0"
+        fecha_estreno: { type: String }, // "2024-01-01"
+        visible_bit: { type: Number }    // 0 or 1
+    }).toTableSchema("series"),
+    
+    new Schema({
+        id: { type: String, primaryKey: true },
+        serie_id: { type: String, required: true },
+        numero: { type: Number, required: true },
+        anio: { type: Number }
+    }).toTableSchema("temporadas"),
+    
+    new Schema({
+        id: { type: String, primaryKey: true },
+        temporada_id: { type: String, required: true },
+        titulo: { type: String, required: true },
+        duracion: { type: Number }
+    }).toTableSchema("capitulos")
+];
 
+// 2. Define English Schemas (Target State)
+const englishSchemas = [
+    new Schema({
+        id: { type: String, primaryKey: true },
+        title: { type: String, required: true },
+        description: { type: String },
+        rating: { type: Number },
+        active: { type: Boolean },      // Typed Boolean
+        release_date: { type: Date },   // Typed Date
+        is_visible: { type: Boolean }   // Typed Boolean from bit
+    }).toTableSchema("shows"), // series -> shows
+    
+    new Schema({
+        id: { type: String, primaryKey: true },
+        show_id: { type: String, required: true },
+        number: { type: Number, required: true },
+        year: { type: Number }
+    }).toTableSchema("seasons"), // temporadas -> seasons
+    
+    new Schema({
+        id: { type: String, primaryKey: true },
+        season_id: { type: String, required: true },
+        title: { type: String, required: true },
+        duration_minutes: { type: Number }
+    }).toTableSchema("episodes") // capitulos -> episodes
+];
 describe("Schema Migration System", () => {
     let db: Database;
     let extractor: SQLiteSchemaExtractor;
@@ -210,11 +263,9 @@ describe("Schema Migration System", () => {
         expect(row.max_retries).toBe(5);
     });
 
-    it("should detect complex type changes as warnings (simulated)", async () => {
-        // Although we can't easily capture console.warn in Bun test without mocking,
-        // we can verify the SQL generator returns the commented warnings or nothing safe for execution.
-        
+    it("should handle complex type changes by rebuilding table", async () => {
         db.run(`CREATE TABLE metadata (id TEXT PRIMARY KEY, value INTEGER);`);
+        db.run(`INSERT INTO metadata (id, value) VALUES ('1', 123);`);
         const currentSchemas = await extractor.extractAsTableSchemas();
         
         // Change 'value' from INTEGER to TEXT
@@ -226,14 +277,51 @@ describe("Schema Migration System", () => {
         const diff = SchemaComparator.compareSchemas(currentSchemas, [targetSchema]);
         const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
         
-        // We shouldn't receive any functional SQL for this column change in the current implementation
-        // because we decided to just log warnings for complex alters.
-        // Assuming we didn't add any OTHER columns, the SQL list might be empty or contain other ops.
-        // But for *this* column, no ALTER TABLE ... statements should mistakenly try to change type directly.
+        // Should generate a rebuild script (Create new, Insert, Drop old, Rename)
+        expect(sql.some(s => s.includes('CREATE TABLE IF NOT EXISTS "_new_metadata"'))).toBe(true);
+        expect(sql.some(s => s.includes('INSERT INTO "_new_metadata"'))).toBe(true);
+        expect(sql.some(s => s.includes('DROP TABLE "metadata"'))).toBe(true);
+        expect(sql.some(s => s.includes('ALTER TABLE "_new_metadata" RENAME TO "metadata"'))).toBe(true);
         
-        // Our generator implementation logs warnings and does NOT return SQL for complex column alters.
-        // So we expect no SQL related to 'value' column modification (SQLite doesn't support it directly).
-        expect(sql.every(s => !s.includes('ALTER TABLE "metadata" ALTER COLUMN'))).toBe(true);
+        // Execute
+        for (const stmt of sql) db.run(stmt);
+        
+        // Analyze result
+        const row = db.query("SELECT * FROM metadata WHERE id = '1'").get() as any;
+        expect(String(row.value)).toBe("123"); // Data preserved and type handled (SQLite dynamic typing makes this easy, but structure changed)
+        
+        const newSchema = await extractor.extractTableSchema("metadata");
+        expect(newSchema!.tableSchema.columns.find(c => c.name === "value")!.type).toBe("TEXT");
+    });
+
+    it("should handle adding column with UNIQUE constraint", async () => {
+        db.run(`DROP TABLE IF EXISTS users`);
+        db.run(`CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT);`);
+        const currentSchemas = await extractor.extractAsTableSchemas();
+        
+        // Add email with UNIQUE
+        const targetSchema = new Schema({
+            id: { type: String, primaryKey: true },
+            name: { type: String },
+            email: { type: String, unique: true }
+        }).toTableSchema("users");
+        
+        const diff = SchemaComparator.compareSchemas(currentSchemas, [targetSchema]);
+        const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+        
+        // Should contain ADD COLUMN (without UNIQUE) and CREATE UNIQUE INDEX
+        const addColumn = sql.find(s => s.includes('ADD COLUMN "email"'));
+        expect(addColumn).toBeDefined();
+        expect(addColumn).not.toContain("UNIQUE"); // Should NOT be in the ADD COLUMN statement
+        
+        expect(sql.some(s => s.includes('CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_email_unique"'))).toBe(true);
+        
+        // Execute
+        for (const stmt of sql) db.run(stmt);
+        
+        const newSchema = await extractor.extractTableSchema("users");
+        // Verify index exists
+        expect(newSchema!.tableSchema.indexes?.some(i => i.columns.includes("email") && i.unique)).toBe(true);
     });
 
     it("should validate Zod schemas match the db structure via Schema class", () => {
@@ -298,7 +386,7 @@ describe("Schema Migration System", () => {
          
          // Should ALTER oauth_clients to add missing columns (e.g. client_secret)
          // We check for one specific column addition
-         expect(sql.some(s => s.includes('ALTER TABLE "oauth_clients" ADD COLUMN "client_secret"'))).toBe(true);
+         expect(sql.some(s => s.includes('ADD COLUMN "client_secret"') || (s.includes('CREATE TABLE') && s.includes('client_secret')))).toBe(true);
          
          for(const stmt of sql) db.run(stmt);
          
@@ -332,52 +420,6 @@ describe("Schema Migration System", () => {
 
   describe("Large Schema Migration (Rename Simulation)", () => {
     it("should handle migration from distinct naming conventions (Spanish to English)", async () => {
-         // 1. Define Spanish Schemas (Current State)
-         const spanishSchemas = [
-             new Schema({
-                 id: { type: String, primaryKey: true },
-                 titulo: { type: String, required: true },
-                 descripcion: { type: String }
-             }).toTableSchema("series"),
-             
-             new Schema({
-                 id: { type: String, primaryKey: true },
-                 serie_id: { type: String, required: true },
-                 numero: { type: Number, required: true },
-                 anio: { type: Number }
-             }).toTableSchema("temporadas"),
-             
-             new Schema({
-                 id: { type: String, primaryKey: true },
-                 temporada_id: { type: String, required: true },
-                 titulo: { type: String, required: true },
-                 duracion: { type: Number }
-             }).toTableSchema("capitulos")
-         ];
-
-         // 2. Define English Schemas (Target State)
-         const englishSchemas = [
-             new Schema({
-                 id: { type: String, primaryKey: true },
-                 title: { type: String, required: true },
-                 description: { type: String },
-                 rating: { type: Number } // New field
-             }).toTableSchema("shows"), // series -> shows
-             
-             new Schema({
-                 id: { type: String, primaryKey: true },
-                 show_id: { type: String, required: true },
-                 number: { type: Number, required: true },
-                 year: { type: Number }
-             }).toTableSchema("seasons"), // temporadas -> seasons
-             
-             new Schema({
-                 id: { type: String, primaryKey: true },
-                 season_id: { type: String, required: true },
-                 title: { type: String, required: true },
-                 duration_minutes: { type: Number }
-             }).toTableSchema("episodes") // capitulos -> episodes
-         ];
          
          // 3. Setup Initial State (Spanish)
          const setupDiff = SchemaComparator.compareSchemas([], spanishSchemas);
@@ -418,6 +460,140 @@ describe("Schema Migration System", () => {
          expect(newTables).toContain("shows");
          expect(newTables).toContain("seasons");
          expect(newTables).toContain("episodes");
+    });
+  });
+
+  describe("Data Migration with BaseController", () => {
+    it("should allow manual data migration between tables using BaseController", async () => {
+        // 1. Setup Source Tables (Spanish)
+        const setupDiff = SchemaComparator.compareSchemas([], spanishSchemas);
+        const setupSql = SQLiteMigrationGenerator.generateMigrationSQL(setupDiff);
+        for (const stmt of setupSql) db.run(stmt);
+        
+        // 2. Populate Source with BaseController
+        dbInitializer.registerSchemas(spanishSchemas);
+        
+        const seriesController = dbInitializer.createController<{
+            id: string, 
+            titulo: string, 
+            descripcion: string,
+            es_activo: string,
+            fecha_estreno: string,
+            visible_bit: number
+        }>("series");
+        
+        // Scenario A: "true" string, Date string, 1 bit
+        await seriesController.create({ 
+            id: "1", 
+            titulo: "La Casa de Papel", 
+            descripcion: "Un atraco perfecto",
+            es_activo: "true",
+            fecha_estreno: "2017-05-02",
+            visible_bit: 1
+        });
+        
+        // Scenario B: "0" string (false), Date string, 0 bit
+        await seriesController.create({ 
+            id: "2", 
+            titulo: "Élite", 
+            descripcion: "Drama adolescente",
+            es_activo: "0",
+            fecha_estreno: "2018-10-05",
+            visible_bit: 0
+        });
+
+        // Scenario C: "false" string, Date string, 1 bit
+        await seriesController.create({
+            id: "3",
+            titulo: "Vis a Vis",
+            descripcion: "Carcel",
+            es_activo: "false", 
+            fecha_estreno: "2015-04-20",
+            visible_bit: 1
+        });
+        
+        // Verify insertion
+        const initialData = await seriesController.findAll();
+        expect(initialData.data).toHaveLength(3);
+
+        // 3. Define Target Tables (English) and Register
+        // (englishSchemas is already defined at top level)
+        dbInitializer.registerSchemas(englishSchemas);
+        
+        // Transition: Keep source, add target
+        const transitionSchemas = [...spanishSchemas, ...englishSchemas];
+        const currentSchemas = await extractor.extractAsTableSchemas();
+        const transitionDiff = SchemaComparator.compareSchemas(currentSchemas, transitionSchemas); 
+        const transitionSql = SQLiteMigrationGenerator.generateMigrationSQL(transitionDiff);
+        for (const stmt of transitionSql) db.run(stmt);
+        
+        // 4. Migrate Data from 'series' to 'shows' using BaseController
+        const showsController = dbInitializer.createController<{
+            id: string, 
+            title: string, 
+            description: string, 
+            rating: number,
+            active: boolean,
+            release_date: Date,
+            is_visible: boolean
+        }>("shows");
+        
+        const seriesRecords = await seriesController.findAll();
+        expect(seriesRecords.success).toBe(true);
+        
+        for (const record of seriesRecords.data!) {
+            // Helper to parsing "messy" booleans
+            const rawBool = String(record.es_activo).toLowerCase();
+            const isActive = ["true", "1", "si", "yes"].includes(rawBool);
+            
+            await showsController.create({
+                id: record.id,
+                title: record.titulo,
+                description: record.descripcion, 
+                rating: 5,
+                // Conversions
+                active: isActive,
+                release_date: new Date(record.fecha_estreno),
+                is_visible: Boolean(record.visible_bit)
+            });
+        }
+        
+        // 5. Verify Final State in New Table
+        const showsRecords = await showsController.findAll();
+        expect(showsRecords.data).toHaveLength(3);
+        
+        // Check Record 1 (True, True)
+        const paperHouse = showsRecords.data!.find(u => u.id === "1");
+        expect(paperHouse!.title).toBe("La Casa de Papel");
+        expect(paperHouse!.active).toBe<number>(1);  // from "true"
+        expect(paperHouse!.is_visible).toBe<number>(1); // from 1
+        expect(paperHouse!.release_date).toBeDefined();
+        // SQLite stores Dates as strings typically, but BaseController might parse them back effectively or treat them as ISO strings
+        // We check if it matches the input date string roughly
+        expect(new Date(paperHouse!.release_date as any).toISOString().slice(0, 10)).toBe("2017-05-02");
+
+        // Check Record 2 (False, False)
+        const elite = showsRecords.data!.find(u => u.id === "2");
+        expect(elite!.title).toBe("Élite");
+        expect(elite!.active).toBe<number>(0); // from "0"
+        expect(elite!.is_visible).toBe<number>(0); // from 0
+        
+        // Check Record 3 (False, True)
+        const vis = showsRecords.data!.find(u => u.id === "3");
+        expect(vis!.active).toBe<number>(0); // from "false"
+        
+        expect(vis!.is_visible).toBe<number>(1); // from 1
+        // 6. Cleanup / Finalize Migration (Drop Old Tables)
+        const finalDiff = SchemaComparator.compareSchemas(await extractor.extractAsTableSchemas(), englishSchemas);
+        const finalSql = SQLiteMigrationGenerator.generateMigrationSQL(finalDiff);
+        
+        expect(finalSql.some(s => s.includes('DROP TABLE IF EXISTS "series"'))).toBe(true);
+        
+        for (const stmt of finalSql) db.run(stmt);
+        
+        const finalTables = await extractor.getAllTableNames();
+        expect(finalTables).not.toContain("series");
+        expect(finalTables).toContain("shows");
     });
   });
 });

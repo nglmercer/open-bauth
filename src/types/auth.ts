@@ -636,3 +636,31 @@ export abstract class AuthError extends Error {
     };
   }
 }
+
+export interface UserRole {
+  id: string;
+  user_id: string;
+  role_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RolePermission {
+  id: string;
+  role_id: string;
+  permission_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Session {
+  id: string;
+  user_id: string;
+  token: string;
+  created_at: string;
+  expires_at: string;
+  last_activity: string;
+  ip_address?: string;
+  user_agent?: string;
+  is_active: boolean;
+}

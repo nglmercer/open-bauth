@@ -32,8 +32,82 @@ export class SQLiteMigrationGenerator {
     // 3. Tables to ALTER
     for (const tableDiff of diff.tableDiffs) {
       if (tableDiff.changeType === "ALTER") {
-        statements.push(...this.generateAlterTableSQL(tableDiff));
+        if (this.requiresTableRebuild(tableDiff)) {
+          statements.push(...this.generateRebuildTableSQL(tableDiff));
+        } else {
+          statements.push(...this.generateAlterTableSQL(tableDiff));
+        }
       }
+    }
+
+    return statements;
+  }
+
+  private static requiresTableRebuild(tableDiff: TableDiff): boolean {
+    // 1. Check for Column Modifications (ALTER) - Type change, constraint change
+    if (tableDiff.columnDiffs.some(c => c.changeType === "ALTER")) {
+      return true;
+    }
+
+    // 2. Check for Adding NOT NULL without Default
+    // SQLite ADD COLUMN limitations
+    for (const colDiff of tableDiff.columnDiffs) {
+      if (colDiff.changeType === "CREATE" && colDiff.newColumn) {
+        if (
+          colDiff.newColumn.notNull &&
+          colDiff.newColumn.defaultValue === undefined &&
+          !colDiff.newColumn.primaryKey
+        ) {
+          // Cannot add NOT NULL column without default to populated table in SQLite
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  private static generateRebuildTableSQL(tableDiff: TableDiff): string[] {
+    const statements: string[] = [];
+    const tableName = tableDiff.tableName;
+    const tempTableName = `_new_${tableName}`;
+    
+    if (!tableDiff.newSchema || !tableDiff.oldSchema) {
+        console.warn(`Cannot rebuild table ${tableName} without full schema definition.`);
+        return [];
+    }
+
+    // 1. Create new table with temporary name
+    const createSQL = this.generateCreateTableSQL({
+        ...tableDiff.newSchema,
+        tableName: tempTableName
+    });
+    statements.push(createSQL);
+
+    // 2. Copy data
+    // Identify common columns
+    const oldColumns = new Set(tableDiff.oldSchema.columns.map(c => c.name));
+    
+    const commonColumns = tableDiff.newSchema.columns
+        .filter(c => oldColumns.has(c.name))
+        .map(c => `"${c.name}"`);
+
+    if (commonColumns.length > 0) {
+        const cols = commonColumns.join(", ");
+        statements.push(`INSERT INTO "${tempTableName}" (${cols}) SELECT ${cols} FROM "${tableName}";`);
+    }
+
+    // 3. Drop old table
+    statements.push(`DROP TABLE "${tableName}";`);
+
+    // 4. Rename new table
+    statements.push(`ALTER TABLE "${tempTableName}" RENAME TO "${tableName}";`);
+
+    // 5. Recreate Indexes
+    if (tableDiff.newSchema.indexes) {
+        for (const idx of tableDiff.newSchema.indexes) {
+             statements.push(this.generateCreateIndexSQL(tableName, idx));
+        }
     }
 
     return statements;
@@ -55,34 +129,6 @@ export class SQLiteMigrationGenerator {
         }
     }
 
-    // Column changes
-    // SQLite supports ADD COLUMN
-    // SQLite supports DROP COLUMN (>= 3.35.0) which bun supports
-    // Altering column types is NOT supported directly and requires table recreation usually.
-    
-    // We will separate changes into:
-    // - Simple additions (ADD COLUMN)
-    // - Simple removals (DROP COLUMN)
-    // - Complex changes (Type change, constraint change) -> Need full recreation
-    
-    const complexChanges = tableDiff.columnDiffs.some(
-        c => c.changeType === "ALTER" // Modification of existing column
-    );
-
-    if (complexChanges) {
-        // If we have complex changes, we might need to recreate the table
-        // For now, let's just log a warning or handle what we can.
-        // Implementing full table recreation (Create new, copy data, drop old, rename) is risky to auto-generate without backup.
-        console.warn(`WARNING: Complex changes detected for table ${tableName}. Manual migration might be required.`);
-         
-         for (const colDiff of tableDiff.columnDiffs) {
-             if (colDiff.changeType === "ALTER") {
-                  console.warn(`-- ALTER COLUMN ${colDiff.columnName} changed: ${colDiff.differences?.join(", ")}`);
-                  // SQLite doesn't support ALTER COLUMN type/constraint
-             }
-         }
-    }
-
     // Handle Drops
     for (const colDiff of tableDiff.columnDiffs) {
         if (colDiff.changeType === "DROP") {
@@ -93,8 +139,19 @@ export class SQLiteMigrationGenerator {
     // Handle Adds
     for (const colDiff of tableDiff.columnDiffs) {
         if (colDiff.changeType === "CREATE" && colDiff.newColumn) {
-             const colDef = this.generateColumnDefinition(colDiff.newColumn);
+             // Handle UNIQUE constraint limitation in ADD COLUMN
+             const isUnique = colDiff.newColumn.unique;
+             const colDef = this.generateColumnDefinition(colDiff.newColumn, true); // true = forAddColumn
+             
              statements.push(`ALTER TABLE "${tableName}" ADD COLUMN ${colDef};`);
+             
+             if (isUnique) {
+                 statements.push(this.generateCreateIndexSQL(tableName, {
+                     name: `idx_${tableName}_${colDiff.columnName}_unique`,
+                     columns: [colDiff.columnName],
+                     unique: true
+                 }));
+             }
         }
     }
 
@@ -106,7 +163,7 @@ export class SQLiteMigrationGenerator {
     return `CREATE TABLE IF NOT EXISTS "${schema.tableName}" (${columns});`;
   }
 
-  private static generateColumnDefinition(col: ColumnDefinition): string {
+  private static generateColumnDefinition(col: ColumnDefinition, forAddColumn: boolean = false): string {
       let def = `"${col.name}" ${col.type}`;
       
       if (col.primaryKey) {
@@ -115,7 +172,9 @@ export class SQLiteMigrationGenerator {
       }
       
       if (col.notNull && !col.primaryKey) def += " NOT NULL";
-      if (col.unique && !col.primaryKey) def += " UNIQUE";
+      
+      // SQLite ADD COLUMN does not support UNIQUE constraint directly
+      if (col.unique && !col.primaryKey && !forAddColumn) def += " UNIQUE";
       
       if (col.defaultValue !== undefined) {
            def += ` DEFAULT ${this.formatDefaultValue(col.defaultValue)}`;
