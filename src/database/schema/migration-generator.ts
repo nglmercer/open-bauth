@@ -1,10 +1,11 @@
 import { SchemaDiff, TableDiff, ColumnDiff, IndexDiff } from "./schema-comparison";
-import type { ColumnDefinition } from "../base-controller";
+import type { ColumnDefinition, TriggerSchema } from "../base-controller";
 import { BaseController } from "../base-controller";
 
 export class SQLiteMigrationGenerator {
-  static generateMigrationSQL(diff: SchemaDiff): string[] {
+  static generateMigrationSQL(diff: SchemaDiff, targetTriggers: TriggerSchema[] = []): string[] {
     const statements: string[] = [];
+    const rebuiltTables = new Set<string>();
 
     // 1. Tables to DROP
     for (const tableDiff of diff.tableDiffs) {
@@ -17,7 +18,6 @@ export class SQLiteMigrationGenerator {
     for (const tableDiff of diff.tableDiffs) {
       if (tableDiff.changeType === "CREATE" && tableDiff.newSchema) {
         // Use BaseController's logic if possible, or reimplement
-        // BaseController.generateCreateTableSQL is private, so we might need to expose it or reimplement
         statements.push(this.generateCreateTableSQL(tableDiff.newSchema));
         
         // Add indexes for new table
@@ -31,20 +31,8 @@ export class SQLiteMigrationGenerator {
 
     // 4. Tables to RENAME
     for (const tableDiff of diff.tableDiffs) {
-      // NOTE: If changeType is RENAME, we do this FIRST before altering validation
-      // But usually altering involves the new name, so rename first is good.
       if (tableDiff.changeType === "RENAME" && tableDiff.newName) {
           statements.push(`ALTER TABLE "${tableDiff.tableName}" RENAME TO "${tableDiff.newName}";`);
-          // Update tableName for subsequent operations in this loop?
-          // No, the tableDiff object still has old tableName likely, or whatever was passed.
-          // Comparator returned diff.tableName = OLD name for RENAME ops?
-          // In my comparator logic: "diff.tableName = oldName!". So we use tableDiff.tableName to identify it.
-          // Subsequent ALTERs in this loop (if any) need to use NEW name.
-          // Actually, if we have ALTERS inside a RENAME tableDiff, they target the NEW schema.
-          // So we should perform ALTERS on the NEW table name.
-          
-          // Let's mutate/shadow tableName for the next step?
-          // Or we handle it inside generateAlterTableSQL.
       }
     }
 
@@ -57,6 +45,7 @@ export class SQLiteMigrationGenerator {
 
         if (this.requiresTableRebuild(tableDiff)) {
           statements.push(...this.generateRebuildTableSQL(tableDiff, effectiveTableName));
+          rebuiltTables.add(effectiveTableName);
         } else {
           statements.push(...this.generateAlterTableSQL(tableDiff, effectiveTableName));
         }
@@ -75,7 +64,7 @@ export class SQLiteMigrationGenerator {
         }
     }
 
-    // 7. Triggers
+    // 7. Triggers (Explicit Changes)
     for (const triggerDiff of diff.triggerDiffs) {
         if (triggerDiff.changeType === "DROP" || triggerDiff.changeType === "ALTER") {
             statements.push(`DROP TRIGGER IF EXISTS "${triggerDiff.triggerName}";`);
@@ -87,12 +76,35 @@ export class SQLiteMigrationGenerator {
         }
     }
 
+    // 8. Restore Lost Triggers (due to Table Rebuilds)
+    // If a table was rebuilt, its triggers are lost even if they didn't change (no diff).
+    // We must restore them from targetTriggers.
+    if (targetTriggers.length > 0) {
+        for (const trigger of targetTriggers) {
+            // Check if this trigger belongs to a rebuilt table
+            if (rebuiltTables.has(trigger.tableName)) {
+                // Check if this trigger was already handled in the diff (e.g. it was modified or explicitly dropped)
+                const isHandledInDiff = diff.triggerDiffs.some(td => td.triggerName === trigger.name);
+                
+                if (!isHandledInDiff) {
+                    // It was NOT in the diff, meaning it should be preserved.
+                    // But rebuild destroyed it. So we must recreate it.
+                    statements.push(trigger.sql);
+                }
+            }
+        }
+    }
+
     return statements;
   }
 
   private static requiresTableRebuild(tableDiff: TableDiff): boolean {
     // 1. Check for Column Modifications (ALTER) - Type change, constraint change
-    if (tableDiff.columnDiffs.some(c => c.changeType === "ALTER")) {
+    // Also Check for RENAME where other properties changed (e.g. Type change + Rename)
+    if (tableDiff.columnDiffs.some(c => 
+        c.changeType === "ALTER" || 
+        (c.changeType === "RENAME" && c.differences && c.differences.length > 0)
+    )) {
       return true;
     }
 
@@ -142,16 +154,35 @@ export class SQLiteMigrationGenerator {
     statements.push(createSQL);
 
     // 2. Copy data
-    // Identify common columns
-    const oldColumns = new Set(tableDiff.oldSchema.columns.map(c => c.name));
-    
-    const commonColumns = tableDiff.newSchema.columns
-        .filter(c => oldColumns.has(c.name))
-        .map(c => `"${c.name}"`);
+    // 2. Copy data
+    const insertColumns: string[] = [];
+    const selectColumns: string[] = [];
 
-    if (commonColumns.length > 0) {
-        const cols = commonColumns.join(", ");
-        statements.push(`INSERT INTO "${tempTableName}" (${cols}) SELECT ${cols} FROM "${tableName}";`);
+    // Map new columns to old columns to preserve data
+    for (const newCol of tableDiff.newSchema.columns) {
+        // Check if this column corresponds to an old column (either same name or renamed)
+        const colDiff = tableDiff.columnDiffs.find(cd => cd.newColumn?.name === newCol.name);
+        
+        let oldColName: string | undefined;
+
+        if (colDiff && colDiff.changeType === "RENAME" && colDiff.oldColumn) {
+             oldColName = colDiff.oldColumn.name;
+        } else {
+             // If not explicitly renamed in diff, check if it existed in old schema with same name
+             const existsInOld = tableDiff.oldSchema.columns.some(c => c.name === newCol.name);
+             if (existsInOld) {
+                 oldColName = newCol.name;
+             }
+        }
+
+        if (oldColName) {
+            insertColumns.push(`"${newCol.name}"`);
+            selectColumns.push(`"${oldColName}"`);
+        }
+    }
+
+    if (insertColumns.length > 0) {
+        statements.push(`INSERT INTO "${tempTableName}" (${insertColumns.join(", ")}) SELECT ${selectColumns.join(", ")} FROM "${tableName}";`);
     }
 
     // 3. Drop old table
@@ -229,14 +260,26 @@ export class SQLiteMigrationGenerator {
   }
 
   private static generateCreateTableSQL(schema: import("../base-controller").TableSchema): string {
-    const columns = schema.columns.map(c => this.generateColumnDefinition(c)).join(", ");
-    return `CREATE TABLE IF NOT EXISTS "${schema.tableName}" (${columns});`;
+    const pkColumns = schema.columns.filter(c => c.primaryKey);
+    const useTableConstraint = pkColumns.length > 1;
+
+    const columns = schema.columns.map(c => 
+        this.generateColumnDefinition(c, false, useTableConstraint)
+    ).join(", ");
+
+    let constraints = "";
+    if (useTableConstraint) {
+        const pkNames = pkColumns.map(c => `"${c.name}"`).join(", ");
+        constraints = `, PRIMARY KEY (${pkNames})`;
+    }
+
+    return `CREATE TABLE IF NOT EXISTS "${schema.tableName}" (${columns}${constraints});`;
   }
 
-  private static generateColumnDefinition(col: ColumnDefinition, forAddColumn: boolean = false): string {
+  private static generateColumnDefinition(col: ColumnDefinition, forAddColumn: boolean = false, suppressPrimaryKey: boolean = false): string {
       let def = `"${col.name}" ${col.type}`;
       
-      if (col.primaryKey) {
+      if (col.primaryKey && !suppressPrimaryKey) {
           def += " PRIMARY KEY";
           if (col.autoIncrement) def += " AUTOINCREMENT";
       }

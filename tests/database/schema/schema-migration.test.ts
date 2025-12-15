@@ -326,6 +326,52 @@ describe("Schema Migration System", () => {
         expect(newSchema!.tableSchema.indexes?.some(i => i.columns.includes("email") && i.unique)).toBe(true);
     });
 
+    it("should correctly generate SQL for composite primary keys", async () => {
+        db.run(`DROP TABLE IF EXISTS team_members`);
+        const currentSchemas: TableSchema[] = [];
+
+        // Target: Table with Composite PK (team_id, user_id)
+        const targetSchema = new Schema({
+            team_id: { type: String, primaryKey: true },
+            user_id: { type: String, primaryKey: true },
+            role: { type: String }
+        }).toTableSchema("team_members");
+
+        const diff = SchemaComparator.compareSchemas(currentSchemas, [targetSchema]);
+        const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff);
+
+        expect(sql).toHaveLength(1);
+        const createStmt = sql[0];
+        
+        // Assertions
+        expect(createStmt).toContain('CREATE TABLE IF NOT EXISTS "team_members"');
+        expect(createStmt).toContain('PRIMARY KEY ("team_id", "user_id")');
+        // Ensure individual columns don't have PRIMARY KEY appended
+        expect(createStmt).not.toMatch(/"team_id" [^,]+ PRIMARY KEY/);
+        expect(createStmt).not.toMatch(/"user_id" [^,]+ PRIMARY KEY/);
+
+        // Apply and Verify
+        db.run(createStmt);
+        
+        // SQLite doesn't easily expose composite PK metadata via simple PRAGMA table_info check for "pk" > 0 
+        // (multiple cols will have pk > 0), so we check insertion behavior.
+        
+        // 1. Insert unique combination
+        expect(() => {
+            db.run(`INSERT INTO team_members (team_id, user_id, role) VALUES ('t1', 'u1', 'admin')`);
+        }).not.toThrow();
+
+        // 2. Insert same combination (Should fail)
+        expect(() => {
+            db.run(`INSERT INTO team_members (team_id, user_id, role) VALUES ('t1', 'u1', 'member')`);
+        }).toThrow(/UNIQUE constraint failed/);
+
+        // 3. Insert different combination (Should succeed)
+        expect(() => {
+            db.run(`INSERT INTO team_members (team_id, user_id, role) VALUES ('t1', 'u2', 'member')`);
+        }).not.toThrow();
+    });
+
     it("should validate Zod schemas match the db structure via Schema class", () => {
          const schemaDef = new Schema({
              id: { type: String, primaryKey: true },
@@ -703,6 +749,67 @@ describe("Schema Migration System", () => {
         expect(row.name).toBeNull(); 
         expect(row.fullname).toBeUndefined();
       });
+  });
+
+  describe("Trigger Preservation during Rebuilds", () => {
+    it("should preserve triggers when rebuilding a table", async () => {
+        // 1. Setup Table and Trigger
+        db.run(`CREATE TABLE events (id TEXT PRIMARY KEY, type TEXT);`);
+        db.run(`CREATE TABLE logs (message TEXT);`);
+        const triggerSQL = `CREATE TRIGGER log_event AFTER INSERT ON events BEGIN INSERT INTO logs (message) VALUES ('new event'); END;`;
+        db.run(triggerSQL);
+
+        // Verify trigger exists
+        let triggers = db.query("SELECT name FROM sqlite_master WHERE type = 'trigger'").all();
+        expect(triggers.some((t: any) => t.name === "log_event")).toBe(true);
+        
+        // Use extractor to get current state (requires extractTriggers which we verified exists)
+        const currentSchemas = await extractor.extractAsTableSchemas();
+        const currentTriggers = await extractor.extractTriggers();
+        
+        // 2. Define Target Schema that forces a REBUILD (e.g. changing column type)
+        const targetTableSchema = new Schema({
+            id: { type: String, primaryKey: true },
+            type: { type: Number } // Changed from TEXT to NUMBER
+        }).toTableSchema("events");
+        
+        const targetLogSchema = new Schema({ message: String }).toTableSchema("logs");
+
+        // Target Triggers: We want to KEEP the existing trigger
+        const targetTriggers = [...currentTriggers]; 
+
+        // 3. Compare without modifying trigger
+        const diff = SchemaComparator.compareSchemas(
+            currentSchemas, 
+            [targetTableSchema, targetLogSchema], 
+            {}, 
+            [], [], // views 
+            currentTriggers, // current triggers
+            targetTriggers   // target triggers
+        );
+
+        // Expect no trigger diffs because they are identical
+        expect(diff.triggerDiffs).toHaveLength(0);
+        
+        // Expect table diff to be ALTER (Rebuild)
+        const eventDiff = diff.tableDiffs.find(t => t.tableName === "events");
+        expect(eventDiff?.changeType).toBe("ALTER");
+
+        // 4. Generate SQL passing the targetTriggers to restore them if needed
+        const sql = SQLiteMigrationGenerator.generateMigrationSQL(diff, targetTriggers);
+        
+        // 5. Execute
+        MigrationManager.runMigrations(db, sql);
+
+        // 6. Verify Trigger Still Exists
+        triggers = db.query("SELECT name FROM sqlite_master WHERE type = 'trigger'").all();
+        expect(triggers.some((t: any) => t.name === "log_event")).toBe(true);
+        
+        // Verify Data Integrity
+        db.run(`INSERT INTO events (id, type) VALUES ('e1', 1)`);
+        const log = db.query("SELECT * FROM logs").get() as any;
+        expect(log.message).toBe("new event");
+    });
   });
 
   describe("Advanced Features: Renames, Views, Triggers", () => {
