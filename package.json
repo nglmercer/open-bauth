@@ -80,6 +80,26 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/src/index.d.ts"
+    },
+    "./schemas": {
+      "import": "./dist/schemas/index.js",
+      "types": "./dist/src/schemas/index.d.ts"
+    },
+    "./schemas/auth": {
+      "import": "./dist/schemas/auth-schemas.js",
+      "types": "./dist/src/schemas/auth-schemas.d.ts"
+    },
+    "./schemas/oauth": {
+      "import": "./dist/schemas/oauth-schemas.js",
+      "types": "./dist/src/schemas/oauth-schemas.d.ts"
+    },
+    "./database": {
+      "import": "./dist/database/index.js",
+      "types": "./dist/src/database/index.d.ts"
+    },
+    "./database/schema": {
+      "import": "./dist/database/schema/index.js",
+      "types": "./dist/src/database/schema/index.d.ts"
     }
   },
   "trustedDependencies": [

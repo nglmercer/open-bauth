@@ -11,6 +11,12 @@ import {
   type SchemaCollection,
 } from "./base-controller";
 import type { User, Role, Permission,RolePermission } from "../types/auth";
+
+// Import schema builder for optional default schemas
+import { buildDatabaseSchemas } from "./schema/schema-builder";
+import { Schema, type ModelZodSchemas } from "./schema/schema";
+import { createSchemaExtractor } from "./schema/schema-extractor";
+
 // Type definitions for better type safety
 export interface DatabaseConfig {
   database: Database;
@@ -58,37 +64,72 @@ const silenceLogger: DatabaseLogger = {
   warn: (msg: string, ...args: any[]) => { },
   error: (msg: string, ...args: any[]) => { },
 };
-// Database table schemas using your existing structure
-// Import dynamic schema builder
-import { buildDatabaseSchemas } from "./schema/schema-builder";
-import { Schema, type ModelZodSchemas } from "./schema/schema";
-import { createSchemaExtractor } from "./schema/schema-extractor";
-
-// Legacy export for backward compatibility - now uses dynamic schemas
+// Database table schemas - EMPTY BY DEFAULT
+// Users must explicitly register schemas using externalSchemas or registerSchemas()
 export const DATABASE_SCHEMAS: TableSchema[] = [];
 
-// Initialize schemas on first access
+// Flag to track if schemas have been explicitly set
+let schemasInitialized = false;
+
+// Initialize schemas on first access - now returns empty by default
+// Use externalSchemas in DatabaseInitializer constructor to provide schemas
 function getSchemas(): TableSchema[] {
   // Check if cache needs to be cleared
   if ((globalThis as any).__schemaCacheCleared) {
     DATABASE_SCHEMAS.length = 0;
     (globalThis as any).__schemaCacheCleared = false;
+    schemasInitialized = false;
   }
 
-  if (DATABASE_SCHEMAS.length === 0) {
-    DATABASE_SCHEMAS.push(...buildDatabaseSchemas());
+  // Return empty by default - schemas must be explicitly provided
+  // This allows the system to work without any predefined schema
+  if (!schemasInitialized) {
+    return [];
   }
+  
   return DATABASE_SCHEMAS;
 }
 
-// Alias público para el conjunto por defecto (retrocompatibilidad y claridad)
-// Export function to get current schemas based on configuration
-export function getCurrentSchemas(): TableSchema[] {
+/**
+ * Register schemas to be used by the database system
+ * Call this to enable schema-based features
+ * @param schemas Array of TableSchema to register
+ */
+export function registerSchemas(schemas: TableSchema[]): void {
+  DATABASE_SCHEMAS.length = 0;
+  DATABASE_SCHEMAS.push(...schemas);
+  schemasInitialized = true;
+}
+
+/**
+ * Check if schemas have been registered
+ */
+export function hasSchemas(): boolean {
+  return schemasInitialized && DATABASE_SCHEMAS.length > 0;
+}
+
+/**
+ * Load default schemas from the schema builder
+ * Call this if you want to use the built-in auth schemas
+ */
+export function loadDefaultSchemas(): TableSchema[] {
+  const defaultSchemas = buildDatabaseSchemas();
+  registerSchemas(defaultSchemas);
+  return defaultSchemas;
+}
+
+/**
+ * Get built-in auth schemas (requires importing from schemas module)
+ * This is a convenience function that returns the default auth schemas
+ */
+export function getDefaultAuthSchemas(): TableSchema[] {
   return buildDatabaseSchemas();
 }
 
-// Legacy export for backward compatibility
-export const DEFAULT_SCHEMAS = getCurrentSchemas();
+// Export function to get current schemas - returns empty by default
+export function getCurrentSchemas(): TableSchema[] {
+  return getSchemas();
+}
 
 // API ligera para registrar y combinar esquemas desde fuera de la librería
 export class SchemaRegistry {

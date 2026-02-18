@@ -1,3 +1,18 @@
+/**
+ * Schema Builder - Dynamic Schema Construction
+ * 
+ * This module provides utilities for building database schemas dynamically.
+ * By default, no schemas are predefined - you must import and register them.
+ * 
+ * @example
+ * ```ts
+ * import { getAuthSchemas } from 'open-bauth/schemas';
+ * 
+ * const schemas = getAuthSchemas();
+ * // Use schemas with DatabaseInitializer
+ * ```
+ */
+
 import type { TableSchema, ColumnDefinition } from "../base-controller";
 import { Schema } from "./schema";
 import {
@@ -7,154 +22,19 @@ import {
   type DatabaseTableConfig,
 } from "../config";
 import { StandardFields } from "./constants";
-// Schema base
+
+// Re-export constants
 export * from "./constants";
-export const BASE_SCHEMAS: Record<string, Schema> = {
-  users: new Schema(
-    {
-      id: StandardFields.UUID,
-      email: { type: String, required: true, unique: true },
-      username: String,
-      password_hash: { type: String, required: true },
-      first_name: String,
-      last_name: String,
-      ...StandardFields.Timestamps,
-      last_login_at: Date,
-      is_active: StandardFields.Active,
-    },
-    {
-      indexes: [
-        { name: "idx_users_email", columns: ["email"], unique: true },
-        { name: "idx_users_username", columns: ["username"], unique: true },
-        { name: "idx_users_active", columns: ["is_active"] },
-      ],
-    },
-  ),
 
-  roles: new Schema(
-    {
-      id: StandardFields.UUID,
-      name: { type: String, required: true, unique: true },
-      description: String,
-      ...StandardFields.Timestamps,
-      is_active: StandardFields.Active,
-    },
-    {
-      indexes: [{ name: "idx_roles_name", columns: ["name"], unique: true }],
-    },
-  ),
+/**
+ * Empty base schemas - the system works without predefined schemas
+ * Users should import schemas from 'open-bauth/schemas' module
+ */
+export const BASE_SCHEMAS: Record<string, Schema> = {};
 
-  permissions: new Schema(
-    {
-      id: StandardFields.UUID,
-      name: { type: String, required: true, unique: true },
-      resource: { type: String, required: true },
-      action: { type: String, required: true },
-      description: String,
-      created_at: { type: Date, default: Date.now },
-    },
-    {
-      indexes: [
-        { name: "idx_permissions_name", columns: ["name"], unique: true },
-        { name: "idx_permissions_resource", columns: ["resource"] },
-        { name: "idx_permissions_action", columns: ["action"] },
-      ],
-    },
-  ),
-
-  userRoles: new Schema(
-    {
-      id: StandardFields.UUID,
-      user_id: {
-        type: "TEXT",
-        required: true,
-        ref: "users",
-        onDelete: "CASCADE",
-      },
-      role_id: {
-        type: "TEXT",
-        required: true,
-        ref: "roles",
-        onDelete: "CASCADE",
-      },
-      ...StandardFields.Timestamps,
-    },
-    {
-      indexes: [
-        { name: "idx_user_roles_user_id", columns: ["user_id"] },
-        { name: "idx_user_roles_role_id", columns: ["role_id"] },
-        {
-          name: "idx_user_roles_unique",
-          columns: ["user_id", "role_id"],
-          unique: true,
-        },
-      ],
-    },
-  ),
-
-  rolePermissions: new Schema(
-    {
-      id: StandardFields.UUID,
-      role_id: {
-        type: "TEXT",
-        required: true,
-        ref: "roles",
-        onDelete: "CASCADE",
-      },
-      permission_id: {
-        type: "TEXT",
-        required: true,
-        ref: "permissions",
-        onDelete: "CASCADE",
-      },
-      ...StandardFields.Timestamps,
-    },
-    {
-      indexes: [
-        { name: "idx_role_permissions_role_id", columns: ["role_id"] },
-        {
-          name: "idx_role_permissions_permission_id",
-          columns: ["permission_id"],
-        },
-        {
-          name: "idx_role_permissions_unique",
-          columns: ["role_id", "permission_id"],
-          unique: true,
-        },
-      ],
-    },
-  ),
-
-  sessions: new Schema(
-    {
-      id: StandardFields.UUID,
-      user_id: {
-        type: "TEXT",
-        required: true,
-        ref: "users",
-        onDelete: "CASCADE",
-      },
-      token: { type: String, required: true, unique: true },
-      created_at: { type: Date, default: Date.now },
-      expires_at: { type: Date, required: true },
-      last_activity: { type: Date, default: Date.now },
-      ip_address: String,
-      user_agent: String,
-      is_active: StandardFields.Active,
-    },
-    {
-      indexes: [
-        { name: "idx_sessions_user_id", columns: ["user_id"] },
-        { name: "idx_sessions_token", columns: ["token"], unique: true },
-        { name: "idx_sessions_expires_at", columns: ["expires_at"] },
-        { name: "idx_sessions_active", columns: ["is_active"] },
-      ],
-    },
-  ),
-};
-
-// constructor functions
-
+/**
+ * Apply schema extensions to a base schema
+ */
 function applySchemaExtensions(
   baseSchema: TableSchema,
   extension?: import("../config").SchemaExtension,
@@ -182,19 +62,19 @@ function applySchemaExtensions(
   return { ...baseSchema, columns };
 }
 
+/**
+ * Update table references based on custom table names
+ */
 function updateTableReferences(
   schema: TableSchema,
   tableNames: Record<string, string>,
 ): TableSchema {
-  // Mapeo inverso de claves conocidas a nombres personalizados
-  const referenceMap: Record<string, string> = {
-    users: tableNames.users,
-    roles: tableNames.roles,
-    permissions: tableNames.permissions,
-    user_roles: tableNames.userRoles,
-    role_permissions: tableNames.rolePermissions,
-    sessions: tableNames.sessions,
-  };
+  const referenceMap: Record<string, string> = {};
+
+  // Build reference map from known table names
+  Object.entries(tableNames).forEach(([key, name]) => {
+    referenceMap[key] = name;
+  });
 
   const updatedColumns = schema.columns.map((column) => {
     if (column.references && referenceMap[column.references.table]) {
@@ -211,7 +91,6 @@ function updateTableReferences(
 
   const updatedIndexes = (schema.indexes || []).map((index) => {
     let newName = index.name;
-    // Reemplazo dinámico de prefijos basado en el mapa
     Object.entries(referenceMap).forEach(([key, customName]) => {
       if (newName.includes(`idx_${key}_`)) {
         newName = newName.replace(`idx_${key}_`, `idx_${customName}_`);
@@ -227,19 +106,26 @@ function updateTableReferences(
   };
 }
 
+/**
+ * Build database schemas from configuration
+ * 
+ * This function now returns an empty array by default unless:
+ * 1. Schema extensions are configured
+ * 2. External schemas are provided
+ * 
+ * For predefined auth/OAuth schemas, import them from 'open-bauth/schemas'
+ */
 export function buildDatabaseSchemas(): TableSchema[] {
   const config = getDatabaseConfig();
   const tableNames = getAllTableNames();
   const schemaExtensions = config.schemaExtensions || {};
   const schemas: TableSchema[] = [];
 
-  // 1. Procesar Esquemas Base
+  // Process BASE_SCHEMAS (empty by default)
   const baseKeys = Object.keys(BASE_SCHEMAS) as (keyof typeof BASE_SCHEMAS)[];
 
   for (const key of baseKeys) {
     const definition = BASE_SCHEMAS[key];
-    // key mapping BASE_SCHEMAS  -> config.tableNames
-    //  (users -> users, roles -> roles, etc.)
     const configKey = key as keyof DatabaseTableConfig;
     const customTableName = tableNames[configKey];
     const extension = schemaExtensions[configKey];
@@ -252,8 +138,8 @@ export function buildDatabaseSchemas(): TableSchema[] {
     }
   }
 
-  // Oauth Schemes
-  const oauthKeys: (keyof DatabaseTableConfig)[] = [
+  // Process OAuth-style schema extensions
+  const extensionKeys: (keyof DatabaseTableConfig)[] = [
     "oauthClients",
     "authorizationCodes",
     "refreshTokens",
@@ -264,9 +150,15 @@ export function buildDatabaseSchemas(): TableSchema[] {
     "mfaConfigurations",
     "securityChallenges",
     "oauthSessions",
+    "users",
+    "roles",
+    "permissions",
+    "userRoles",
+    "rolePermissions",
+    "sessions",
   ];
 
-  for (const key of oauthKeys) {
+  for (const key of extensionKeys) {
     const extension = schemaExtensions[key];
     const tableName = tableNames[key];
 
@@ -282,12 +174,69 @@ export function buildDatabaseSchemas(): TableSchema[] {
   return schemas;
 }
 
+/**
+ * Get table schema by table name
+ */
 export function getTableSchema(tableName: string): TableSchema | null {
   return buildDatabaseSchemas().find((s) => s.tableName === tableName) || null;
 }
 
+/**
+ * Get table schema by configuration key
+ */
 export function getTableSchemaByKey(
   tableKey: keyof DatabaseTableConfig,
 ): TableSchema | null {
   return getTableSchema(getTableName(tableKey));
+}
+
+/**
+ * Register external schemas to be used by the database
+ * This is the recommended way to add schemas
+ */
+export function registerExternalSchemas(schemas: TableSchema[]): void {
+  const { setDatabaseConfig, getDatabaseConfig, createSchemaExtension } = require("../config");
+  const currentConfig = getDatabaseConfig();
+  
+  const schemaExtensions: Record<string, ReturnType<typeof createSchemaExtension>> = {};
+  
+  for (const schema of schemas) {
+    schemaExtensions[schema.tableName] = createSchemaExtension(
+      schema.columns,
+      [],
+      [],
+    );
+    
+    if (schema.indexes && schema.indexes.length > 0) {
+      // Include indexes in the extension
+      schemaExtensions[schema.tableName] = createSchemaExtension(
+        schema.columns,
+        [],
+        [],
+      );
+    }
+  }
+
+  setDatabaseConfig({
+    ...currentConfig,
+    schemaExtensions: {
+      ...currentConfig.schemaExtensions,
+      ...schemaExtensions,
+    },
+  });
+}
+
+/**
+ * Merge schemas from multiple sources
+ */
+export function mergeSchemas(...schemaArrays: TableSchema[][]): TableSchema[] {
+  const merged = new Map<string, TableSchema>();
+  
+  for (const schemas of schemaArrays) {
+    for (const schema of schemas) {
+      merged.set(schema.tableName, schema);
+    }
+  }
+  
+  return Array.from(merged.values());
 }

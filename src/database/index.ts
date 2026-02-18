@@ -6,8 +6,12 @@ export {
   DatabaseInitializer,
   SchemaRegistry,
   getCurrentSchemas,
-  DEFAULT_SCHEMAS,
   DATABASE_SCHEMAS,
+  // New exports for modular schema system
+  registerSchemas,
+  hasSchemas,
+  loadDefaultSchemas,
+  getDefaultAuthSchemas,
 } from "./database-initializer";
 
 // Export types from database-initializer using export type for isolatedModules
