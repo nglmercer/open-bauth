@@ -5,8 +5,9 @@ import { beforeAll, afterAll, beforeEach, afterEach, expect } from "bun:test";
 import { initJWTService } from "../src/services/jwt";
 import { defaultLogger as logger } from "../src/logger";
 import { Database } from "bun:sqlite";
-import { DatabaseInitializer } from "../src/database/database-initializer";
-import { SchemaRegistry } from "../src/database/database-initializer";
+import { DatabaseInitializer, SchemaRegistry, registerSchemas } from "../src/database/database-initializer";
+import { registerBaseSchemas } from "../src/database/schema/schema-builder";
+import { getAuthSchemas, getOAuthSchemas } from "../src/schemas";
 // Variables globales para tests
 export const TEST_DB_PATH = process.env.TEST_DB_PATH || "./tests/db/auth.db";
 export const TEST_JWT_SECRET = "test-jwt-secret-key-for-testing-only";
@@ -27,7 +28,13 @@ beforeAll(async () => {
     // Inicializar servicio JWT
     initJWTService(TEST_JWT_SECRET);
 
-    logger.info("tests configurado correctamente");
+    // Registrar schemas por defecto para tests (auth + OAuth)
+    // Esto pobla BASE_SCHEMAS y DATABASE_SCHEMAS para que buildDatabaseSchemas() funcione
+    const allSchemas = [...getAuthSchemas(), ...getOAuthSchemas()];
+    registerBaseSchemas(allSchemas);
+    registerSchemas(allSchemas);
+
+    logger.info(`tests configurado correctamente con ${allSchemas.length} schemas`);
   } catch (error: any) {
     console.error("❌ Error configurando entorno de tests:", error);
     throw error;

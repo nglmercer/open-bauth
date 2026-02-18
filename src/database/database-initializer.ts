@@ -64,15 +64,14 @@ const silenceLogger: DatabaseLogger = {
   warn: (msg: string, ...args: any[]) => { },
   error: (msg: string, ...args: any[]) => { },
 };
-// Database table schemas - EMPTY BY DEFAULT
-// Users must explicitly register schemas using externalSchemas or registerSchemas()
+// Database table schemas - loads default schemas on first access for backward compatibility
+// Use registerSchemas([]) to opt-out and use empty schemas
 export const DATABASE_SCHEMAS: TableSchema[] = [];
 
 // Flag to track if schemas have been explicitly set
 let schemasInitialized = false;
 
-// Initialize schemas on first access - now returns empty by default
-// Use externalSchemas in DatabaseInitializer constructor to provide schemas
+// Initialize schemas on first access - loads default schemas for backward compatibility
 function getSchemas(): TableSchema[] {
   // Check if cache needs to be cleared
   if ((globalThis as any).__schemaCacheCleared) {
@@ -81,10 +80,10 @@ function getSchemas(): TableSchema[] {
     schemasInitialized = false;
   }
 
-  // Return empty by default - schemas must be explicitly provided
-  // This allows the system to work without any predefined schema
+  // Load default schemas on first access for backward compatibility
   if (!schemasInitialized) {
-    return [];
+    DATABASE_SCHEMAS.push(...buildDatabaseSchemas());
+    schemasInitialized = true;
   }
   
   return DATABASE_SCHEMAS;
@@ -92,13 +91,20 @@ function getSchemas(): TableSchema[] {
 
 /**
  * Register schemas to be used by the database system
- * Call this to enable schema-based features
- * @param schemas Array of TableSchema to register
+ * Call this to enable schema-based features or use empty schemas
+ * @param schemas Array of TableSchema to register (use [] for empty)
  */
 export function registerSchemas(schemas: TableSchema[]): void {
   DATABASE_SCHEMAS.length = 0;
   DATABASE_SCHEMAS.push(...schemas);
   schemasInitialized = true;
+  
+  // Also store in globalThis for buildDatabaseSchemas() to access
+  (globalThis as any).__registeredSchemas = [...schemas];
+  
+  // Also register with schema-builder for declarative approach
+  const { registerBaseSchemas } = require("./schema/schema-builder");
+  registerBaseSchemas(schemas);
 }
 
 /**
@@ -110,7 +116,7 @@ export function hasSchemas(): boolean {
 
 /**
  * Load default schemas from the schema builder
- * Call this if you want to use the built-in auth schemas
+ * Call this if you want to explicitly load the built-in auth schemas
  */
 export function loadDefaultSchemas(): TableSchema[] {
   const defaultSchemas = buildDatabaseSchemas();

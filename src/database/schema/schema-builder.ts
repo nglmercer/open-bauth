@@ -6,10 +6,18 @@
  * 
  * @example
  * ```ts
- * import { getAuthSchemas } from 'open-bauth/schemas';
+ * // Import predefined schemas
+ * import { getAuthSchemas, getOAuthSchemas } from 'open-bauth/schemas';
  * 
- * const schemas = getAuthSchemas();
- * // Use schemas with DatabaseInitializer
+ * // Register schemas for use in buildDatabaseSchemas()
+ * import { registerBaseSchemas } from 'open-bauth/schema-builder';
+ * registerBaseSchemas([...getAuthSchemas(), ...getOAuthSchemas()]);
+ * 
+ * // Or use with DatabaseInitializer
+ * const db = new DatabaseInitializer({
+ *   database,
+ *   externalSchemas: [...getAuthSchemas(), ...getOAuthSchemas()],
+ * });
  * ```
  */
 
@@ -27,10 +35,63 @@ import { StandardFields } from "./constants";
 export * from "./constants";
 
 /**
- * Empty base schemas - the system works without predefined schemas
- * Users should import schemas from 'open-bauth/schemas' module
+ * Base schemas storage - populated via registerBaseSchemas()
+ * This allows declarative schema registration for all tests and usage
  */
-export const BASE_SCHEMAS: Record<string, Schema> = {};
+let BASE_SCHEMAS: Record<string, Schema> = {};
+
+/**
+ * Registered schema extensions - populated via registerBaseSchemas()
+ * This stores the TableSchema representations for schema extensions
+ */
+let registeredSchemaExtensions: Record<string, TableSchema> = {};
+
+/**
+ * Register schemas to be used by buildDatabaseSchemas()
+ * This is the declarative way to add schemas - call this once at app/test initialization
+ * @param schemas Array of TableSchema to use as base schemas
+ */
+export function registerBaseSchemas(schemas: TableSchema[]): void {
+  BASE_SCHEMAS = {};
+  registeredSchemaExtensions = {};
+  
+  for (const schema of schemas) {
+    // Store the table schema for later processing
+    registeredSchemaExtensions[schema.tableName] = schema;
+    
+    // Also create a Schema instance if we have columns
+    if (schema.columns && schema.columns.length > 0) {
+      // Create a minimal Schema object that will produce the correct TableSchema
+      // We store the tableName and will use it directly
+      (BASE_SCHEMAS as any)[schema.tableName] = {
+        toTableSchema: (tableName: string) => ({
+          tableName,
+          columns: schema.columns,
+          indexes: schema.indexes || [],
+        }),
+      };
+    }
+  }
+}
+
+/**
+ * Get the currently registered base schemas
+ * Useful for debugging or introspection
+ */
+export function getRegisteredBaseSchemas(): TableSchema[] {
+  return Object.values(registeredSchemaExtensions);
+}
+
+/**
+ * Clear all registered schemas - useful for testing
+ */
+export function clearBaseSchemas(): void {
+  BASE_SCHEMAS = {};
+  registeredSchemaExtensions = {};
+  
+  // Also clear the globalThis registered schemas
+  (globalThis as any).__registeredSchemas = [];
+}
 
 /**
  * Apply schema extensions to a base schema
@@ -72,8 +133,26 @@ function updateTableReferences(
   const referenceMap: Record<string, string> = {};
 
   // Build reference map from known table names
+  // Map both config keys and default table names to custom names
   Object.entries(tableNames).forEach(([key, name]) => {
     referenceMap[key] = name;
+  });
+  
+  // Also map default table names to handle index renaming
+  // This maps "users", "user_roles", etc. to their custom names
+  const defaultToKey: Record<string, string> = {
+    "users": "users",
+    "roles": "roles", 
+    "permissions": "permissions",
+    "user_roles": "userRoles",
+    "role_permissions": "rolePermissions",
+    "sessions": "sessions",
+  };
+  
+  Object.entries(defaultToKey).forEach(([defaultName, configKey]) => {
+    if (tableNames[configKey as keyof typeof tableNames]) {
+      referenceMap[defaultName] = tableNames[configKey as keyof typeof tableNames];
+    }
   });
 
   const updatedColumns = schema.columns.map((column) => {
@@ -109,11 +188,13 @@ function updateTableReferences(
 /**
  * Build database schemas from configuration
  * 
- * This function now returns an empty array by default unless:
- * 1. Schema extensions are configured
- * 2. External schemas are provided
+ * This function returns schemas from:
+ * 1. Registered base schemas (via registerBaseSchemas())
+ * 2. Schema extensions configured via setDatabaseConfig
+ * 3. Schemas registered via registerSchemas() from database-initializer
  * 
  * For predefined auth/OAuth schemas, import them from 'open-bauth/schemas'
+ * and register them using registerBaseSchemas()
  */
 export function buildDatabaseSchemas(): TableSchema[] {
   const config = getDatabaseConfig();
@@ -121,24 +202,58 @@ export function buildDatabaseSchemas(): TableSchema[] {
   const schemaExtensions = config.schemaExtensions || {};
   const schemas: TableSchema[] = [];
 
-  // Process BASE_SCHEMAS (empty by default)
-  const baseKeys = Object.keys(BASE_SCHEMAS) as (keyof typeof BASE_SCHEMAS)[];
+  // Map: default table name -> config key
+  const defaultNameToConfigKey: Record<string, keyof DatabaseTableConfig> = {
+    'users': 'users',
+    'roles': 'roles', 
+    'permissions': 'permissions',
+    'user_roles': 'userRoles',
+    'role_permissions': 'rolePermissions',
+    'sessions': 'sessions',
+  };
 
-  for (const key of baseKeys) {
-    const definition = BASE_SCHEMAS[key];
-    const configKey = key as keyof DatabaseTableConfig;
-    const customTableName = tableNames[configKey];
-    const extension = schemaExtensions[configKey];
+  // Map: config key -> custom table name
+  const configKeyToCustomName: Record<string, string> = {
+    users: tableNames.users,
+    roles: tableNames.roles,
+    permissions: tableNames.permissions,
+    userRoles: tableNames.userRoles,
+    rolePermissions: tableNames.rolePermissions,
+    sessions: tableNames.sessions,
+  };
 
-    if (definition && customTableName) {
-      let schema = definition.toTableSchema(customTableName);
-      schema = applySchemaExtensions(schema, extension);
-      schema = updateTableReferences(schema, tableNames);
+  // Process registered base schemas via registerBaseSchemas()
+  const registeredKeys = Object.keys(registeredSchemaExtensions);
+
+  for (const defaultTableName of registeredKeys) {
+    const schema = registeredSchemaExtensions[defaultTableName];
+    
+    // Find the config key for this default table name
+    const configKey = defaultNameToConfigKey[defaultTableName];
+    
+    // Get the custom table name (from config or use default)
+    const customTableName = configKey 
+      ? (configKeyToCustomName[configKey] || defaultTableName)
+      : defaultTableName;
+    
+    const extension = configKey ? schemaExtensions[configKey] : undefined;
+    
+    let builtSchema = { ...schema, tableName: customTableName };
+    builtSchema = applySchemaExtensions(builtSchema, extension);
+    builtSchema = updateTableReferences(builtSchema, tableNames);
+    schemas.push(builtSchema);
+  }
+
+  // Get schemas registered via registerSchemas() from database-initializer
+  const registeredSchemas = (globalThis as any).__registeredSchemas || [];
+  for (const schema of registeredSchemas) {
+    // Check if schema already exists (avoid duplicates)
+    if (!schemas.find(s => s.tableName === schema.tableName)) {
       schemas.push(schema);
     }
   }
 
-  // Process OAuth-style schema extensions
+  // Process schema extensions that define complete tables
   const extensionKeys: (keyof DatabaseTableConfig)[] = [
     "oauthClients",
     "authorizationCodes",
@@ -163,11 +278,15 @@ export function buildDatabaseSchemas(): TableSchema[] {
     const tableName = tableNames[key];
 
     if (extension?.additionalColumns?.length) {
-      schemas.push({
-        tableName: tableName || key,
-        columns: extension.additionalColumns,
-        indexes: [],
-      });
+      // Check if schema already exists
+      const existingSchema = schemas.find(s => s.tableName === (tableName || key));
+      if (!existingSchema) {
+        schemas.push({
+          tableName: tableName || key,
+          columns: extension.additionalColumns,
+          indexes: (extension as any).indexes || [],
+        });
+      }
     }
   }
 
@@ -206,15 +325,6 @@ export function registerExternalSchemas(schemas: TableSchema[]): void {
       [],
       [],
     );
-    
-    if (schema.indexes && schema.indexes.length > 0) {
-      // Include indexes in the extension
-      schemaExtensions[schema.tableName] = createSchemaExtension(
-        schema.columns,
-        [],
-        [],
-      );
-    }
   }
 
   setDatabaseConfig({

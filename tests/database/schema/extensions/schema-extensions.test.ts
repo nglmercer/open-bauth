@@ -15,7 +15,10 @@ import {
 import {
   buildDatabaseSchemas,
   getTableSchemaByKey,
+  clearBaseSchemas,
+  registerBaseSchemas,
 } from "../../../../src/database/schema/schema-builder";
+import { getAuthSchemas } from "../../../../src/schemas";
 import { defaultLogger as logger } from "../../../../src/logger";
 
 describe("Database Schema Extensions", () => {
@@ -44,6 +47,10 @@ describe("Database Schema Extensions", () => {
 
     // Reset to default configuration before each test
     setDatabaseConfig({});
+    
+    // Clear and re-register only auth schemas for this test
+    clearBaseSchemas();
+    registerBaseSchemas(getAuthSchemas());
   });
 
   afterEach(async () => {

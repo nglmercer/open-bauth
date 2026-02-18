@@ -14,9 +14,12 @@ import {
   buildDatabaseSchemas,
   getTableSchema,
   getTableSchemaByKey,
+  clearBaseSchemas,
+  registerBaseSchemas,
 } from "../../../../src/database/schema/schema-builder";
 import { defaultLogger as logger } from "../../../../src/logger";
 import { registerOAuthSchemaExtensions } from "../../../../src/database/schema/oauth-schema-extensions";
+import { getAuthSchemas } from "../../../../src/schemas";
 
 describe("Custom Table Names and Service-Specific Schemas", () => {
   let testDb: Database;
@@ -43,6 +46,10 @@ describe("Custom Table Names and Service-Specific Schemas", () => {
 
     // Reset to default configuration before each test
     setDatabaseConfig({});
+    
+    // Clear and re-register only auth schemas for this test
+    clearBaseSchemas();
+    registerBaseSchemas(getAuthSchemas());
   });
 
   afterEach(async () => {
