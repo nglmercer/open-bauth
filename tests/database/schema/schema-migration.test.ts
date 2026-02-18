@@ -7,7 +7,7 @@ import { DatabaseInitializer } from "../../../src/database/database-initializer"
 import { Schema } from "../../../src/database/schema/schema";
 import type { TableSchema } from "../../../src/database/base-controller";
 import { SchemaRegistry } from "../../../src/database/database-initializer";
-import { getOAuthSchemas } from "../../../src/database/schema/oauth-schema-extensions";
+import { getOAuthSchemas } from "../../../src/schemas";
 import { BaseController } from "../../../src/database/base-controller";
 const newschemas = new Schema({
     id: { type: String, primaryKey: true },
