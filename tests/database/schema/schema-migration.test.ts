@@ -82,11 +82,13 @@ describe("Schema Migration System", () => {
     beforeEach(() => {
         db = new Database(":memory:");
         extractor = new SQLiteSchemaExtractor(db);
+        // Do NOT initialize with any schemas - tests will create what they need
+        // This ensures a clean empty database for migration testing
         dbInitializer = new DatabaseInitializer({
             database: db,
-            externalSchemas: registry.getAll(),
+            externalSchemas: [],  // Empty - don't use global schemas
         });
-        dbInitializer.initialize();
+        // Don't call initialize() - let each test manage its own schema state
     });
 
     afterEach(async () => {
